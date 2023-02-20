@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "micro_compute.h"
+#include "microcompute.h"
 
 typedef struct mc_Program {
 	GLuint shader;

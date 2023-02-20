@@ -1,4 +1,4 @@
-#include "_micro_compute.h"
+#include "_microcompute.h"
 
 struct mc_State {
 	int rendererFd;

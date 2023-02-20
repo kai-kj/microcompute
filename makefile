@@ -4,30 +4,34 @@
 
 #---- BASIC -----------------------------------------------------------------------------------------------------------#
 
-EXECUTABLE     := micro_compute_test
-LIBS           := -lgbm -lEGL -lGL -lGLEW
+LIBRARY        := microcompute
+LIBS           := -lmicrocompute -lgbm -lEGL -lGL -lGLEW
 FLAGS          := -Wall -Wextra -Wno-missing-braces -Wno-unused-parameter -g
-DEFS           := -D PRINT_DBG_LOGS
+DEFS           := 
 
 #---- PROJECT STRUCTURE -----------------------------------------------------------------------------------------------#
 
 INCLUDE_FOLDER := include
-LIB_FOLDER     := lib
+LIB_FOLDER     := out
 BUILD_FOLDER   := build
 SRC_FOLDER     := src
+OUT_FOLDER     := out
+EXAMPLE_FOLDER := example
 
 #======================================================================================================================#
 
-CC            := gcc $(FLAGS) $(DEFS) -isystem $(INCLUDE_FOLDER) -I $(SRC_FOLDER)
-DB            := gdb -q -ex "run" -iex "set confirm off" # gdb will run the binary immediately
-MV            := mv
-RM            := rm -rf
-CP            := cp
-MKDIR         := mkdir -p
-SRC_FOLDERS   := $(shell find $(SRC_FOLDER)/ -type d)
-BUILD_FOLDERS := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(SRC_FOLDERS))
-C_FILES       := $(shell find $(SRC_FOLDER)/ -type f -name "*.c")
-C_OBJECTS     := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(subst .c,.o, $(C_FILES)))
+CC                := gcc -fPIC $(FLAGS) $(DEFS) -isystem $(INCLUDE_FOLDER) -I $(SRC_FOLDER)
+AR                := ar rcs
+RM                := rm -rf
+CP                := cp
+MKDIR             := mkdir -p
+SRC_FOLDERS       := $(shell find $(SRC_FOLDER)/ -type d)
+BUILD_SUB_FOLDERS := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(SRC_FOLDERS))
+C_FILES           := $(shell find $(SRC_FOLDER)/ -type f -name "*.c")
+C_OBJECTS         := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(subst .c,.o,$(C_FILES)))
+EXAMPLE_C_FILES   := $(shell find $(EXAMPLE_FOLDER)/ -type f -name "*.c")
+EXAMPLES          := $(subst $(EXAMPLE_FOLDER)/,$(OUT_FOLDER)/,$(subst .c,,$(EXAMPLE_C_FILES)))
+STATIC_LIB        := $(OUT_FOLDER)/lib$(LIBRARY).a
 
 export __GLX_VENDOR_LIBRARY_NAME = nvidia
 export __NV_PRIME_RENDER_OFFLOAD = 1
@@ -37,27 +41,28 @@ define \n
 
 endef
 
-.PHONY: clean
+.PHONY: clean all test
 
-all: $(EXECUTABLE)
+all: $(EXAMPLES) $(STATIC_LIB)
 
-run: $(EXECUTABLE)
-	./$(EXECUTABLE)
+$(BUILD_FOLDER):
+	$(MKDIR) $(BUILD_FOLDER)
 
-debug: $(EXECUTABLE)
-	$(DB) $(EXECUTABLE)
+$(OUT_FOLDER):
+	$(MKDIR) $(OUT_FOLDER)
 
-doc:
-	doxygen
+$(BUILD_SUB_FOLDERS): $(BUILD_FOLDER)
+	$(MKDIR) $(BUILD_SUB_FOLDERS)
 
-$(BUILD_FOLDERS):
-	$(MKDIR) $(BUILD_FOLDERS)
-
-$(C_OBJECTS): $(BUILD_FOLDERS) $(C_FILES)
+$(C_OBJECTS): $(BUILD_SUB_FOLDERS) $(C_FILES)
 	$(CC) -c $(subst $(BUILD_FOLDER)/,$(SRC_FOLDER)/,$(subst .o,.c,$@)) -o $@
 
-$(EXECUTABLE): $(C_OBJECTS)
-	$(CC) $(C_OBJECTS) $(CPP_OBJECTS) -o $(EXECUTABLE) -L$(LIB_FOLDER) $(LIBS)
+$(STATIC_LIB): $(OUT_FOLDER) $(C_OBJECTS)
+	$(AR) $(STATIC_LIB) $(C_OBJECTS)
+	$(CP) $(SRC_FOLDER)/$(LIBRARY).h $(OUT_FOLDER)/$(LIBRARY).h
+
+$(EXAMPLES): $(STATIC_LIB)
+	$(CC) $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
 
 clean:
-	$(RM) $(EXECUTABLE) $(BUILD_FOLDER) out/*
+	$(RM) $(BUILD_FOLDER) $(OUT_FOLDER)

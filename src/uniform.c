@@ -1,4 +1,4 @@
-#include "_micro_compute.h"
+#include "_microcompute.h"
 
 #define SET(program, name, glUniformFunction, ...)                             \
 	GLint loc = glGetUniformLocation(program->program, name);                  \

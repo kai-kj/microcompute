@@ -1,4 +1,4 @@
-#include "_micro_compute.h"
+#include "_microcompute.h"
 
 mc_Buffer *mc_buffer_create(int index) {
 	mc_Buffer *buffer = malloc(sizeof(mc_Buffer));
