@@ -5,12 +5,12 @@ struct mc_State {
 	struct gbm_device *gbmDevice;
 	EGLDisplay eglDisplay;
 	EGLContext eglContext;
-	void (*_debug_callback)(int, char *);
+	void (*debug_callback)(mc_DebugLevel, char *);
 };
 
 static struct mc_State g_state;
 
-void _gl_debug_cb(
+static void gl_debug_cb(
 	GLenum source,
 	GLenum type,
 	GLuint id,
@@ -19,37 +19,37 @@ void _gl_debug_cb(
 	const GLchar *msg,
 	const void *data
 ) {
-	if (g_state._debug_callback == NULL) return;
+	if (g_state.debug_callback == NULL) return;
 
-	char *_source;
+	char *sourceStr;
 	switch (source) {
-		case GL_DEBUG_SOURCE_API: _source = "API"; break;
-		case GL_DEBUG_SOURCE_WINDOW_SYSTEM: _source = "WINDOW SYSTEM"; break;
-		case GL_DEBUG_SOURCE_SHADER_COMPILER: _source = "SHADER"; break;
-		case GL_DEBUG_SOURCE_THIRD_PARTY: _source = "THIRD PARTY"; break;
-		case GL_DEBUG_SOURCE_APPLICATION: _source = "APPLICATION"; break;
-		case GL_DEBUG_SOURCE_OTHER: _source = "UNKNOWN"; break;
+		case GL_DEBUG_SOURCE_API: sourceStr = "API"; break;
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM: sourceStr = "WINDOW"; break;
+		case GL_DEBUG_SOURCE_SHADER_COMPILER: sourceStr = "SHADER"; break;
+		case GL_DEBUG_SOURCE_THIRD_PARTY: sourceStr = "THIRD PARTY"; break;
+		case GL_DEBUG_SOURCE_APPLICATION: sourceStr = "APPLICATION"; break;
+		case GL_DEBUG_SOURCE_OTHER: sourceStr = "UNKNOWN"; break;
 		default: return;
 	}
 
-	char *_type;
+	char *typeStr;
 	switch (type) {
-		case GL_DEBUG_TYPE_ERROR: _type = "error"; break;
-		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: _type = "deprecated"; break;
-		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: _type = "undefined"; break;
-		case GL_DEBUG_TYPE_PORTABILITY: _type = "portability"; break;
-		case GL_DEBUG_TYPE_PERFORMANCE: _type = "performance"; break;
-		case GL_DEBUG_TYPE_OTHER: _type = "other"; break;
-		case GL_DEBUG_TYPE_MARKER: _type = "marker"; break;
+		case GL_DEBUG_TYPE_ERROR: typeStr = "error"; break;
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: typeStr = "deprecated"; break;
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: typeStr = "undefined"; break;
+		case GL_DEBUG_TYPE_PORTABILITY: typeStr = "portability"; break;
+		case GL_DEBUG_TYPE_PERFORMANCE: typeStr = "performance"; break;
+		case GL_DEBUG_TYPE_OTHER: typeStr = "other"; break;
+		case GL_DEBUG_TYPE_MARKER: typeStr = "marker"; break;
 		default: return;
 	}
 
-	int _level;
+	mc_DebugLevel level;
 	switch (severity) {
-		case GL_DEBUG_SEVERITY_HIGH: _level = 4; break;
-		case GL_DEBUG_SEVERITY_MEDIUM: _level = 3; break;
-		case GL_DEBUG_SEVERITY_LOW: _level = 2; break;
-		case GL_DEBUG_SEVERITY_NOTIFICATION: _level = 1; break;
+		case GL_DEBUG_SEVERITY_HIGH: level = mc_DebugLevel_HIGH; break;
+		case GL_DEBUG_SEVERITY_MEDIUM: level = mc_DebugLevel_MEDIUM; break;
+		case GL_DEBUG_SEVERITY_LOW: level = mc_DebugLevel_LOW; break;
+		case GL_DEBUG_SEVERITY_NOTIFICATION: level = mc_DebugLevel_INFO; break;
 		default: return;
 	}
 
@@ -57,9 +57,9 @@ void _gl_debug_cb(
 		NULL,
 		0,
 		"GL: %s (%s, level %d): %s",
-		_source,
-		_type,
-		_level,
+		sourceStr,
+		typeStr,
+		level,
 		msg
 	);
 
@@ -69,47 +69,81 @@ void _gl_debug_cb(
 		buff,
 		len + 1,
 		"GL: %s (%s, level %d): %s",
-		_source,
-		_type,
-		_level,
+		sourceStr,
+		typeStr,
+		level,
 		msg
 	);
 
-	g_state._debug_callback(_level, buff);
+	g_state.debug_callback(level, buff);
 	free(buff);
 }
 
+void debug_msg_fn(const char *function, int level, char *format, ...) {
+	if (g_state.debug_callback == NULL) return;
+
+	va_list args;
+	va_start(args, format);
+	int len = vsnprintf(NULL, 0, format, args) + 1;
+	va_end(args);
+
+	char *message = malloc(len);
+
+	va_start(args, format);
+	vsnprintf(message, len, format, args);
+	va_end(args);
+
+	len = snprintf(NULL, 0, "%s(): %s", function, message);
+	char *formattedMessage = malloc(len + 1);
+	snprintf(formattedMessage, len + 1, "%s(): %s", function, message);
+
+	g_state.debug_callback(level, formattedMessage);
+	free(message);
+	free(formattedMessage);
+}
+
 int mc_init(char *renderDevice) {
-	g_state.rendererFd = open("/dev/dri/renderD129", O_RDWR);
+	g_state.rendererFd = open(renderDevice, O_RDWR);
 	if (g_state.rendererFd <= 0) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to open %s", renderDevice);
 		mc_terminate();
 		return 0;
 	}
 
 	g_state.gbmDevice = gbm_create_device(g_state.rendererFd);
 	if (g_state.gbmDevice == NULL) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to create gbm device");
 		mc_terminate();
 		return 0;
 	}
 
 	g_state.eglDisplay = eglGetDisplay(g_state.gbmDevice);
 	if (g_state.eglDisplay == NULL) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to get egl display");
 		mc_terminate();
 		return 0;
 	}
 
 	EGLint major, minor;
 	if (!eglInitialize(g_state.eglDisplay, &major, &minor)) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to initialize egl");
 		mc_terminate();
 		return 0;
 	};
 
 	if (major < 1 || (major == 1 && minor < 5)) {
+		debug_msg(
+			mc_DebugLevel_HIGH,
+			"egl version: %d.%d too low (min 1.5)",
+			major,
+			minor
+		);
 		mc_terminate();
 		return 0;
 	}
 
 	if (!eglBindAPI(EGL_OPENGL_API)) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to bind opengl api to egl");
 		mc_terminate();
 		return 0;
 	}
@@ -130,6 +164,7 @@ int mc_init(char *renderDevice) {
 			1,
 			&configCount
 		)) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to choose egl config");
 		mc_terminate();
 		return 0;
 	};
@@ -152,6 +187,7 @@ int mc_init(char *renderDevice) {
 	);
 
 	if (eglContext == EGL_NO_CONTEXT) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to create egl context");
 		mc_terminate();
 		return 0;
 	};
@@ -162,14 +198,19 @@ int mc_init(char *renderDevice) {
 			EGL_NO_SURFACE,
 			eglContext
 		)) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to make egl context current");
 		mc_terminate();
 		return 0;
 	};
 
-	glewInit();
+	if (!glewInit()) {
+		debug_msg(mc_DebugLevel_HIGH, "failed to initialize GLEW");
+		mc_terminate();
+		return 0;
+	}
 
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	glDebugMessageCallback(_gl_debug_cb, NULL);
+	glDebugMessageCallback(gl_debug_cb, NULL);
 
 	return 1;
 }
@@ -182,6 +223,6 @@ void mc_terminate() {
 	if (g_state.rendererFd != 0) close(g_state.rendererFd);
 }
 
-void mc_set_debug_callback(void (*callback)(int, char *)) {
-	g_state._debug_callback = callback;
+void mc_set_debug_callback(void (*callback)(mc_DebugLevel, char *)) {
+	g_state.debug_callback = callback;
 }

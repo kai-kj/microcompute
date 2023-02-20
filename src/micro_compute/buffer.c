@@ -21,10 +21,38 @@ void mc_buffer_write(mc_Buffer *buffer, size_t size, void *data) {
 
 void mc_buffer_modify(mc_Buffer *buffer, size_t off, size_t size, void *data) {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
+
+	GLint ssboSize;
+	glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &ssboSize);
+	if (off + size > (size_t)ssboSize) {
+		debug_msg(
+			mc_DebugLevel_MEDIUM,
+			"offset %d, size %d is larger than buffer ssboSize %d",
+			off,
+			size,
+			ssboSize
+		);
+		return;
+	}
+
 	glBufferSubData(GL_SHADER_STORAGE_BUFFER, off, size, data);
 }
 
-void mc_buffer_read(mc_Buffer *buffer, size_t size, void *data) {
+void mc_buffer_read(mc_Buffer *buffer, size_t off, size_t size, void *data) {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
-	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, size, data);
+
+	GLint ssboSize;
+	glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &ssboSize);
+	if (off + size > (size_t)ssboSize) {
+		debug_msg(
+			mc_DebugLevel_MEDIUM,
+			"offset %d, size %d is larger than buffer ssboSize %d",
+			off,
+			size,
+			ssboSize
+		);
+		return;
+	}
+
+	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, off, size, data);
 }

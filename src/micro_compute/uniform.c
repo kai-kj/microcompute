@@ -1,70 +1,42 @@
 #include "_micro_compute.h"
 
-void mc_program_destroy(mc_Program *program) {
-	if (program != NULL) {
-		if (program->shader != 0) glDeleteShader(program->shader);
-		if (program->program != 0) glDeleteProgram(program->program);
-		free(program);
-	}
-}
-
-void mc_program_dispatch(mc_Program *program, mc_ivec3 size) {
-	glUseProgram(program->program);
-	glDispatchCompute(size.x, size.y, size.z);
-}
+#define SET(program, name, glUniformFunction, ...)                             \
+	GLint loc = glGetUniformLocation(program->program, name);                  \
+	if (loc == -1) {                                                           \
+		debug_msg(mc_DebugLevel_MEDIUM, "failed to find uniform %s", name);    \
+		return;                                                                \
+	}                                                                          \
+	glUseProgram(program->program);                                            \
+	glUniformFunction(loc, __VA_ARGS__)
 
 void mc_program_set_float(mc_Program *program, char *name, float value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform1f(loc, value);
+	SET(program, name, glUniform1f, value);
 }
 
 void mc_program_set_vec2(mc_Program *program, char *name, mc_vec2 value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform2f(loc, value.x, value.y);
+	SET(program, name, glUniform2f, value.x, value.y);
 }
 
 void mc_program_set_vec3(mc_Program *program, char *name, mc_vec3 value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform3f(loc, value.x, value.y, value.z);
+	SET(program, name, glUniform3f, value.x, value.y, value.z);
 }
 
 void mc_program_set_vec4(mc_Program *program, char *name, mc_vec4 value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform4f(loc, value.x, value.y, value.z, value.w);
+	SET(program, name, glUniform4f, value.x, value.y, value.z, value.w);
 }
 
 void mc_program_set_int(mc_Program *program, char *name, int value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform1i(loc, value);
+	SET(program, name, glUniform1i, value);
 }
 
 void mc_program_set_ivec2(mc_Program *program, char *name, mc_ivec2 value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform2i(loc, value.x, value.y);
+	SET(program, name, glUniform2i, value.x, value.y);
 }
 
 void mc_program_set_ivec3(mc_Program *program, char *name, mc_ivec3 value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform3i(loc, value.x, value.y, value.z);
+	SET(program, name, glUniform3i, value.x, value.y, value.z);
 }
 
 void mc_program_set_ivec4(mc_Program *program, char *name, mc_ivec4 value) {
-	GLint loc = glGetUniformLocation(program->program, name);
-	if (loc == -1) return;
-	glUseProgram(program->program);
-	glUniform4i(loc, value.x, value.y, value.z, value.w);
+	SET(program, name, glUniform4i, value.x, value.y, value.z, value.w);
 }

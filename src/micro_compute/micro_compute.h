@@ -24,6 +24,13 @@ typedef struct mc_ivec4 {
 	int x, y, z, w;
 } mc_ivec4;
 
+typedef enum mc_DebugLevel {
+	mc_DebugLevel_INFO,
+	mc_DebugLevel_LOW,
+	mc_DebugLevel_MEDIUM,
+	mc_DebugLevel_HIGH,
+} mc_DebugLevel;
+
 typedef struct mc_Program mc_Program;
 typedef struct mc_Buffer mc_Buffer;
 
@@ -34,7 +41,7 @@ typedef struct mc_Buffer mc_Buffer;
 int mc_init(char *renderDevice);
 void mc_terminate();
 
-void mc_set_debug_callback(void (*callback)(int, char *));
+void mc_set_debug_callback(void (*callback)(mc_DebugLevel, char *));
 
 //============================================================================//
 // program management
@@ -69,4 +76,4 @@ void mc_buffer_destroy(mc_Buffer *buffer);
 void mc_buffer_write(mc_Buffer *buffer, size_t size, void *data);
 void mc_buffer_modify(mc_Buffer *buffer, size_t off, size_t size, void *data);
 
-void mc_buffer_read(mc_Buffer *buffer, size_t size, void *data);
+void mc_buffer_read(mc_Buffer *buffer, size_t off, size_t size, void *data);

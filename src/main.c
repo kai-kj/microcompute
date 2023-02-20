@@ -3,14 +3,14 @@
 
 #include "micro_compute/micro_compute.h"
 
-void debug_cb(int level, char *msg) {
-	if (level < 3) return;
-	printf("DEBUG: %s\n", msg);
+void debug_cb(mc_DebugLevel level, char *msg) {
+	if (level < mc_DebugLevel_MEDIUM) return;
+	printf("DEBUG (level %d): %s\n", level, msg);
 }
 
 int main(void) {
-	if (!mc_init("/dev/dri/renderD129")) return -1;
 	mc_set_debug_callback(debug_cb);
+	if (!mc_init("/dev/dri/renderD129")) return -1;
 
 	mc_Program *program = mc_program_create_from_file("shader/test.glsl");
 	if (program == NULL) return -1;
@@ -25,7 +25,7 @@ int main(void) {
 
 	mc_program_dispatch(program, (mc_ivec3){10, 1, 1});
 
-	mc_buffer_read(buff, sizeof(float) * 10, data);
+	mc_buffer_read(buff, 0, sizeof(float) * 10, data);
 	for (int i = 0; i < 10; i++) printf("%f, ", data[i]);
 	printf("\n");
 
