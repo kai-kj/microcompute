@@ -9,6 +9,7 @@ static char *read_file(const char *filePath) {
 	fseek(fp, 0, SEEK_SET);
 	char *buff = malloc(length);
 	fread(buff, 1, length, fp);
+	buff[length] = '\0';
 	fclose(fp);
 
 	return buff;
@@ -42,7 +43,7 @@ static char *get_program_link_errors(GLuint program) {
 	return buff;
 }
 
-mc_Program *mc_program_create_from_str(const char *programCode) {
+mc_Program *mc_program_from_str(const char *programCode) {
 	mc_Program *program = malloc(sizeof(mc_Program));
 
 	program->shader = glCreateShader(GL_COMPUTE_SHADER);
@@ -70,13 +71,13 @@ mc_Program *mc_program_create_from_str(const char *programCode) {
 	return program;
 }
 
-mc_Program *mc_program_create_from_file(const char *programPath) {
+mc_Program *mc_program_from_file(const char *programPath) {
 	char *shaderCode = read_file(programPath);
 	if (shaderCode == NULL) {
 		debug_msg(mc_DebugLevel_MEDIUM, "failed to open %s", programPath);
 		return NULL;
 	}
-	mc_Program *shader = mc_program_create_from_str(shaderCode);
+	mc_Program *shader = mc_program_from_str(shaderCode);
 	free(shaderCode);
 	return shader;
 }

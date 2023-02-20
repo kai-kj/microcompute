@@ -47,8 +47,8 @@ void mc_set_debug_callback(void (*callback)(mc_DebugLevel, char *));
 // program management
 //============================================================================//
 
-mc_Program *mc_program_create_from_str(const char *programCode);
-mc_Program *mc_program_create_from_file(const char *programPath);
+mc_Program *mc_program_from_str(const char *programCode);
+mc_Program *mc_program_from_file(const char *programPath);
 void mc_program_destroy(mc_Program *program);
 
 void mc_program_dispatch(mc_Program *program, mc_ivec3 size);

@@ -173,7 +173,7 @@ int mc_init(char *renderDevice) {
 		EGL_CONTEXT_MAJOR_VERSION,
 		4,
 		EGL_CONTEXT_MINOR_VERSION,
-		5,
+		6,
 		EGL_CONTEXT_OPENGL_DEBUG,
 		EGL_TRUE,
 		EGL_NONE,
