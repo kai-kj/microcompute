@@ -31,6 +31,8 @@ int main(void) {
 	mc_buffer_write(byteImage, sizeof(int) * width * height, NULL);
 
 	mc_program_set_float(renderProgram, "maxIter", 1000);
+	mc_program_set_vec2(renderProgram, "center", (mc_vec2){-0.7615, -0.08459});
+	mc_program_set_vec2(renderProgram, "zoom", (mc_vec2){1000, 1000});
 
 	mc_program_dispatch(renderProgram, (mc_ivec3){width, height, 1});
 	mc_program_dispatch(convertProgram, (mc_ivec3){width, height, 1});
