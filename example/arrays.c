@@ -12,7 +12,7 @@ int main(void) {
 	mc_set_debug_callback(debug_cb);
 	if (!mc_init("/dev/dri/renderD129")) return -1;
 
-	mc_Program *program = mc_program_create_from_file("example/test1.glsl");
+	mc_Program *program = mc_program_from_file("example/arrays.glsl");
 	if (program == NULL) return -1;
 
 	float data[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
