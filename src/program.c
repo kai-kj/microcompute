@@ -69,10 +69,10 @@ mc_Program *mc_program_from_str(const char *programCode) {
 	return program;
 }
 
-mc_Program *mc_program_from_file(const char *programPath) {
-	char *shaderCode = read_file(programPath);
+mc_Program *mc_program_from_file(const char *filePath) {
+	char *shaderCode = read_file(filePath);
 	if (shaderCode == NULL) {
-		debug_msg(mc_DebugLevel_MEDIUM, "failed to open %s", programPath);
+		debug_msg(mc_DebugLevel_MEDIUM, "failed to open %s", filePath);
 		return NULL;
 	}
 

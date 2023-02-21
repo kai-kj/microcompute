@@ -23,5 +23,4 @@ typedef struct mc_Buffer {
 } mc_Buffer;
 
 #define debug_msg(level, ...) debug_msg_fn(__FUNCTION__, level, __VA_ARGS__)
-
 void debug_msg_fn(const char *function, int level, char *format, ...);

@@ -1,13 +1,16 @@
 #include "_microcompute.h"
 
-#define SET(program, name, uniformFn, ...)                                     \
+#define SET(program, name, fn, ...)                                            \
 	GLint loc = glGetUniformLocation(program->program, name);                  \
 	if (loc == -1) {                                                           \
 		debug_msg(mc_DebugLevel_MEDIUM, "failed to find uniform %s", name);    \
 		return;                                                                \
 	}                                                                          \
 	glUseProgram(program->program);                                            \
-	uniformFn(loc, __VA_ARGS__)
+	fn(loc, __VA_ARGS__)
+
+#define SET_MATRIX(program, name, fn, value)                                   \
+	SET(program, name, fn, 1, value.transpose, value.values)
 
 void mc_program_set_float(mc_Program *program, char *name, float value) {
 	SET(program, name, glUniform1f, value);
@@ -39,4 +42,56 @@ void mc_program_set_ivec3(mc_Program *program, char *name, mc_ivec3 value) {
 
 void mc_program_set_ivec4(mc_Program *program, char *name, mc_ivec4 value) {
 	SET(program, name, glUniform4i, value.x, value.y, value.z, value.w);
+}
+
+void mc_program_set_uint(mc_Program *program, char *name, unsigned int value) {
+	SET(program, name, glUniform1ui, value);
+}
+
+void mc_program_set_uvec2(mc_Program *program, char *name, mc_uvec2 value) {
+	SET(program, name, glUniform2ui, value.x, value.y);
+}
+
+void mc_program_set_uvec3(mc_Program *program, char *name, mc_uvec3 value) {
+	SET(program, name, glUniform3ui, value.x, value.y, value.z);
+}
+
+void mc_program_set_uvec4(mc_Program *program, char *name, mc_uvec4 value) {
+	SET(program, name, glUniform4ui, value.x, value.y, value.z, value.w);
+}
+
+void mc_program_set_mat22(mc_Program *program, char *name, mc_mat22 value) {
+	SET_MATRIX(program, name, glUniformMatrix2fv, value);
+}
+
+void mc_program_set_mat33(mc_Program *program, char *name, mc_mat33 value) {
+	SET_MATRIX(program, name, glUniformMatrix3fv, value);
+}
+
+void mc_program_set_mat44(mc_Program *program, char *name, mc_mat44 value) {
+	SET_MATRIX(program, name, glUniformMatrix4fv, value);
+}
+
+void mc_program_set_mat23(mc_Program *program, char *name, mc_mat23 value) {
+	SET_MATRIX(program, name, glUniformMatrix2x3fv, value);
+}
+
+void mc_program_set_mat32(mc_Program *program, char *name, mc_mat32 value) {
+	SET_MATRIX(program, name, glUniformMatrix3x2fv, value);
+}
+
+void mc_program_set_mat24(mc_Program *program, char *name, mc_mat24 value) {
+	SET_MATRIX(program, name, glUniformMatrix2x4fv, value);
+}
+
+void mc_program_set_mat42(mc_Program *program, char *name, mc_mat42 value) {
+	SET_MATRIX(program, name, glUniformMatrix4x2fv, value);
+}
+
+void mc_program_set_mat34(mc_Program *program, char *name, mc_mat34 value) {
+	SET_MATRIX(program, name, glUniformMatrix3x4fv, value);
+}
+
+void mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value) {
+	SET_MATRIX(program, name, glUniformMatrix4x3fv, value);
 }
