@@ -18,7 +18,6 @@ static char *read_file(const char *filePath) {
 static char *get_shader_compile_errors(GLuint shader) {
 	int success;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-
 	if (success) return NULL;
 
 	int length;
@@ -32,7 +31,6 @@ static char *get_shader_compile_errors(GLuint shader) {
 static char *get_program_link_errors(GLuint program) {
 	int success;
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
-
 	if (success) return NULL;
 
 	int length;
@@ -77,17 +75,17 @@ mc_Program *mc_program_from_file(const char *programPath) {
 		debug_msg(mc_DebugLevel_MEDIUM, "failed to open %s", programPath);
 		return NULL;
 	}
+
 	mc_Program *shader = mc_program_from_str(shaderCode);
 	free(shaderCode);
 	return shader;
 }
 
 void mc_program_destroy(mc_Program *program) {
-	if (program != NULL) {
-		if (program->shader != 0) glDeleteShader(program->shader);
-		if (program->program != 0) glDeleteProgram(program->program);
-		free(program);
-	}
+	if (program == NULL) return;
+	if (program->shader != 0) glDeleteShader(program->shader);
+	if (program->program != 0) glDeleteProgram(program->program);
+	free(program);
 }
 
 void mc_program_dispatch(mc_Program *program, mc_ivec3 size) {

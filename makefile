@@ -6,7 +6,7 @@
 
 LIBRARY        := microcompute
 LIBS           := -lmicrocompute -lgbm -lEGL -lGL -lGLEW
-FLAGS          := -Wall -Wextra -Wno-missing-braces -Wno-unused-parameter -g
+FLAGS          := -Wall -Wextra -Wno-missing-braces -Wno-unused-parameter
 DEFS           := 
 
 #---- PROJECT STRUCTURE -----------------------------------------------------------------------------------------------#
@@ -20,7 +20,7 @@ EXAMPLE_FOLDER := example
 
 #======================================================================================================================#
 
-CC                := gcc -fPIC $(FLAGS) $(DEFS) -isystem $(INCLUDE_FOLDER) -I $(SRC_FOLDER)
+CC                := gcc $(FLAGS) $(DEFS) -isystem $(INCLUDE_FOLDER) -I $(SRC_FOLDER)
 AR                := ar rcs
 RM                := rm -rf
 CP                := cp
@@ -62,7 +62,7 @@ $(STATIC_LIB): $(OUT_FOLDER) $(C_OBJECTS)
 	$(CP) $(SRC_FOLDER)/$(LIBRARY).h $(OUT_FOLDER)/$(LIBRARY).h
 
 $(EXAMPLES): $(STATIC_LIB)
-	$(CC) $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
+	$(CC) -g $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
 
 clean:
 	$(RM) $(BUILD_FOLDER) $(OUT_FOLDER)

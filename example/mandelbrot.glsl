@@ -25,7 +25,7 @@ void main(void) {
 	vec2 z2 = vec2(0.0, 0.0);
 
 	int i = 0;
-	for(; i < maxIter && z2.x + z2.y <= 4 ; i++) {
+	for(; i < maxIter && z2.x + z2.y <= 4; i++) {
 		z = vec2(z2.x - z2.y + z0.x, 2 * z.x * z.y + z0.y);
 		z2 = vec2(z.x * z.x, z.y * z.y);
 	}

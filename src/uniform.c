@@ -1,13 +1,13 @@
 #include "_microcompute.h"
 
-#define SET(program, name, glUniformFunction, ...)                             \
+#define SET(program, name, uniformFn, ...)                                     \
 	GLint loc = glGetUniformLocation(program->program, name);                  \
 	if (loc == -1) {                                                           \
 		debug_msg(mc_DebugLevel_MEDIUM, "failed to find uniform %s", name);    \
 		return;                                                                \
 	}                                                                          \
 	glUseProgram(program->program);                                            \
-	glUniformFunction(loc, __VA_ARGS__)
+	uniformFn(loc, __VA_ARGS__)
 
 void mc_program_set_float(mc_Program *program, char *name, float value) {
 	SET(program, name, glUniform1f, value);

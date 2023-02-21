@@ -38,10 +38,11 @@ typedef struct mc_Buffer mc_Buffer;
 // core
 //============================================================================//
 
-int mc_init(char *renderDevice);
-void mc_terminate();
+int mc_start(char *renderDevice);
+void mc_stop();
 
 void mc_set_debug_callback(void (*callback)(mc_DebugLevel, char *));
+void mc_default_debug_callback(mc_DebugLevel level, char *message);
 
 //============================================================================//
 // program management
@@ -70,10 +71,13 @@ void mc_program_set_ivec4(mc_Program *program, char *name, mc_ivec4 value);
 // buffer management
 //============================================================================//
 
-mc_Buffer *mc_buffer_create(int index);
+mc_Buffer *mc_buffer_create(int binding, size_t size);
 void mc_buffer_destroy(mc_Buffer *buffer);
 
-void mc_buffer_write(mc_Buffer *buffer, size_t size, void *data);
-void mc_buffer_modify(mc_Buffer *buffer, size_t off, size_t size, void *data);
+void mc_buffer_rebind(mc_Buffer *buffer, int binding);
+void mc_buffer_resize(mc_Buffer *buffer, size_t size);
 
-void mc_buffer_read(mc_Buffer *buffer, size_t off, size_t size, void *data);
+size_t mc_buffer_get_size(mc_Buffer *buffer);
+
+size_t mc_buffer_write(mc_Buffer *buffer, size_t off, size_t size, void *data);
+size_t mc_buffer_read(mc_Buffer *buffer, size_t off, size_t size, void *data);

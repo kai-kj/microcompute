@@ -27,6 +27,5 @@ void main(void) {
 	);
 
 	int bytes = color.r << 0 | color.g << 8 | color.b << 16 | color.a << 24;
-
 	byteData[(pos.y * size.x + pos.x)] = bytes;
 }
