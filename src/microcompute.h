@@ -134,9 +134,9 @@ typedef struct mc_Buffer mc_Buffer;
  * - `renderDevice`
  *   The rendering device to be used by the library.
  * - returns
- *   `1` on success, `0` otherwise.
+ *   `true` on success, `false` otherwise.
  */
-int mc_start(char *renderDevice);
+bool mc_start(char *renderDevice);
 
 /**
  * Stops the microcompute library.
@@ -146,26 +146,36 @@ void mc_stop();
 /**
  * Set the function to be called when a debug message is produced.
  *
- * `mc_set_debug_callback(mc_default_debug_callback)` can be called to avoid
- * defining a custom debug callback function.
+ * `mc_set_debug_callback(mc_default_debug_callback, NULL)` can be called to
+ * simply have all debug messages printed to `stdout`.
  *
  * - `callback`
  *   The function to be called. The `mc_DebugLevel` parameter indicates the
- *   severity of the message, and the `char *` parameter contains the message.
- *   The `char *` parameter is managed by microcompute, so do not `free()` it.
+ *   severity of the message, the `char *` parameter contains the message. This
+ *   parameter is managed by microcompute, so do not `free()` it, and the `void`
+ *   parameter will contain whatever was passed to `arg`.
+ * - `arg`
+ *   A pointer to any data to pass onto the debug callback function. If set to
+ * `NULL`, all messages will be printed.
  */
-void mc_set_debug_callback(void (*callback)(mc_DebugLevel, char *));
+void mc_set_debug_callback(
+	void (*callback)(mc_DebugLevel, char *, void *),
+	void *arg
+);
 
 /**
- * The default debug callback function. This will print messages of any priority
- * level. See `mc_set_debug_callback()` for more info about the parameters.
+ * The default debug callback function. This will print messages of any greater
+ * than the value pointed to by `arg` to `stdout`. See `mc_set_debug_callback()`
+ * for more info about the parameters.
  *
  * - `level`
  *   The severity of the debug message.
  * - `message`
  *   The debug message.
+ * - `arg`
+ *   A pointer to a value indicating the lowest severity message type to print.
  */
-void mc_default_debug_callback(mc_DebugLevel level, char *message);
+void mc_default_debug_callback(mc_DebugLevel level, char *message, void *arg);
 
 //============================================================================//
 // program management
@@ -223,32 +233,34 @@ void mc_program_dispatch(mc_Program *program, mc_ivec3 size);
  *   The name of the uniform to set.
  * - `value`
  *   The value of the uniform.
+ * - returns
+ *   `true` on success, `false` if the variable could not be found.
  */
 
-void mc_program_set_float(mc_Program *program, char *name, float value);
-void mc_program_set_vec2(mc_Program *program, char *name, mc_vec2 value);
-void mc_program_set_vec3(mc_Program *program, char *name, mc_vec3 value);
-void mc_program_set_vec4(mc_Program *program, char *name, mc_vec4 value);
+bool mc_program_set_float(mc_Program *program, char *name, float value);
+bool mc_program_set_vec2(mc_Program *program, char *name, mc_vec2 value);
+bool mc_program_set_vec3(mc_Program *program, char *name, mc_vec3 value);
+bool mc_program_set_vec4(mc_Program *program, char *name, mc_vec4 value);
 
-void mc_program_set_int(mc_Program *program, char *name, int value);
-void mc_program_set_ivec2(mc_Program *program, char *name, mc_ivec2 value);
-void mc_program_set_ivec3(mc_Program *program, char *name, mc_ivec3 value);
-void mc_program_set_ivec4(mc_Program *program, char *name, mc_ivec4 value);
+bool mc_program_set_int(mc_Program *program, char *name, int value);
+bool mc_program_set_ivec2(mc_Program *program, char *name, mc_ivec2 value);
+bool mc_program_set_ivec3(mc_Program *program, char *name, mc_ivec3 value);
+bool mc_program_set_ivec4(mc_Program *program, char *name, mc_ivec4 value);
 
-void mc_program_set_uint(mc_Program *program, char *name, unsigned int value);
-void mc_program_set_uvec2(mc_Program *program, char *name, mc_uvec2 value);
-void mc_program_set_uvec3(mc_Program *program, char *name, mc_uvec3 value);
-void mc_program_set_uvec4(mc_Program *program, char *name, mc_uvec4 value);
+bool mc_program_set_uint(mc_Program *program, char *name, unsigned int value);
+bool mc_program_set_uvec2(mc_Program *program, char *name, mc_uvec2 value);
+bool mc_program_set_uvec3(mc_Program *program, char *name, mc_uvec3 value);
+bool mc_program_set_uvec4(mc_Program *program, char *name, mc_uvec4 value);
 
-void mc_program_set_mat22(mc_Program *program, char *name, mc_mat22 value);
-void mc_program_set_mat33(mc_Program *program, char *name, mc_mat33 value);
-void mc_program_set_mat44(mc_Program *program, char *name, mc_mat44 value);
-void mc_program_set_mat23(mc_Program *program, char *name, mc_mat23 value);
-void mc_program_set_mat32(mc_Program *program, char *name, mc_mat32 value);
-void mc_program_set_mat24(mc_Program *program, char *name, mc_mat24 value);
-void mc_program_set_mat42(mc_Program *program, char *name, mc_mat42 value);
-void mc_program_set_mat34(mc_Program *program, char *name, mc_mat34 value);
-void mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value);
+bool mc_program_set_mat22(mc_Program *program, char *name, mc_mat22 value);
+bool mc_program_set_mat33(mc_Program *program, char *name, mc_mat33 value);
+bool mc_program_set_mat44(mc_Program *program, char *name, mc_mat44 value);
+bool mc_program_set_mat23(mc_Program *program, char *name, mc_mat23 value);
+bool mc_program_set_mat32(mc_Program *program, char *name, mc_mat32 value);
+bool mc_program_set_mat24(mc_Program *program, char *name, mc_mat24 value);
+bool mc_program_set_mat42(mc_Program *program, char *name, mc_mat42 value);
+bool mc_program_set_mat34(mc_Program *program, char *name, mc_mat34 value);
+bool mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value);
 
 //============================================================================//
 // buffer management

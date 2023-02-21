@@ -4,7 +4,7 @@
 #include "../out/microcompute.h"
 
 int main(void) {
-	mc_set_debug_callback(mc_default_debug_callback);
+	mc_set_debug_callback(mc_default_debug_callback, NULL);
 	if (!mc_start("/dev/dri/renderD129")) return -1;
 
 	mc_Program *program = mc_program_from_file("example/arrays.glsl");

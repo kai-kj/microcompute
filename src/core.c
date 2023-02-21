@@ -5,7 +5,8 @@ struct mc_State {
 	struct gbm_device *device;
 	EGLDisplay display;
 	EGLContext context;
-	void (*debug_cb)(mc_DebugLevel, char *);
+	void (*debug_cb)(mc_DebugLevel, char *, void *);
+	void *callbackArg;
 };
 
 static struct mc_State state;
@@ -53,7 +54,7 @@ static void gl_debug_cb(
 	char *buff = malloc(len);
 	snprintf(buff, len, "GL: %s (%s): %s", sourceStr, typeStr, msg);
 
-	state.debug_cb(level, buff);
+	state.debug_cb(level, buff, state.callbackArg);
 	free(buff);
 }
 
@@ -73,38 +74,38 @@ void debug_msg_fn(const char *function, int level, char *format, ...) {
 	char *formattedMessage = malloc(len);
 	snprintf(formattedMessage, len, "%s(): %s", function, message);
 
-	state.debug_cb(level, formattedMessage);
+	state.debug_cb(level, formattedMessage, state.callbackArg);
 	free(message);
 	free(formattedMessage);
 }
 
-int mc_start(char *renderDevice) {
+bool mc_start(char *renderDevice) {
 	state.rendererFd = open(renderDevice, O_RDWR);
 	if (state.rendererFd <= 0) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to open %s", renderDevice);
 		mc_stop();
-		return 0;
+		return false;
 	}
 
 	state.device = gbm_create_device(state.rendererFd);
 	if (state.device == NULL) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to create gbm device");
 		mc_stop();
-		return 0;
+		return false;
 	}
 
 	state.display = eglGetDisplay(state.device);
 	if (state.display == NULL) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to get egl display");
 		mc_stop();
-		return 0;
+		return false;
 	}
 
 	EGLint major, minor;
 	if (!eglInitialize(state.display, &major, &minor)) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to initialize egl");
 		mc_stop();
-		return 0;
+		return false;
 	};
 
 	if (major < 1 || (major == 1 && minor < 5)) {
@@ -115,13 +116,13 @@ int mc_start(char *renderDevice) {
 			minor
 		);
 		mc_stop();
-		return 0;
+		return false;
 	}
 
 	if (!eglBindAPI(EGL_OPENGL_API)) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to bind opengl api to egl");
 		mc_stop();
-		return 0;
+		return false;
 	}
 
 	static const EGLint cfgAttrib[] = {
@@ -136,7 +137,7 @@ int mc_start(char *renderDevice) {
 	if (!eglChooseConfig(state.display, cfgAttrib, &eglCfg, 1, &cfgCount)) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to choose egl config");
 		mc_stop();
-		return 0;
+		return false;
 	};
 
 	static const EGLint ctxAttrib[] = {
@@ -155,25 +156,25 @@ int mc_start(char *renderDevice) {
 	if (ctx == EGL_NO_CONTEXT) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to create egl context");
 		mc_stop();
-		return 0;
+		return false;
 	};
 
 	if (!eglMakeCurrent(state.display, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx)) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to make egl context current");
 		mc_stop();
-		return 0;
+		return false;
 	};
 
 	if (!glewInit()) {
 		debug_msg(mc_DebugLevel_HIGH, "failed to initialize GLEW");
 		mc_stop();
-		return 0;
+		return false;
 	}
 
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback(gl_debug_cb, NULL);
 
-	return 1;
+	return true;
 }
 
 void mc_stop() {
@@ -183,10 +184,15 @@ void mc_stop() {
 	if (state.rendererFd != 0) close(state.rendererFd);
 }
 
-void mc_set_debug_callback(void (*callback)(mc_DebugLevel, char *)) {
+void mc_set_debug_callback(
+	void (*callback)(mc_DebugLevel, char *, void *),
+	void *arg
+) {
 	state.debug_cb = callback;
+	state.callbackArg = arg;
 }
 
-void mc_default_debug_callback(mc_DebugLevel level, char *msg) {
-	printf("DEBUG (level %d): %s\n", level, msg);
+void mc_default_debug_callback(mc_DebugLevel level, char *msg, void *arg) {
+	if (arg == NULL || level >= *(mc_DebugLevel *)arg)
+		printf("DEBUG (level %d): %s\n", level, msg);
 }

@@ -10,8 +10,9 @@ int main(void) {
 	int width = 10000;
 	int height = 10000;
 	int pixels = width * height;
+	mc_DebugLevel level = mc_DebugLevel_MEDIUM;
 
-	mc_set_debug_callback(mc_default_debug_callback);
+	mc_set_debug_callback(mc_default_debug_callback, &level);
 	if (!mc_start("/dev/dri/renderD129")) return -1;
 
 	mc_Program *renderProgram = mc_program_from_file("example/mandelbrot.glsl");
