@@ -36,12 +36,7 @@ STATIC_LIB        := $(OUT_FOLDER)/lib$(LIBRARY).a
 export __GLX_VENDOR_LIBRARY_NAME = nvidia
 export __NV_PRIME_RENDER_OFFLOAD = 1
 
-define \n
-
-
-endef
-
-.PHONY: clean all test
+.PHONY: clean all test readme
 
 all: $(EXAMPLES) $(STATIC_LIB)
 
@@ -63,6 +58,9 @@ $(STATIC_LIB): $(OUT_FOLDER) $(C_OBJECTS)
 
 $(EXAMPLES): $(STATIC_LIB)
 	$(CC) -g $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
+
+readme:
+	python3 doc_generator.py $(SRC_FOLDER)/$(LIBRARY).h README.md
 
 clean:
 	$(RM) $(BUILD_FOLDER) $(OUT_FOLDER)
