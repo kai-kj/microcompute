@@ -1,16 +1,13 @@
 /**
  * # `microcompute`
  *
- * ## Examples
+ * See [here](https://github.com/kal39/microcompute/blob/master/example) for
+ * usage examples.
  *
- * - Array operations: [`example/arrays.c`](
- *     https://github.com/kal39/microcompute/blob/master/example/arrays.c
- *   )
- * - Mandelbrot renderer: [`example/mandelbrot.c`](
- *     https://github.com/kal39/microcompute/blob/master/example/mandelbrot.c
- *   )
- *
- * ## Documentation
+ * Usage notes:
+ * - For `gcc`, use `-lmicrocompute -lgbm -lEGL -lGL -lGLEW`
+ * - Because this library uses `OpenGL`, all `microcompute` operations must be
+ * performed in the same thread.
  */
 
 #pragma once
