@@ -27,4 +27,4 @@ See [doc.md](https://github.com/kal39/microcompute/blob/master/doc.md).
 
 ## License
 
-See [LICENSE](https://github.com/kal39/microcompute/blob/master/LICENCE).
+See [LICENSE](https://github.com/kal39/microcompute/blob/master/LICENSE).
