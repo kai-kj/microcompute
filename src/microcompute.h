@@ -1,13 +1,16 @@
 /**
  * # `microcompute`
  *
- * See [here](https://github.com/kal39/microcompute/blob/master/example) for
- * usage examples.
+ * [**Github**](https://github.com/kal39/microcompute)
  *
  * Usage notes:
  * - For `gcc`, use `-lmicrocompute -lgbm -lEGL -lGL -lGLEW`
  * - Because this library uses `OpenGL`, all `microcompute` operations must be
- * performed in the same thread.
+ * performed in the same thread
+ * - For examples, see
+ * [here](https://github.com/kal39/microcompute/blob/master/example)
+ *
+ * ## Documentation
  */
 
 #pragma once
@@ -16,6 +19,10 @@
 #include <stdlib.h>
 
 /**
+ * ### Structs
+ */
+
+/** code
  * Vector types, compatible with glsl vectors.
  */
 
@@ -58,7 +65,7 @@ typedef struct mc_uvec4 {
 	unsigned int x, y, z, w;
 } mc_uvec4;
 
-/**
+/** code
  * Matrix types, compatible with glsl matrices.
  *
  * If `transpose` is set to true, the matrix values are in row major order,
@@ -111,7 +118,18 @@ typedef struct mc_mat43 {
 	bool transpose;
 } mc_mat43;
 
+/** code
+ * Opaque types for complex objects.
+ */
+
+typedef struct mc_Program mc_Program;
+typedef struct mc_Buffer mc_Buffer;
+
 /**
+ * ### Enums
+ */
+
+/** code
  * Debug message severity level.
  *
  * Passed as an argument to the debug callback function.
@@ -125,13 +143,10 @@ typedef enum mc_DebugLevel {
 } mc_DebugLevel;
 
 /**
- * Opaque types for complex objects.
+ * ### Core functionality
  */
 
-typedef struct mc_Program mc_Program;
-typedef struct mc_Buffer mc_Buffer;
-
-/**
+/** code
  * Initialize the microcompute library. If any errors occur, it will call the
  * debug callback function, so `mc_set_debug_callback()` should be called before
  * calling `mc_start()`.
@@ -145,12 +160,12 @@ typedef struct mc_Buffer mc_Buffer;
  */
 bool mc_start(char *renderDevice);
 
-/**
+/** code
  * Stops the microcompute library.
  */
 void mc_stop();
 
-/**
+/** code
  * Set the function to be called when a debug message is produced.
  *
  * `mc_set_debug_callback(mc_default_debug_callback, NULL)` can be called to
@@ -169,7 +184,7 @@ void mc_set_debug_callback(
 	void *arg
 );
 
-/**
+/** code
  * The default debug callback function. This will print messages of any greater
  * than the value pointed to by `arg` to `stdout`. See `mc_set_debug_callback()`
  * for more info about the parameters.
@@ -181,6 +196,10 @@ void mc_set_debug_callback(
 void mc_default_debug_callback(mc_DebugLevel level, char *message, void *arg);
 
 /**
+ * ### Program (compute shader) management
+ */
+
+/** code
  * Create a program (compute shader) from a string.
  *
  * - `programCode`: A string containing the program code.
@@ -188,7 +207,7 @@ void mc_default_debug_callback(mc_DebugLevel level, char *message, void *arg);
  */
 mc_Program *mc_program_from_str(const char *programCode);
 
-/**
+/** code
  * Create a program (compute shader) from a file.
  *
  * - `filePath`: The path to the file containing the program code.
@@ -196,14 +215,14 @@ mc_Program *mc_program_from_str(const char *programCode);
  */
 mc_Program *mc_program_from_file(const char *filePath);
 
-/**
+/** code
  * Destroy a program.
  *
  * - `program`: The program to destroy.
  */
 void mc_program_destroy(mc_Program *program);
 
-/**
+/** code
  * Dispatch (run) a program.
  *
  * - `program`: The program to run.
@@ -211,7 +230,7 @@ void mc_program_destroy(mc_Program *program);
  */
 void mc_program_dispatch(mc_Program *program, mc_ivec3 size);
 
-/**
+/** code
  * Set the value of uniform value.
  *
  * - `program`: The program in which to set the uniform value.
@@ -250,6 +269,10 @@ bool mc_program_set_mat34(mc_Program *program, char *name, mc_mat34 value);
 bool mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value);
 
 /**
+ * ### Buffer management
+ */
+
+/** code
  * Create a buffer (SSBO).
  *
  * - `binding`: The binding in which to store the buffer.
@@ -258,14 +281,14 @@ bool mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value);
  */
 mc_Buffer *mc_buffer_create(int binding, size_t size);
 
-/**
+/** code
  * Destroy a buffer.
  *
  * - `buffer`: The buffer to destroy.
  */
 void mc_buffer_destroy(mc_Buffer *buffer);
 
-/**
+/** code
  * Rebind a buffer.
  *
  * - `buffer`: The buffer to rebind.
@@ -273,7 +296,7 @@ void mc_buffer_destroy(mc_Buffer *buffer);
  */
 void mc_buffer_rebind(mc_Buffer *buffer, int binding);
 
-/**
+/** code
  * Resize a buffer.
  *
  * - `buffer`: The buffer to resize.
@@ -281,7 +304,7 @@ void mc_buffer_rebind(mc_Buffer *buffer, int binding);
  */
 void mc_buffer_resize(mc_Buffer *buffer, size_t size);
 
-/**
+/** code
  * Get the current size of a buffer.
  *
  * - `buffer`: The buffer to get the size of.
@@ -289,7 +312,7 @@ void mc_buffer_resize(mc_Buffer *buffer, size_t size);
  */
 size_t mc_buffer_get_size(mc_Buffer *buffer);
 
-/**
+/** code
  * Write data to a buffer. If `off` + `size` is larger than the size of the
  * buffer, the function call will fail.
  *
@@ -301,7 +324,7 @@ size_t mc_buffer_get_size(mc_Buffer *buffer);
  */
 size_t mc_buffer_write(mc_Buffer *buffer, size_t off, size_t size, void *data);
 
-/**
+/** code
  * Read data from a buffer. If `off` + `size` is larger than the size of the
  * buffer, the function call will fail.
  *
@@ -312,3 +335,30 @@ size_t mc_buffer_write(mc_Buffer *buffer, size_t off, size_t size, void *data);
  * - returns: The number of bytes read. `size` on success, `0` otherwise.
  */
 size_t mc_buffer_read(mc_Buffer *buffer, size_t off, size_t size, void *data);
+
+/**
+ * ## License
+ *
+ * ```
+ * MIT License
+ * Copyright (c) 2023 Kai Kitagawa-Jones
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * ```
+ */

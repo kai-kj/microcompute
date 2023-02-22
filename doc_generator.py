@@ -2,49 +2,78 @@ import re
 import sys
 
 
-def generate_docs(code: str):
+class Lines:
+    def __init__(self, text):
+        self.current = 0
+        self.lines = text.splitlines(True)
+
+    def _get_line(self, index):
+        if index >= len(self.lines): return None
+        else: return self.lines[index]
+
+    def next(self):
+        self.current += 1
+        return self._get_line(self.current - 1)
+
+    def peek(self):
+        return self._get_line(self.current)
+
+def doc_section_start(line):
+    return re.search(r"^\/\*\*\s*(\w*)", line)
+
+def doc_section_end(line):
+    return re.search(r"^ \*\/", line)
+
+def parse_doc_line(line):
+    if m := re.search(r"^ \* (.*)", line): return m.groups()[0] + "\n"
+    elif m := re.search(r"^ \*(.*)", line): return m.groups()[0] + "\n"
+    else: raise ("unexpected line: \"" + line[:-1] + "\"")
+
+def parse_doc_section(lines, prepend=""):
     doc = ""
-    start = True
+    while True:
+        line = lines.peek()
+        if not line: raise ("unexpected EOF")
+        if doc_section_end(line): break
+        else: doc += prepend + parse_doc_line(lines.next())
 
-    code_section = ""
-    doc_section = ""
+    return doc
 
-    for line in code.splitlines():
-        if re.search(r"^\/\*\*", line):  # documentation block start
-            pass
+def parse_code_section(file):
+    code = ""
+    while True:
+        line = lines.peek()
+        if not line or doc_section_start(line): break
+        else: code += lines.next()
 
-        elif re.search(r"^ \*\/", line):  # documentation block end
-            doc_section += "\n"
+    return code
 
-        elif re.search(r"^ \*", line):  # inside documentation block
-            if doc_section != "" and code_section != "":  # new documentation block
-                doc_section = re.sub(r"```\s*", "\n```\n", doc_section)
 
-                if start:  # the first documentation block
-                    doc += doc_section
-                    start = False
-                else:
-                    doc += "----\n\n```c\n" + code_section.strip() + "\n```\n" + doc_section
-                doc_section = ""
-                code_section = ""
+def generate_docs(lines):
+    doc = ""
 
-            if re.search(r"^ \*$", line):  # empty line
-                doc_section += "\n"
-            else:
-                doc_section += re.sub(r"^ \* ", "", line) + "\n"
+    while line := lines.next():
+        if doc_type := doc_section_start(line):
+            doc_type = doc_type.groups()[0]
 
-        else:  # code
-            code_section += line + "\n"
+            if doc_type == "code":
+                doc_section = parse_doc_section(lines, "> ")
+                lines.next()
+                code_section = parse_code_section(lines).strip() + "\n"
+                doc += "```c\n" + code_section + "```\n" + doc_section + "\n<br/>\n\n"
 
-    # add the last block
-    doc += "\n----\n\n```c\n" + code_section.strip() + "\n```\n" + doc_section
+            elif doc_type == "":
+                doc_section = parse_doc_section(lines)
+                doc += doc_section
+
+            else: raise ("unknown documentation type " + doc_type)
+    
     return doc
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("usage python3 doc_generator.py [code file] [doc file]")
+    if len(sys.argv) != 3: raise("provide 2 arguments")
 
-    code = open(sys.argv[1], 'r').read()
-    doc = generate_docs(code)
+    lines = Lines(open(sys.argv[1], "r").read())
+    doc = generate_docs(lines)
     open(sys.argv[2], "w").write(doc)
