@@ -117,18 +117,6 @@ typedef struct mc_Buffer mc_Buffer;
 
 <br/>
 
-### Function pointers
-```c
-typedef void (*mc_DebugCallback)(mc_DebugLevel level, char *message, void *arg);
-```
-> Debug callback function.
-> 
-> - `level`: The severity of the debug message.
-> - `message`: The message. Managed by microcompute, so do not `free()` it.
-> - `arg`: User defined data defined in `mc_set_debug_callback()`
-
-<br/>
-
 ### Enums
 ```c
 typedef enum mc_DebugLevel {
@@ -141,6 +129,18 @@ typedef enum mc_DebugLevel {
 > Debug message severity level.
 > 
 > Passed as an argument to the debug callback function.
+
+<br/>
+
+### Function pointers
+```c
+typedef void (*mc_DebugCallback)(mc_DebugLevel level, char *message, void *arg);
+```
+> Debug callback function.
+> 
+> - `level`: The severity of the debug message.
+> - `message`: The message. Managed by microcompute, so do not `free()` it.
+> - `arg`: User defined data defined in `mc_set_debug_callback()`
 
 <br/>
 
