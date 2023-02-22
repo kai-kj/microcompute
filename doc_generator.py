@@ -24,20 +24,14 @@ def generate_docs(code: str):
                     doc += doc_section
                     start = False
                 else:
-                    doc += "\n----\n\n```c\n" + code_section.strip() + "\n```\n" + doc_section
+                    doc += "----\n\n```c\n" + code_section.strip() + "\n```\n" + doc_section
                 doc_section = ""
                 code_section = ""
 
-            if re.search(r"^ \*\s*$", line):  # empty line
-                doc_section += "\n\n"
-                continue
-
-            if re.search(r"^ \*\s*-", line):  # line with bullet list
+            if re.search(r"^ \*$", line):  # empty line
                 doc_section += "\n"
-
-            _line = re.sub(r"- returns:", "- **returns**:", line)
-            _line = re.sub(r"^ \* ", "", _line)
-            doc_section += _line + " "
+            else:
+                doc_section += re.sub(r"^ \* ", "", line) + "\n"
 
         else:  # code
             code_section += line + "\n"
