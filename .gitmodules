@@ -1,0 +1,3 @@
+[submodule "microdoc"]
+	path = microdoc
+	url = git@github.com:kal39/microdoc.git

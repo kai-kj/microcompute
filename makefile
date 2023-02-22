@@ -60,7 +60,7 @@ $(EXAMPLES): $(STATIC_LIB)
 	$(CC) -g $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
 
 doc:
-	python3 doc_generator.py $(SRC_FOLDER)/$(LIBRARY).h doc.md
+	python3 microdoc/doc_generator.py $(SRC_FOLDER)/$(LIBRARY).h doc.md
 
 clean:
 	$(RM) $(BUILD_FOLDER) $(OUT_FOLDER)
