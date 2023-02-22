@@ -184,11 +184,8 @@ void mc_stop() {
 	if (state.rendererFd != 0) close(state.rendererFd);
 }
 
-void mc_set_debug_callback(
-	void (*callback)(mc_DebugLevel, char *, void *),
-	void *arg
-) {
-	state.debug_cb = callback;
+void mc_set_debug_callback(mc_DebugCallback cb, void *arg) {
+	state.debug_cb = cb;
 	state.callbackArg = arg;
 }
 

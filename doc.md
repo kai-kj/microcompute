@@ -117,6 +117,18 @@ typedef struct mc_Buffer mc_Buffer;
 
 <br/>
 
+### Function pointers
+```c
+typedef void (*mc_DebugCallback)(mc_DebugLevel level, char *message, void *arg);
+```
+> Debug callback function.
+> 
+> - `level`: The severity of the debug message.
+> - `message`: The message. Managed by microcompute, so do not `free()` it.
+> - `arg`: User defined data defined in `mc_set_debug_callback()`
+
+<br/>
+
 ### Enums
 ```c
 typedef enum mc_DebugLevel {
@@ -157,23 +169,15 @@ void mc_stop();
 <br/>
 
 ```c
-void mc_set_debug_callback(
-	void (*callback)(mc_DebugLevel, char *, void *),
-	void *arg
-);
+void mc_set_debug_callback(mc_DebugCallback cb, void *arg);
 ```
 > Set the function to be called when a debug message is produced.
 > 
 > `mc_set_debug_callback(mc_default_debug_callback, NULL)` can be called to
 > simply have all debug messages printed to `stdout`.
 > 
-> In the callback function, the `mc_DebugLevel` parameter indicates the
-> severity of the message, the `char *` parameter contains the message. This
-> parameter is managed by microcompute, so do not `free()` it, and the `void`
-> parameter will contain whatever was passed to `arg`.
-> 
-> - `callback`: The function to be called.
-> - `arg`: A pointer to some data to be passed to the callback function.
+> - `cb`: The function to be called.
+> - `arg`: User defined data to be passed to the callback function.
 
 <br/>
 
@@ -181,7 +185,7 @@ void mc_set_debug_callback(
 void mc_default_debug_callback(mc_DebugLevel level, char *message, void *arg);
 ```
 > The default debug callback function. This will print messages of any greater
-> than the value pointed to by `arg` to `stdout`. See `mc_set_debug_callback()`
+> than the value pointed to by `arg` to `stdout`. See `mc_DebugCallback`
 > for more info about the parameters.
 > 
 > - `level`: The severity of the debug message.
