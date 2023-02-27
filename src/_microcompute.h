@@ -5,22 +5,32 @@
 #include <GL/glew.h>
 #include <fcntl.h>
 #include <gbm.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 #include "microcompute.h"
 
-typedef struct mc_Program {
-	GLuint shader;
-	GLuint program;
-} mc_Program;
+#define GL_CHECK_ERROR() gl_check_error(__LINE__, __FILE__, __FUNCTION__)
 
-typedef struct mc_Buffer {
-	GLuint ssbo;
-} mc_Buffer;
+mc_Result gl_check_error(uint32_t line, const char* file, const char* func);
 
-#define debug_msg(level, ...) debug_msg_fn(__FUNCTION__, level, __VA_ARGS__)
-void debug_msg_fn(const char *function, int level, char *format, ...);
+#define OK                                                                     \
+	((mc_Result){                                                              \
+		.ok = MC_TRUE,                                                         \
+		.file = __FILE__,                                                      \
+		.line = __LINE__,                                                      \
+		.func = __FUNCTION__,                                                  \
+		.message = (char*){"no errors here :)"}})
+
+#define ERROR(msg)                                                             \
+	((mc_Result){                                                              \
+		.ok = MC_FALSE,                                                        \
+		.file = __FILE__,                                                      \
+		.line = __LINE__,                                                      \
+		.func = __FUNCTION__,                                                  \
+		.message = (char*){(msg)}})
+
+#define ASSERT(cond, msg)                                                      \
+	do {                                                                       \
+		if (!(cond)) return ERROR((msg));                                      \
+	} while (0)

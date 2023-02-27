@@ -15,12 +15,41 @@
 
 #pragma once
 
-#include <stdbool.h>
-#include <stdlib.h>
+#include <stdint.h>
 
 /**
  * ### Structs
  */
+
+/** code
+ * Bool type.
+ */
+
+typedef enum mc_Bool {
+	MC_FALSE = 0,
+	MC_TRUE = 1,
+} mc_Bool;
+
+/** code
+ * Result type. Returned by all microcompute functions;
+ */
+
+typedef struct mc_Result {
+	mc_Bool ok;
+	uint32_t line;
+	const char* file;
+	const char* func;
+	const char* message;
+} mc_Result;
+
+typedef struct mc_Program {
+	int32_t shader;
+	int32_t program;
+} mc_Program;
+
+typedef struct mc_Buffer {
+	uint32_t ssbo;
+} mc_Buffer;
 
 /** code
  * Vector types, compatible with glsl vectors.
@@ -41,28 +70,28 @@ typedef struct mc_vec4 {
 
 // int vectors
 typedef struct mc_ivec2 {
-	int x, y;
+	int32_t x, y;
 } mc_ivec2;
 
 typedef struct mc_ivec3 {
-	int x, y, z;
+	int32_t x, y, z;
 } mc_ivec3;
 
 typedef struct mc_ivec4 {
-	int x, y, z, w;
+	int32_t x, y, z, w;
 } mc_ivec4;
 
-// unsigned int vectors
+// uint vectors
 typedef struct mc_uvec2 {
-	unsigned int x, y;
+	uint32_t x, y;
 } mc_uvec2;
 
 typedef struct mc_uvec3 {
-	unsigned int x, y, z;
+	uint32_t x, y, z;
 } mc_uvec3;
 
 typedef struct mc_uvec4 {
-	unsigned int x, y, z, w;
+	uint32_t x, y, z, w;
 } mc_uvec4;
 
 /** code
@@ -75,55 +104,48 @@ typedef struct mc_uvec4 {
 
 typedef struct mc_mat22 {
 	float values[4];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat22;
 
 typedef struct mc_mat33 {
 	float values[9];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat33;
 
 typedef struct mc_mat44 {
 	float values[16];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat44;
 
 typedef struct mc_mat23 {
 	float values[6];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat23;
 
 typedef struct mc_mat32 {
 	float values[6];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat32;
 
 typedef struct mc_mat24 {
 	float values[8];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat24;
 
 typedef struct mc_mat42 {
 	float values[8];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat42;
 
 typedef struct mc_mat34 {
 	float values[12];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat34;
 
 typedef struct mc_mat43 {
 	float values[12];
-	bool transpose;
+	mc_Bool transpose;
 } mc_mat43;
-
-/** code
- * Opaque types for complex objects.
- */
-
-typedef struct mc_Program mc_Program;
-typedef struct mc_Buffer mc_Buffer;
 
 /**
  * ### Enums
@@ -154,8 +176,6 @@ typedef enum mc_DebugLevel {
  * - `arg`: User defined data defined in `mc_set_debug_callback()`
  */
 
-typedef void (*mc_DebugCallback)(mc_DebugLevel level, char *message, void *arg);
-
 /**
  * ### Core functionality
  */
@@ -172,12 +192,12 @@ typedef void (*mc_DebugCallback)(mc_DebugLevel level, char *message, void *arg);
  * - `renderDevice`: The rendering device to be used by the library.
  * - returns: `true` on success, `false` otherwise.
  */
-bool mc_start(char *renderDevice);
+mc_Result mc_start(char* renderDevice);
 
 /** code
  * Stops the microcompute library.
  */
-void mc_stop();
+mc_Result mc_stop();
 
 /** code
  * Set the function to be called when a debug message is produced.
@@ -188,18 +208,6 @@ void mc_stop();
  * - `cb`: The function to be called.
  * - `arg`: User defined data to be passed to the callback function.
  */
-void mc_set_debug_callback(mc_DebugCallback cb, void *arg);
-
-/** code
- * The default debug callback function. This will print messages of any greater
- * than the value pointed to by `arg` to `stdout`. See `mc_DebugCallback`
- * for more info about the parameters.
- *
- * - `level`: The severity of the debug message.
- * - `message`: The debug message.
- * - `arg`: A pointer to a value indicating the lowest severity to print.
- */
-void mc_default_debug_callback(mc_DebugLevel level, char *message, void *arg);
 
 /**
  * ### Program (compute shader) management
@@ -211,7 +219,12 @@ void mc_default_debug_callback(mc_DebugLevel level, char *message, void *arg);
  * - `programCode`: A string containing the program code.
  * - returns: A reference to the program on success, `NULL` otherwise.
  */
-mc_Program *mc_program_from_str(const char *programCode);
+mc_Result mc_program_from_str(
+	mc_Program* program,
+	const char* code,
+	uint32_t maxErrorLength,
+	char* error
+);
 
 /** code
  * Create a program (compute shader) from a file.
@@ -219,14 +232,19 @@ mc_Program *mc_program_from_str(const char *programCode);
  * - `filePath`: The path to the file containing the program code.
  * - returns: A reference to the program on success, `NULL` otherwise.
  */
-mc_Program *mc_program_from_file(const char *filePath);
+mc_Result mc_program_from_file(
+	mc_Program* program,
+	const char* path,
+	uint32_t maxErrorLength,
+	char* error
+);
 
 /** code
  * Destroy a program.
  *
  * - `program`: The program to destroy.
  */
-void mc_program_destroy(mc_Program *program);
+mc_Result mc_program_destroy(mc_Program* program);
 
 /** code
  * Dispatch (run) a program.
@@ -234,7 +252,7 @@ void mc_program_destroy(mc_Program *program);
  * - `program`: The program to run.
  * - `size`: The number of workgroups to be run in each dimension.
  */
-void mc_program_dispatch(mc_Program *program, mc_ivec3 size);
+mc_Result mc_program_dispatch(mc_Program* program, mc_ivec3 size);
 
 /** code
  * Set the value of uniform value.
@@ -246,33 +264,33 @@ void mc_program_dispatch(mc_Program *program, mc_ivec3 size);
  */
 
 // for float values
-bool mc_program_set_float(mc_Program *program, char *name, float value);
-bool mc_program_set_vec2(mc_Program *program, char *name, mc_vec2 value);
-bool mc_program_set_vec3(mc_Program *program, char *name, mc_vec3 value);
-bool mc_program_set_vec4(mc_Program *program, char *name, mc_vec4 value);
+mc_Result mc_program_set_float(mc_Program* program, char* name, float value);
+mc_Result mc_program_set_vec2(mc_Program* program, char* name, mc_vec2 value);
+mc_Result mc_program_set_vec3(mc_Program* program, char* name, mc_vec3 value);
+mc_Result mc_program_set_vec4(mc_Program* program, char* name, mc_vec4 value);
 
 // for int values
-bool mc_program_set_int(mc_Program *program, char *name, int value);
-bool mc_program_set_ivec2(mc_Program *program, char *name, mc_ivec2 value);
-bool mc_program_set_ivec3(mc_Program *program, char *name, mc_ivec3 value);
-bool mc_program_set_ivec4(mc_Program *program, char *name, mc_ivec4 value);
+mc_Result mc_program_set_int(mc_Program* program, char* name, int32_t value);
+mc_Result mc_program_set_ivec2(mc_Program* program, char* name, mc_ivec2 value);
+mc_Result mc_program_set_ivec3(mc_Program* program, char* name, mc_ivec3 value);
+mc_Result mc_program_set_ivec4(mc_Program* program, char* name, mc_ivec4 value);
 
-// for unsigned int values
-bool mc_program_set_uint(mc_Program *program, char *name, unsigned int value);
-bool mc_program_set_uvec2(mc_Program *program, char *name, mc_uvec2 value);
-bool mc_program_set_uvec3(mc_Program *program, char *name, mc_uvec3 value);
-bool mc_program_set_uvec4(mc_Program *program, char *name, mc_uvec4 value);
+// for uint values
+mc_Result mc_program_set_uint(mc_Program* program, char* name, uint32_t value);
+mc_Result mc_program_set_uvec2(mc_Program* program, char* name, mc_uvec2 value);
+mc_Result mc_program_set_uvec3(mc_Program* program, char* name, mc_uvec3 value);
+mc_Result mc_program_set_uvec4(mc_Program* program, char* name, mc_uvec4 value);
 
 // for matrix values
-bool mc_program_set_mat22(mc_Program *program, char *name, mc_mat22 value);
-bool mc_program_set_mat33(mc_Program *program, char *name, mc_mat33 value);
-bool mc_program_set_mat44(mc_Program *program, char *name, mc_mat44 value);
-bool mc_program_set_mat23(mc_Program *program, char *name, mc_mat23 value);
-bool mc_program_set_mat32(mc_Program *program, char *name, mc_mat32 value);
-bool mc_program_set_mat24(mc_Program *program, char *name, mc_mat24 value);
-bool mc_program_set_mat42(mc_Program *program, char *name, mc_mat42 value);
-bool mc_program_set_mat34(mc_Program *program, char *name, mc_mat34 value);
-bool mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value);
+mc_Result mc_program_set_mat22(mc_Program* program, char* name, mc_mat22 value);
+mc_Result mc_program_set_mat33(mc_Program* program, char* name, mc_mat33 value);
+mc_Result mc_program_set_mat44(mc_Program* program, char* name, mc_mat44 value);
+mc_Result mc_program_set_mat23(mc_Program* program, char* name, mc_mat23 value);
+mc_Result mc_program_set_mat32(mc_Program* program, char* name, mc_mat32 value);
+mc_Result mc_program_set_mat24(mc_Program* program, char* name, mc_mat24 value);
+mc_Result mc_program_set_mat42(mc_Program* program, char* name, mc_mat42 value);
+mc_Result mc_program_set_mat34(mc_Program* program, char* name, mc_mat34 value);
+mc_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 value);
 
 /**
  * ### Buffer management
@@ -285,14 +303,14 @@ bool mc_program_set_mat43(mc_Program *program, char *name, mc_mat43 value);
  * - `size`: The size of the buffer.
  * - returns: A reference to the buffer on success, `NULL` otherwise.
  */
-mc_Buffer *mc_buffer_create(int binding, size_t size);
+mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, size_t size);
 
 /** code
  * Destroy a buffer.
  *
  * - `buffer`: The buffer to destroy.
  */
-void mc_buffer_destroy(mc_Buffer *buffer);
+mc_Result mc_buffer_destroy(mc_Buffer* buffer);
 
 /** code
  * Rebind a buffer.
@@ -300,7 +318,7 @@ void mc_buffer_destroy(mc_Buffer *buffer);
  * - `buffer`: The buffer to rebind.
  * - `binding`: The (new) binding in which to store the buffer.
  */
-void mc_buffer_rebind(mc_Buffer *buffer, int binding);
+mc_Result mc_buffer_rebind(mc_Buffer* buffer, int32_t binding);
 
 /** code
  * Resize a buffer.
@@ -308,7 +326,7 @@ void mc_buffer_rebind(mc_Buffer *buffer, int binding);
  * - `buffer`: The buffer to resize.
  * - `binding`: The (new) size of the buffer.
  */
-void mc_buffer_resize(mc_Buffer *buffer, size_t size);
+mc_Result mc_buffer_resize(mc_Buffer* buffer, size_t size);
 
 /** code
  * Get the current size of a buffer.
@@ -316,7 +334,7 @@ void mc_buffer_resize(mc_Buffer *buffer, size_t size);
  * - `buffer`: The buffer to get the size of.
  * - returns: The current size of the buffer.
  */
-size_t mc_buffer_get_size(mc_Buffer *buffer);
+mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
 
 /** code
  * Write data to a buffer. If `off` + `size` is larger than the size of the
@@ -328,7 +346,12 @@ size_t mc_buffer_get_size(mc_Buffer *buffer);
  * - `data`: The data to write.
  * - returns: The number of bytes written. `size` on success, `0` otherwise.
  */
-size_t mc_buffer_write(mc_Buffer *buffer, size_t off, size_t size, void *data);
+mc_Result mc_buffer_write(
+	mc_Buffer* buffer,
+	uint64_t offset,
+	uint64_t size,
+	void* data
+);
 
 /** code
  * Read data from a buffer. If `off` + `size` is larger than the size of the
@@ -340,7 +363,16 @@ size_t mc_buffer_write(mc_Buffer *buffer, size_t off, size_t size, void *data);
  * - `data`: A buffer to write the data into. Must be pre-allocated.
  * - returns: The number of bytes read. `size` on success, `0` otherwise.
  */
-size_t mc_buffer_read(mc_Buffer *buffer, size_t off, size_t size, void *data);
+mc_Result mc_buffer_read(
+	mc_Buffer* buffer,
+	uint64_t offset,
+	uint64_t size,
+	void* data
+);
+
+mc_Result mc_read_file(uint32_t* size, char* contents, const char* path);
+
+void mc_result_pretty_print(mc_Result result);
 
 /**
  * ## License

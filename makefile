@@ -36,9 +36,11 @@ STATIC_LIB        := $(OUT_FOLDER)/lib$(LIBRARY).a
 export __GLX_VENDOR_LIBRARY_NAME = nvidia
 export __NV_PRIME_RENDER_OFFLOAD = 1
 
-.PHONY: clean all test doc
+.PHONY: all doc clean
 
 all: $(EXAMPLES) $(STATIC_LIB)
+
+lib: $(STATIC_LIB)
 
 $(BUILD_FOLDER):
 	$(MKDIR) $(BUILD_FOLDER)
