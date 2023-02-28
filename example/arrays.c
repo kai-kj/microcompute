@@ -27,12 +27,17 @@ int main(void) {
     printf("\n");
 
     mc_Buffer buff;
-    mc_buffer_create(&buff, 1, sizeof(float) * 10);
+    mc_buffer_create(&buff, sizeof(float) * 10);
 
     mc_buffer_write(&buff, 0, sizeof(float) * 10, data);
     mc_program_set_float(&program, "test", 9);
 
-    mc_program_dispatch(&program, (mc_ivec3){10, 1, 1});
+    mc_program_dispatch(
+        &program,
+        (mc_ivec3){10, 1, 1},
+        1,
+        (mc_Buffer*[]){&buff}
+    );
 
     mc_buffer_read(&buff, 0, sizeof(float) * 10, data);
     for (int i = 0; i < 10; i++) printf("%f, ", data[i]);

@@ -74,7 +74,17 @@ mc_Result mc_program_destroy(mc_Program* program) {
     return GL_CHECK_ERROR();
 }
 
-mc_Result mc_program_dispatch(mc_Program* program, mc_ivec3 size) {
+mc_Result mc_program_dispatch(
+    mc_Program* program,
+    mc_ivec3 size,
+    uint32_t bufferCount,
+    mc_Buffer** buffers
+) {
+    for (uint32_t i = 0; i < bufferCount; i++) {
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffers[i]->ssbo);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, buffers[i]->ssbo);
+    }
+
     glUseProgram(program->program);
     glDispatchCompute(size.x, size.y, size.z);
     return GL_CHECK_ERROR();

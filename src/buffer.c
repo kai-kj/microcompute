@@ -1,8 +1,7 @@
 #include "_microcompute.h"
 
-mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, uint64_t size) {
+mc_Result mc_buffer_create(mc_Buffer* buffer, uint64_t size) {
     glGenBuffers(1, &buffer->ssbo);
-    mc_buffer_rebind(buffer, binding);
     mc_buffer_resize(buffer, size);
     return GL_CHECK_ERROR();
 }
@@ -10,12 +9,6 @@ mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, uint64_t size) {
 mc_Result mc_buffer_destroy(mc_Buffer* buffer) {
     ASSERT(buffer != NULL, "`buffer` is NULL");
     if (buffer->ssbo != 0) glDeleteBuffers(1, &buffer->ssbo);
-    return GL_CHECK_ERROR();
-}
-
-mc_Result mc_buffer_rebind(mc_Buffer* buffer, int32_t binding) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, buffer->ssbo);
     return GL_CHECK_ERROR();
 }
 

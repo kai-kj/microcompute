@@ -260,10 +260,18 @@ mc_Result mc_program_destroy(mc_Program* program);
  *
  * - `program`: The program to run
  * - `size`: The number of workgroups to be run in each dimension
+ * - `bufferCount`: The number of buffers to pass to the program
+ * - `buffers`: The buffers to pass to the program, the the buffers will be
+ * bound according to their index in this array
  * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
  * otherwise
  */
-mc_Result mc_program_dispatch(mc_Program* program, mc_ivec3 size);
+mc_Result mc_program_dispatch(
+    mc_Program* program,
+    mc_ivec3 size,
+    uint32_t bufferCount,
+    mc_Buffer** buffers
+);
 
 /** code
  * Set the value of uniform value.
@@ -312,12 +320,11 @@ mc_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 value);
  * Create a buffer (SSBO).
  *
  * - `buffer`: The buffer struct to initialize
- * - `binding`: The binding in which to store the buffer
  * - `size`: The size of the buffer
  * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
  * otherwise
  */
-mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, uint64_t size);
+mc_Result mc_buffer_create(mc_Buffer* buffer, uint64_t size);
 
 /** code
  * Destroy a buffer.
@@ -327,16 +334,6 @@ mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, uint64_t size);
  * otherwise
  */
 mc_Result mc_buffer_destroy(mc_Buffer* buffer);
-
-/** code
- * Rebind a buffer.
- *
- * - `buffer`: The buffer to rebind
- * - `binding`: The (new) binding in which to store the buffer
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
- * otherwise
- */
-mc_Result mc_buffer_rebind(mc_Buffer* buffer, int32_t binding);
 
 /** code
  * Resize a buffer.
