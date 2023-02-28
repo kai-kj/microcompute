@@ -8,13 +8,13 @@ layout(std430, binding = 1) buffer buff1 {
 uniform float test;
 
 ivec2 get_pos() {
-	return ivec2(gl_GlobalInvocationID);
+    return ivec2(gl_GlobalInvocationID);
 }
 
 ivec2 get_size() {
-	return ivec2((gl_NumWorkGroups.xy) * gl_WorkGroupSize.xy);
+    return ivec2((gl_NumWorkGroups.xy) * gl_WorkGroupSize.xy);
 }
 
 void main(void) {
-	data[get_pos().x] = data[get_pos().x] * test;
+    data[get_pos().x] = data[get_pos().x] * test;
 }

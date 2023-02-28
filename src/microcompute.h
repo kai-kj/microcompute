@@ -26,8 +26,8 @@
  */
 
 typedef enum mc_Bool {
-	MC_FALSE = 0,
-	MC_TRUE = 1,
+    MC_FALSE = 0,
+    MC_TRUE = 1,
 } mc_Bool;
 
 /** code
@@ -40,11 +40,11 @@ typedef enum mc_Bool {
  */
 
 typedef struct mc_Result {
-	mc_Bool ok;
-	uint32_t line;
-	const char* file;
-	const char* func;
-	const char* message;
+    mc_Bool ok;
+    uint32_t line;
+    const char* file;
+    const char* func;
+    const char* message;
 } mc_Result;
 
 /** code
@@ -53,8 +53,8 @@ typedef struct mc_Result {
  */
 
 typedef struct mc_Program {
-	int32_t shader;
-	int32_t program;
+    int32_t shader;
+    int32_t program;
 } mc_Program;
 
 /** code
@@ -63,7 +63,7 @@ typedef struct mc_Program {
  */
 
 typedef struct mc_Buffer {
-	uint32_t ssbo;
+    uint32_t ssbo;
 } mc_Buffer;
 
 /** code
@@ -72,41 +72,41 @@ typedef struct mc_Buffer {
 
 // float vectors
 typedef struct mc_vec2 {
-	float x, y;
+    float x, y;
 } mc_vec2;
 
 typedef struct mc_vec3 {
-	float x, y, z;
+    float x, y, z;
 } mc_vec3;
 
 typedef struct mc_vec4 {
-	float x, y, z, w;
+    float x, y, z, w;
 } mc_vec4;
 
 // int vectors
 typedef struct mc_ivec2 {
-	int32_t x, y;
+    int32_t x, y;
 } mc_ivec2;
 
 typedef struct mc_ivec3 {
-	int32_t x, y, z;
+    int32_t x, y, z;
 } mc_ivec3;
 
 typedef struct mc_ivec4 {
-	int32_t x, y, z, w;
+    int32_t x, y, z, w;
 } mc_ivec4;
 
 // uint vectors
 typedef struct mc_uvec2 {
-	uint32_t x, y;
+    uint32_t x, y;
 } mc_uvec2;
 
 typedef struct mc_uvec3 {
-	uint32_t x, y, z;
+    uint32_t x, y, z;
 } mc_uvec3;
 
 typedef struct mc_uvec4 {
-	uint32_t x, y, z, w;
+    uint32_t x, y, z, w;
 } mc_uvec4;
 
 /** code
@@ -118,48 +118,48 @@ typedef struct mc_uvec4 {
  */
 
 typedef struct mc_mat22 {
-	float values[4];
-	mc_Bool transpose;
+    float values[4];
+    mc_Bool transpose;
 } mc_mat22;
 
 typedef struct mc_mat33 {
-	float values[9];
-	mc_Bool transpose;
+    float values[9];
+    mc_Bool transpose;
 } mc_mat33;
 
 typedef struct mc_mat44 {
-	float values[16];
-	mc_Bool transpose;
+    float values[16];
+    mc_Bool transpose;
 } mc_mat44;
 
 typedef struct mc_mat23 {
-	float values[6];
-	mc_Bool transpose;
+    float values[6];
+    mc_Bool transpose;
 } mc_mat23;
 
 typedef struct mc_mat32 {
-	float values[6];
-	mc_Bool transpose;
+    float values[6];
+    mc_Bool transpose;
 } mc_mat32;
 
 typedef struct mc_mat24 {
-	float values[8];
-	mc_Bool transpose;
+    float values[8];
+    mc_Bool transpose;
 } mc_mat24;
 
 typedef struct mc_mat42 {
-	float values[8];
-	mc_Bool transpose;
+    float values[8];
+    mc_Bool transpose;
 } mc_mat42;
 
 typedef struct mc_mat34 {
-	float values[12];
-	mc_Bool transpose;
+    float values[12];
+    mc_Bool transpose;
 } mc_mat34;
 
 typedef struct mc_mat43 {
-	float values[12];
-	mc_Bool transpose;
+    float values[12];
+    mc_Bool transpose;
 } mc_mat43;
 
 /**
@@ -173,10 +173,10 @@ typedef struct mc_mat43 {
  */
 
 typedef enum mc_DebugLevel {
-	mc_DebugLevel_INFO,
-	mc_DebugLevel_LOW,
-	mc_DebugLevel_MEDIUM,
-	mc_DebugLevel_HIGH,
+    mc_DebugLevel_INFO,
+    mc_DebugLevel_LOW,
+    mc_DebugLevel_MEDIUM,
+    mc_DebugLevel_HIGH,
 } mc_DebugLevel;
 
 /**
@@ -222,10 +222,10 @@ mc_Result mc_stop();
  * otherwise
  */
 mc_Result mc_program_from_str(
-	mc_Program* program,
-	const char* code,
-	uint32_t maxErrorLength,
-	char* error
+    mc_Program* program,
+    const char* code,
+    uint32_t maxErrorLength,
+    char* error
 );
 
 /** code
@@ -240,10 +240,10 @@ mc_Result mc_program_from_str(
  * otherwise
  */
 mc_Result mc_program_from_file(
-	mc_Program* program,
-	const char* path,
-	uint32_t maxErrorLength,
-	char* error
+    mc_Program* program,
+    const char* path,
+    uint32_t maxErrorLength,
+    char* error
 );
 
 /** code
@@ -370,10 +370,10 @@ mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
  * otherwise
  */
 mc_Result mc_buffer_write(
-	mc_Buffer* buffer,
-	uint64_t offset,
-	uint64_t size,
-	void* data
+    mc_Buffer* buffer,
+    uint64_t offset,
+    uint64_t size,
+    void* data
 );
 
 /** code
@@ -388,10 +388,10 @@ mc_Result mc_buffer_write(
  * otherwise
  */
 mc_Result mc_buffer_read(
-	mc_Buffer* buffer,
-	uint64_t offset,
-	uint64_t size,
-	void* data
+    mc_Buffer* buffer,
+    uint64_t offset,
+    uint64_t size,
+    void* data
 );
 
 /**

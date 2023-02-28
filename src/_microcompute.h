@@ -16,22 +16,22 @@ mc_Result gl_check_error(uint32_t line, const char* file, const char* func);
 mc_Result mc_read_file(uint32_t* size, char* contents, const char* path);
 
 #define OK                                                                     \
-	((mc_Result){                                                              \
-		.ok = MC_TRUE,                                                         \
-		.file = __FILE__,                                                      \
-		.line = __LINE__,                                                      \
-		.func = __FUNCTION__,                                                  \
-		.message = (char*){"no errors here :)"}})
+    ((mc_Result){                                                              \
+        .ok = MC_TRUE,                                                         \
+        .file = __FILE__,                                                      \
+        .line = __LINE__,                                                      \
+        .func = __FUNCTION__,                                                  \
+        .message = (char*){"no errors here :)"}})
 
 #define ERROR(msg)                                                             \
-	((mc_Result){                                                              \
-		.ok = MC_FALSE,                                                        \
-		.file = __FILE__,                                                      \
-		.line = __LINE__,                                                      \
-		.func = __FUNCTION__,                                                  \
-		.message = (char*){(msg)}})
+    ((mc_Result){                                                              \
+        .ok = MC_FALSE,                                                        \
+        .file = __FILE__,                                                      \
+        .line = __LINE__,                                                      \
+        .func = __FUNCTION__,                                                  \
+        .message = (char*){(msg)}})
 
 #define ASSERT(cond, msg)                                                      \
-	do {                                                                       \
-		if (!(cond)) return ERROR((msg));                                      \
-	} while (0)
+    do {                                                                       \
+        if (!(cond)) return ERROR((msg));                                      \
+    } while (0)
