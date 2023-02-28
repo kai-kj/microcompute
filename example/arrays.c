@@ -3,6 +3,17 @@
 
 #include "../out/microcompute.h"
 
+const char* src = //
+    "#version 450\n"
+    "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
+    "layout(std430, binding = 0) buffer buff1 {\n"
+    "    float data[];\n"
+    "};\n"
+    "uniform float v;\n"
+    "void main(void) {\n"
+    "    data[gl_GlobalInvocationID.x] = data[gl_GlobalInvocationID.x] * v;\n"
+    "}\n";
+
 int main(void) {
     mc_Result res;
 
@@ -13,9 +24,10 @@ int main(void) {
     }
 
     mc_Program program;
-    char error[1024];
+    int maxErrLen = 2048;
+    char error[maxErrLen];
 
-    res = mc_program_from_file(&program, "example/arrays.glsl", 1024, error);
+    res = mc_program_from_str(&program, src, maxErrLen, error);
     if (!res.ok) {
         mc_result_pretty_print(res);
         printf("error: %s\n", error);
@@ -30,7 +42,7 @@ int main(void) {
     mc_buffer_create(&buff, sizeof(float) * 10);
 
     mc_buffer_write(&buff, 0, sizeof(float) * 10, data);
-    mc_program_set_float(&program, "test", 9);
+    mc_program_set_float(&program, "v", 9);
 
     mc_program_dispatch(
         &program,
