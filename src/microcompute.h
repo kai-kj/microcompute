@@ -31,7 +31,12 @@ typedef enum mc_Bool {
 } mc_Bool;
 
 /** code
- * Result type. Returned by all microcompute functions;
+ * Result type. Returned by all microcompute functions.
+ * - `ok`: `MC_TRUE` if no errors, `MC_FALSE` otherwise
+ * - `line`: The line number where the result was generated
+ * - `file`: The name of the file where the result was generated
+ * - `func`: The name of the function where the result was generated
+ * - `message`: A message attached to the result
  */
 
 typedef struct mc_Result {
@@ -42,10 +47,20 @@ typedef struct mc_Result {
 	const char* message;
 } mc_Result;
 
+/** code
+ * Contains information about a compute program. It is managed by microcompute,
+ * therefore, don't modify the contents of this struct.
+ */
+
 typedef struct mc_Program {
 	int32_t shader;
 	int32_t program;
 } mc_Program;
+
+/** code
+ *  Contains information about a compute buffer. It is managed by microcompute,
+ * therefore, don't modify the contents of this type.
+ */
 
 typedef struct mc_Buffer {
 	uint32_t ssbo;
@@ -165,18 +180,6 @@ typedef enum mc_DebugLevel {
 } mc_DebugLevel;
 
 /**
- * ### Function pointers
- */
-
-/** code
- * Debug callback function.
- *
- * - `level`: The severity of the debug message.
- * - `message`: The message. Managed by microcompute, so do not `free()` it.
- * - `arg`: User defined data defined in `mc_set_debug_callback()`
- */
-
-/**
  * ### Core functionality
  */
 
@@ -188,26 +191,20 @@ typedef enum mc_DebugLevel {
  * If the machine the library is being used on has multiple graphics cards, the
  * `renderDevice` parameter will determine which card is used.
  *
- * - `renderDevice`: Should be `/dev/dri/renderD...`.
- * - `renderDevice`: The rendering device to be used by the library.
- * - returns: `true` on success, `false` otherwise.
+ * - `renderDevice`: The rendering device to be used by the library, should be
+ * `/dev/dri/renderD...`
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_start(char* renderDevice);
 
 /** code
  * Stops the microcompute library.
+ *
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_stop();
-
-/** code
- * Set the function to be called when a debug message is produced.
- *
- * `mc_set_debug_callback(mc_default_debug_callback, NULL)` can be called to
- * simply have all debug messages printed to `stdout`.
- *
- * - `cb`: The function to be called.
- * - `arg`: User defined data to be passed to the callback function.
- */
 
 /**
  * ### Program (compute shader) management
@@ -216,8 +213,13 @@ mc_Result mc_stop();
 /** code
  * Create a program (compute shader) from a string.
  *
- * - `programCode`: A string containing the program code.
- * - returns: A reference to the program on success, `NULL` otherwise.
+ * - `program`: The program struct to initialize
+ * - `code`: A string containing the shader code
+ * - `maxErrorLength`: Maximum length for shader errors
+ * - `error`: A string with longer than `maxErrorLength` that will contain any
+ * shader errors
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_program_from_str(
 	mc_Program* program,
@@ -229,8 +231,13 @@ mc_Result mc_program_from_str(
 /** code
  * Create a program (compute shader) from a file.
  *
- * - `filePath`: The path to the file containing the program code.
- * - returns: A reference to the program on success, `NULL` otherwise.
+ * - `program`: The program struct to initialize
+ * - `code`: A string containing the path to the file containing the shader code
+ * - `maxErrorLength`: Maximum length for shader errors
+ * - `error`: A string with longer than `maxErrorLength` that will contain any
+ * shader errors
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_program_from_file(
 	mc_Program* program,
@@ -242,25 +249,30 @@ mc_Result mc_program_from_file(
 /** code
  * Destroy a program.
  *
- * - `program`: The program to destroy.
+ * - `program`: The program to destroy
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_program_destroy(mc_Program* program);
 
 /** code
  * Dispatch (run) a program.
  *
- * - `program`: The program to run.
- * - `size`: The number of workgroups to be run in each dimension.
+ * - `program`: The program to run
+ * - `size`: The number of workgroups to be run in each dimension
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_program_dispatch(mc_Program* program, mc_ivec3 size);
 
 /** code
  * Set the value of uniform value.
  *
- * - `program`: The program in which to set the uniform value.
- * - `name`: The name of the uniform to set.
- * - `value`: The value of the uniform.
- * - returns: `true` on success, `false` if the variable could not be found.
+ * - `program`: The program in which to set the uniform value
+ * - `name`: The name of the uniform to set
+ * - `value`: The value of the uniform
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 
 // for float values
@@ -299,40 +311,50 @@ mc_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 value);
 /** code
  * Create a buffer (SSBO).
  *
- * - `binding`: The binding in which to store the buffer.
- * - `size`: The size of the buffer.
- * - returns: A reference to the buffer on success, `NULL` otherwise.
+ * - `buffer`: The buffer struct to initialize
+ * - `binding`: The binding in which to store the buffer
+ * - `size`: The size of the buffer
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
-mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, size_t size);
+mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, uint64_t size);
 
 /** code
  * Destroy a buffer.
  *
- * - `buffer`: The buffer to destroy.
+ * - `buffer`: The buffer to destroy
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_buffer_destroy(mc_Buffer* buffer);
 
 /** code
  * Rebind a buffer.
  *
- * - `buffer`: The buffer to rebind.
- * - `binding`: The (new) binding in which to store the buffer.
+ * - `buffer`: The buffer to rebind
+ * - `binding`: The (new) binding in which to store the buffer
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_buffer_rebind(mc_Buffer* buffer, int32_t binding);
 
 /** code
  * Resize a buffer.
  *
- * - `buffer`: The buffer to resize.
- * - `binding`: The (new) size of the buffer.
+ * - `buffer`: The buffer to resize
+ * - `binding`: The (new) size of the buffer
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
-mc_Result mc_buffer_resize(mc_Buffer* buffer, size_t size);
+mc_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size);
 
 /** code
  * Get the current size of a buffer.
  *
- * - `buffer`: The buffer to get the size of.
- * - returns: The current size of the buffer.
+ * - `buffer`: The buffer to get the size of
+ * - returns: The current size of the buffer
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
 
@@ -340,11 +362,12 @@ mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
  * Write data to a buffer. If `off` + `size` is larger than the size of the
  * buffer, the function call will fail.
  *
- * - `buffer`: The buffer to write to.
- * - `off`: The offset at which to start writing data to. Measured in bytes.
- * - `size`: The size (length) of the data to be written. Measured in bytes.
- * - `data`: The data to write.
- * - returns: The number of bytes written. `size` on success, `0` otherwise.
+ * - `buffer`: The buffer to write to
+ * - `off`: The offset at which to start writing data to, measured in bytes
+ * - `size`: The size (length) of the data to be written, measured in bytes
+ * - `data`: The data to write
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_buffer_write(
 	mc_Buffer* buffer,
@@ -357,11 +380,12 @@ mc_Result mc_buffer_write(
  * Read data from a buffer. If `off` + `size` is larger than the size of the
  * buffer, the function call will fail.
  *
- * - `buffer`: The buffer to read from.
- * - `off`: The offset at which to start reading data from. Measured in bytes.
- * - `size`: The size (length) of the data to be read. Measured in bytes.
- * - `data`: A buffer to write the data into. Must be pre-allocated.
- * - returns: The number of bytes read. `size` on success, `0` otherwise.
+ * - `buffer`: The buffer to read from
+ * - `off`: The offset at which to start reading data from, measured in bytes
+ * - `size`: The size (length) of the data to be read, measured in bytes
+ * - `data`: A buffer to write the data into. Must be pre-allocated
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
  */
 mc_Result mc_buffer_read(
 	mc_Buffer* buffer,
@@ -370,8 +394,15 @@ mc_Result mc_buffer_read(
 	void* data
 );
 
-mc_Result mc_read_file(uint32_t* size, char* contents, const char* path);
+/**
+ * ### Misc functions
+ */
 
+/** code
+ * Print the contents of a `mc_Result`.
+ *
+ * - `result`: The result to print
+ */
 void mc_result_pretty_print(mc_Result result);
 
 /**

@@ -13,6 +13,7 @@
 #define GL_CHECK_ERROR() gl_check_error(__LINE__, __FILE__, __FUNCTION__)
 
 mc_Result gl_check_error(uint32_t line, const char* file, const char* func);
+mc_Result mc_read_file(uint32_t* size, char* contents, const char* path);
 
 #define OK                                                                     \
 	((mc_Result){                                                              \
