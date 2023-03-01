@@ -38,7 +38,7 @@ export __NV_PRIME_RENDER_OFFLOAD = 1
 
 .PHONY: all doc clean
 
-all: $(EXAMPLES) $(STATIC_LIB)
+all: $(EXAMPLES) $(STATIC_LIB) doc
 
 lib: $(STATIC_LIB)
 
