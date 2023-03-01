@@ -48,23 +48,11 @@ typedef struct mc_Result {
 } mc_Result;
 
 /** code
- * Contains information about a compute program. It is managed by microcompute,
- * therefore, don't modify the contents of this struct.
+ * Private microcompute types.
  */
 
-typedef struct mc_Program {
-    int32_t shader;
-    int32_t program;
-} mc_Program;
-
-/** code
- *  Contains information about a compute buffer. It is managed by microcompute,
- * therefore, don't modify the contents of this type.
- */
-
-typedef struct mc_Buffer {
-    uint32_t ssbo;
-} mc_Buffer;
+typedef struct mc_Program mc_Program;
+typedef struct mc_Buffer mc_Buffer;
 
 /** code
  * Vector types, compatible with glsl vectors.
@@ -218,11 +206,9 @@ mc_Result mc_stop();
  * - `maxErrorLength`: Maximum length for shader errors
  * - `error`: A string with longer than `maxErrorLength` that will contain any
  * shader errors
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
- * otherwise
+ * - returns: A non-`NULL` pointer on success, `NULL` otherwise
  */
-mc_Result mc_program_from_str(
-    mc_Program* program,
+mc_Program* mc_program_create_from_string(
     const char* code,
     uint32_t maxErrorLength,
     char* error
@@ -236,11 +222,9 @@ mc_Result mc_program_from_str(
  * - `maxErrorLength`: Maximum length for shader errors
  * - `error`: A string with longer than `maxErrorLength` that will contain any
  * shader errors
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
- * otherwise
+ * - returns: A non-`NULL` pointer on success, `NULL` otherwise
  */
-mc_Result mc_program_from_file(
-    mc_Program* program,
+mc_Program* mc_program_create_from_file(
     const char* path,
     uint32_t maxErrorLength,
     char* error
@@ -321,10 +305,9 @@ mc_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 value);
  *
  * - `buffer`: The buffer struct to initialize
  * - `size`: The size of the buffer
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
- * otherwise
+ * - returns: A non-`NULL` pointer on success, `NULL` otherwise
  */
-mc_Result mc_buffer_create(mc_Buffer* buffer, uint64_t size);
+mc_Buffer* mc_buffer_create(uint64_t size);
 
 /** code
  * Destroy a buffer.

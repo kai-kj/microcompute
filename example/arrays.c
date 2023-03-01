@@ -23,11 +23,10 @@ int main(void) {
         return -1;
     }
 
-    mc_Program program;
     int maxErrLen = 2048;
     char error[maxErrLen];
 
-    res = mc_program_from_str(&program, src, maxErrLen, error);
+    mc_Program* program = mc_program_create_from_string(src, maxErrLen, error);
     if (!res.ok) {
         mc_result_pretty_print(res);
         printf("error: %s\n", error);
@@ -38,25 +37,19 @@ int main(void) {
     for (int i = 0; i < 10; i++) printf("%f, ", data[i]);
     printf("\n");
 
-    mc_Buffer buff;
-    mc_buffer_create(&buff, sizeof(float) * 10);
+    mc_Buffer* buff = mc_buffer_create(sizeof(float) * 10);
 
-    mc_buffer_write(&buff, 0, sizeof(float) * 10, data);
-    mc_program_set_float(&program, "v", 9);
+    mc_buffer_write(buff, 0, sizeof(float) * 10, data);
+    mc_program_set_float(program, "v", 9);
 
-    mc_program_dispatch(
-        &program,
-        (mc_ivec3){10, 1, 1},
-        1,
-        (mc_Buffer*[]){&buff}
-    );
+    mc_program_dispatch(program, (mc_ivec3){10, 1, 1}, 1, (mc_Buffer*[]){buff});
 
-    mc_buffer_read(&buff, 0, sizeof(float) * 10, data);
+    mc_buffer_read(buff, 0, sizeof(float) * 10, data);
     for (int i = 0; i < 10; i++) printf("%f, ", data[i]);
     printf("\n");
 
-    mc_buffer_destroy(&buff);
-    mc_program_destroy(&program);
+    mc_buffer_destroy(buff);
+    mc_program_destroy(program);
     mc_stop();
 
     return 0;

@@ -30,41 +30,47 @@ mc_Result check_program(GLuint program, uint32_t maxLen, char* err) {
     return ERROR("program link error");
 }
 
-mc_Result mc_program_from_str(
-    mc_Program* program,
+mc_Program* mc_program_create_from_string(
     const char* code,
     uint32_t maxErrorLength,
     char* error
 ) {
+    mc_Program* program = malloc(sizeof(*program));
+
     program->shader = glCreateShader(GL_COMPUTE_SHADER);
     glShaderSource(program->shader, 1, &code, NULL);
     glCompileShader(program->shader);
 
     mc_Result res = check_shader(program->shader, maxErrorLength, error);
-    if (!res.ok) return res;
+    if (!res.ok) {
+        free(program);
+        return NULL;
+    };
 
     program->program = glCreateProgram();
     glAttachShader(program->program, program->shader);
     glLinkProgram(program->program);
 
     res = check_program(program->program, maxErrorLength, error);
-    if (!res.ok) return res;
+    if (!res.ok) {
+        free(program);
+        return NULL;
+    };
 
-    return GL_CHECK_ERROR();
+    return program;
 }
 
-mc_Result mc_program_from_file(
-    mc_Program* program,
+mc_Program* mc_program_create_from_file(
     const char* path,
     uint32_t maxErrorLength,
     char* error
 ) {
     uint32_t fileSize;
-    ASSERT(mc_read_file(&fileSize, NULL, path).ok, "failed to read file");
+    if (!mc_read_file(&fileSize, NULL, path).ok) return NULL;
     char code[fileSize];
-    ASSERT(mc_read_file(&fileSize, code, path).ok, "failed to read file");
+    if (!mc_read_file(&fileSize, code, path).ok) return NULL;
 
-    return mc_program_from_str(program, code, maxErrorLength, error);
+    return mc_program_create_from_string(code, maxErrorLength, error);
 }
 
 mc_Result mc_program_destroy(mc_Program* program) {

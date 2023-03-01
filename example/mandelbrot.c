@@ -67,56 +67,54 @@ int main(void) {
         return -1;
     }
 
-    mc_Program renderProg;
-    res = mc_program_from_str(&renderProg, renderProgSrc, maxErrLen, error);
+    mc_Program* renderProg
+        = mc_program_create_from_string(renderProgSrc, maxErrLen, error);
     if (!res.ok) {
         mc_result_pretty_print(res);
         printf("error: %s\n", error);
         return -1;
     }
 
-    mc_Program convertProg;
-    res = mc_program_from_str(&convertProg, converProgSrc, maxErrLen, error);
+    mc_Program* convertProg
+        = mc_program_create_from_string(converProgSrc, maxErrLen, error);
     if (!res.ok) {
         mc_result_pretty_print(res);
         printf("error: %s\n", error);
         return -1;
     }
 
-    mc_Buffer floatImage;
-    mc_buffer_create(&floatImage, sizeof(float) * pixels * 4);
-    mc_buffer_write(&floatImage, 0, sizeof(float) * pixels * 4, NULL);
+    mc_Buffer* floatImage = mc_buffer_create(sizeof(float) * pixels * 4);
+    mc_buffer_write(floatImage, 0, sizeof(float) * pixels * 4, NULL);
 
-    mc_Buffer byteImage;
-    mc_buffer_create(&byteImage, sizeof(int) * pixels);
-    mc_buffer_write(&byteImage, 0, sizeof(int) * pixels, NULL);
+    mc_Buffer* byteImage = mc_buffer_create(sizeof(int) * pixels);
+    mc_buffer_write(byteImage, 0, sizeof(int) * pixels, NULL);
 
-    mc_program_set_float(&renderProg, "maxIter", 1000);
-    mc_program_set_vec2(&renderProg, "center", (mc_vec2){-0.7615, -0.08459});
-    mc_program_set_vec2(&renderProg, "zoom", (mc_vec2){1000, 1000});
+    mc_program_set_float(renderProg, "maxIter", 1000);
+    mc_program_set_vec2(renderProg, "center", (mc_vec2){-0.7615, -0.08459});
+    mc_program_set_vec2(renderProg, "zoom", (mc_vec2){1000, 1000});
 
     mc_program_dispatch(
-        &renderProg,
+        renderProg,
         (mc_ivec3){width, height, 1},
         1,
-        (mc_Buffer*[]){&floatImage}
+        (mc_Buffer*[]){floatImage}
     );
 
     mc_program_dispatch(
-        &convertProg,
+        convertProg,
         (mc_ivec3){width, height, 1},
         2,
-        (mc_Buffer*[]){&floatImage, &byteImage}
+        (mc_Buffer*[]){floatImage, byteImage}
     );
 
     char* data = malloc(pixels * 4);
-    mc_buffer_read(&byteImage, 0, pixels * 4, data);
+    mc_buffer_read(byteImage, 0, pixels * 4, data);
     stbi_write_bmp("out/mandelbrot.bmp", width, height, 4, data);
     free(data);
 
-    mc_buffer_destroy(&floatImage);
-    mc_buffer_destroy(&byteImage);
-    mc_program_destroy(&renderProg);
-    mc_program_destroy(&convertProg);
+    mc_buffer_destroy(floatImage);
+    mc_buffer_destroy(byteImage);
+    mc_program_destroy(renderProg);
+    mc_program_destroy(convertProg);
     mc_stop();
 }

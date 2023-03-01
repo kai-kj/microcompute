@@ -6,9 +6,19 @@
 #include <fcntl.h>
 #include <gbm.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "microcompute.h"
+
+typedef struct mc_Program {
+    int32_t shader;
+    int32_t program;
+} mc_Program;
+
+typedef struct mc_Buffer {
+    uint32_t ssbo;
+} mc_Buffer;
 
 #define GL_CHECK_ERROR() gl_check_error(__LINE__, __FILE__, __FUNCTION__)
 

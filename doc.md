@@ -40,23 +40,10 @@ performed in the same thread
 <br/>
 
 - ```c
-  typedef struct mc_Program {
-      int32_t shader;
-      int32_t program;
-  } mc_Program;
+  typedef struct mc_Program mc_Program;
+  typedef struct mc_Buffer mc_Buffer;
   ```
-  Contains information about a compute program. It is managed by microcompute,
-  therefore, don't modify the contents of this struct.
-
-<br/>
-
-- ```c
-  typedef struct mc_Buffer {
-      uint32_t ssbo;
-  } mc_Buffer;
-  ```
-   Contains information about a compute buffer. It is managed by microcompute,
-  therefore, don't modify the contents of this type.
+  Private microcompute types.
 
 <br/>
 
@@ -203,8 +190,7 @@ performed in the same thread
 
 ### Program (compute shader) management
 - ```c
-  mc_Result mc_program_from_str(
-      mc_Program* program,
+  mc_Program* mc_program_create_from_string(
       const char* code,
       uint32_t maxErrorLength,
       char* error
@@ -217,14 +203,12 @@ performed in the same thread
   - `maxErrorLength`: Maximum length for shader errors
   - `error`: A string with longer than `maxErrorLength` that will contain any
   shader errors
-  - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
-  otherwise
+  - returns: A non-`NULL` pointer on success, `NULL` otherwise
 
 <br/>
 
 - ```c
-  mc_Result mc_program_from_file(
-      mc_Program* program,
+  mc_Program* mc_program_create_from_file(
       const char* path,
       uint32_t maxErrorLength,
       char* error
@@ -237,8 +221,7 @@ performed in the same thread
   - `maxErrorLength`: Maximum length for shader errors
   - `error`: A string with longer than `maxErrorLength` that will contain any
   shader errors
-  - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
-  otherwise
+  - returns: A non-`NULL` pointer on success, `NULL` otherwise
 
 <br/>
 
@@ -254,12 +237,20 @@ performed in the same thread
 <br/>
 
 - ```c
-  mc_Result mc_program_dispatch(mc_Program* program, mc_ivec3 size);
+  mc_Result mc_program_dispatch(
+      mc_Program* program,
+      mc_ivec3 size,
+      uint32_t bufferCount,
+      mc_Buffer** buffers
+  );
   ```
   Dispatch (run) a program.
   
   - `program`: The program to run
   - `size`: The number of workgroups to be run in each dimension
+  - `bufferCount`: The number of buffers to pass to the program
+  - `buffers`: The buffers to pass to the program, the the buffers will be
+  bound according to their index in this array
   - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
   otherwise
 
@@ -307,15 +298,13 @@ performed in the same thread
 
 ### Buffer management
 - ```c
-  mc_Result mc_buffer_create(mc_Buffer* buffer, int32_t binding, uint64_t size);
+  mc_Buffer* mc_buffer_create(uint64_t size);
   ```
   Create a buffer (SSBO).
   
   - `buffer`: The buffer struct to initialize
-  - `binding`: The binding in which to store the buffer
   - `size`: The size of the buffer
-  - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
-  otherwise
+  - returns: A non-`NULL` pointer on success, `NULL` otherwise
 
 <br/>
 
@@ -325,18 +314,6 @@ performed in the same thread
   Destroy a buffer.
   
   - `buffer`: The buffer to destroy
-  - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
-  otherwise
-
-<br/>
-
-- ```c
-  mc_Result mc_buffer_rebind(mc_Buffer* buffer, int32_t binding);
-  ```
-  Rebind a buffer.
-  
-  - `buffer`: The buffer to rebind
-  - `binding`: The (new) binding in which to store the buffer
   - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
   otherwise
 

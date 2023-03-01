@@ -1,9 +1,10 @@
 #include "_microcompute.h"
 
-mc_Result mc_buffer_create(mc_Buffer* buffer, uint64_t size) {
+mc_Buffer* mc_buffer_create(uint64_t size) {
+    mc_Buffer* buffer = malloc(sizeof(*buffer));
     glGenBuffers(1, &buffer->ssbo);
     mc_buffer_resize(buffer, size);
-    return GL_CHECK_ERROR();
+    return buffer;
 }
 
 mc_Result mc_buffer_destroy(mc_Buffer* buffer) {
