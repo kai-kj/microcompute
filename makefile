@@ -33,9 +33,6 @@ EXAMPLE_C_FILES   := $(shell find $(EXAMPLE_FOLDER)/ -type f -name "*.c")
 EXAMPLES          := $(subst $(EXAMPLE_FOLDER)/,$(OUT_FOLDER)/,$(subst .c,,$(EXAMPLE_C_FILES)))
 STATIC_LIB        := $(OUT_FOLDER)/lib$(LIBRARY).a
 
-export __GLX_VENDOR_LIBRARY_NAME = nvidia
-export __NV_PRIME_RENDER_OFFLOAD = 1
-
 .PHONY: all doc clean
 
 all: $(EXAMPLES) $(STATIC_LIB) doc
