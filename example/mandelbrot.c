@@ -1,10 +1,9 @@
+#include <microcompute.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
-#include "../out/microcompute.h"
 
 static char* renderProgSrc = //
     "#version 460\n"
@@ -109,7 +108,7 @@ int main(void) {
 
     char* data = malloc(pixels * 4);
     mc_buffer_read(byteImage, 0, pixels * 4, data);
-    stbi_write_bmp("out/mandelbrot.bmp", width, height, 4, data);
+    stbi_write_bmp("tmp/mandelbrot.bmp", width, height, 4, data);
     free(data);
 
     mc_buffer_destroy(floatImage);

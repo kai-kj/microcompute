@@ -1,7 +1,6 @@
+#include <microcompute.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "../out/microcompute.h"
 
 const char* src = //
     "#version 450\n"
