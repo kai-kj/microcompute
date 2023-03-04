@@ -12,18 +12,18 @@
 #include "microcompute.h"
 
 typedef struct mc_Program {
-    int32_t shader;
-    int32_t program;
+    GLint shader;
+    GLint program;
 } mc_Program;
 
 typedef struct mc_Buffer {
-    uint32_t ssbo;
+    GLuint ssbo;
 } mc_Buffer;
 
 #define GL_CHECK_ERROR() gl_check_error(__LINE__, __FILE__, __FUNCTION__)
 
 mc_Result gl_check_error(uint32_t line, const char* file, const char* func);
-mc_Result mc_read_file(uint32_t* size, char* contents, const char* path);
+char* mc_read_file(const char* path, uint32_t* size);
 
 #define OK                                                                     \
     ((mc_Result){                                                              \

@@ -1,22 +1,20 @@
 #include "_microcompute.h"
 
-mc_Result mc_read_file(uint32_t* size, char* contents, const char* path) {
+char* mc_read_file(const char* path, uint32_t* size) {
     FILE* fp = fopen(path, "rb");
-    if (fp == NULL) return ERROR("failed to open file");
+    if (fp == NULL) return NULL;
 
     fseek(fp, 0, SEEK_END);
     long length = ftell(fp) + 1;
     fseek(fp, 0, SEEK_SET);
 
-    if (contents != NULL) {
-        fread(contents, 1, length, fp);
-        contents[length - 1] = '\0';
-    }
+    char* contents = malloc(length);
+    fread(contents, 1, length, fp);
+    contents[length - 1] = '\0';
     fclose(fp);
 
     if (size != NULL) *size = length;
-
-    return OK;
+    return contents;
 }
 
 void mc_result_pretty_print(mc_Result result) {

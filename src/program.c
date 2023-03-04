@@ -1,6 +1,6 @@
 #include "_microcompute.h"
 
-mc_Result check_shader(GLuint shader, uint32_t maxLen, char* err) {
+static mc_Result check_shader(GLuint shader, uint32_t maxLen, char* err) {
     int32_t success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (success) return GL_CHECK_ERROR();
@@ -15,7 +15,7 @@ mc_Result check_shader(GLuint shader, uint32_t maxLen, char* err) {
     return ERROR("shader compile error");
 }
 
-mc_Result check_program(GLuint program, uint32_t maxLen, char* err) {
+static mc_Result check_program(GLuint program, uint32_t maxLen, char* err) {
     int32_t success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (success) return GL_CHECK_ERROR();
@@ -65,12 +65,13 @@ mc_Program* mc_program_create_from_file(
     uint32_t maxErrorLength,
     char* error
 ) {
-    uint32_t fileSize;
-    if (!mc_read_file(&fileSize, NULL, path).ok) return NULL;
-    char code[fileSize];
-    if (!mc_read_file(&fileSize, code, path).ok) return NULL;
+    char* code = mc_read_file(path, NULL);
+    if (code == NULL) return NULL;
 
-    return mc_program_create_from_string(code, maxErrorLength, error);
+    mc_Program* program
+        = mc_program_create_from_string(code, maxErrorLength, error);
+    free(code);
+    return program;
 }
 
 mc_Result mc_program_destroy(mc_Program* program) {

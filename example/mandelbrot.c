@@ -56,8 +56,8 @@ int main(void) {
 
     int maxErrLen = 2048;
     char error[maxErrLen];
-    int width = 1000;
-    int height = 1000;
+    int width = 800;
+    int height = 600;
     int pixels = width * height;
 
     res = mc_start("/dev/dri/renderD129");
@@ -68,16 +68,14 @@ int main(void) {
 
     mc_Program* renderProg
         = mc_program_create_from_string(renderProgSrc, maxErrLen, error);
-    if (!res.ok) {
-        mc_result_pretty_print(res);
+    if (renderProg == NULL) {
         printf("error: %s\n", error);
         return -1;
     }
 
     mc_Program* convertProg
         = mc_program_create_from_string(converProgSrc, maxErrLen, error);
-    if (!res.ok) {
-        mc_result_pretty_print(res);
+    if (convertProg == NULL) {
         printf("error: %s\n", error);
         return -1;
     }
@@ -88,7 +86,7 @@ int main(void) {
     mc_Buffer* byteImage = mc_buffer_create(sizeof(int) * pixels);
     mc_buffer_write(byteImage, 0, sizeof(int) * pixels, NULL);
 
-    mc_program_set_float(renderProg, "maxIter", 1000);
+    mc_program_set_float(renderProg, "maxIter", 500);
     mc_program_set_vec2(renderProg, "center", (mc_vec2){-0.7615, -0.08459});
     mc_program_set_vec2(renderProg, "zoom", (mc_vec2){1000, 1000});
 
