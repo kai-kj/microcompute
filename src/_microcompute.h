@@ -1,13 +1,16 @@
 #pragma once
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 #include <GL/glew.h>
-#include <fcntl.h>
-#include <gbm.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef STANDALONE
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <fcntl.h>
+#include <gbm.h>
 #include <unistd.h>
+#endif
 
 #include "microcompute.h"
 

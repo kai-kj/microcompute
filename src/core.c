@@ -1,5 +1,6 @@
 #include "_microcompute.h"
 
+#ifdef STANDALONE
 struct mc_State {
     int32_t rendererFd;
     struct gbm_device* device;
@@ -8,8 +9,6 @@ struct mc_State {
 };
 
 static struct mc_State state;
-
-#define DEBUG_MODE
 
 static void gl_debug_cb(
     GLenum source,
@@ -20,7 +19,7 @@ static void gl_debug_cb(
     const GLchar* msg,
     const void* data
 ) {
-#ifdef DEBUG_MODE
+#ifdef DEBUG
     char* sourceStr = (char*[]){
         "API",
         "WINDOW",
@@ -116,3 +115,5 @@ mc_Result mc_stop() {
     if (state.rendererFd != 0) close(state.rendererFd);
     return GL_CHECK_ERROR();
 }
+
+#endif

@@ -179,6 +179,8 @@ typedef enum mc_DebugLevel {
  * If the machine the library is being used on has multiple graphics cards, the
  * `renderDevice` parameter will determine which card is used.
  *
+ * Only available if microcompute is compiled with STANDALONE.
+ *
  * - `renderDevice`: The rendering device to be used by the library, should be
  * `/dev/dri/renderD...`
  * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
@@ -188,6 +190,8 @@ mc_Result mc_start(char* renderDevice);
 
 /** code
  * Stops the microcompute library.
+ *
+ * Only available if microcompute is compiled with STANDALONE.
  *
  * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
  * otherwise
