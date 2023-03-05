@@ -22,13 +22,8 @@ This library makes it easy to run simple OpenGL compute shaders. It can be used 
 
 ## Examples
 
-- Array operations:
-  - [example/array.c](https://github.com/kal39/microcompute/blob/master/example/arrays.c)
-  - [example/array.glsl](https://github.com/kal39/microcompute/blob/master/example/arrays.glsl)
-- Mandelbrot renderer:
-  - [example/mandelbrot.c](https://github.com/kal39/microcompute/blob/master/example/mandelbrot.c)
-  - [example/mandelbrot.glsl](https://github.com/kal39/microcompute/blob/master/example/mandelbrot.glsl)
-  - [example/convert.glsl](https://github.com/kal39/microcompute/blob/master/example/convert.glsl)
+- [Array operations](https://github.com/kal39/microcompute/blob/master/example/arrays.c)
+- [Mandelbrot renderer](https://github.com/kal39/microcompute/blob/master/example/mandelbrot.c)
 
 ## Documentation
 
