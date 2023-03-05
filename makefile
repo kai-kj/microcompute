@@ -50,9 +50,6 @@ examples: $(EXAMPLES)
 doc:
 	python3 microdoc/doc_generator.py $(SRC_FOLDER)/$(LIBRARY).h doc.md
 
-$(BUILD_FOLDER):
-	$(MKDIR) $(BUILD_FOLDER)
-
 $(OUT_FOLDER):
 	$(MKDIR) $(OUT_FOLDER)
 
@@ -62,7 +59,7 @@ $(INCLUDE_FOLDER):
 $(LIB_FOLDER):
 	$(MKDIR) $(LIB_FOLDER)
 
-$(BUILD_SUB_FOLDERS): $(BUILD_FOLDER)
+$(BUILD_SUB_FOLDERS):
 	$(MKDIR) $(BUILD_SUB_FOLDERS)
 
 $(C_OBJECTS): $(BUILD_SUB_FOLDERS) $(C_FILES)
