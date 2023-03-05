@@ -208,7 +208,7 @@ mc_Result mc_stop();
  * shader errors
  * - returns: A non-`NULL` pointer on success, `NULL` otherwise
  */
-mc_Program* mc_program_create_from_string(
+mc_Program* mc_program_from_string(
     const char* code,
     uint32_t maxErrorLength,
     char* error
@@ -224,7 +224,7 @@ mc_Program* mc_program_create_from_string(
  * shader errors
  * - returns: A non-`NULL` pointer on success, `NULL` otherwise
  */
-mc_Program* mc_program_create_from_file(
+mc_Program* mc_program_from_file(
     const char* path,
     uint32_t maxErrorLength,
     char* error

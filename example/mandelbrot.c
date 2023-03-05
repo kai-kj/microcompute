@@ -5,7 +5,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-static char* renderProgSrc = //
+static char* renSrc = //
     "#version 460\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
     "layout(std430, binding = 0) buffer buff1 {\n"
@@ -31,7 +31,7 @@ static char* renderProgSrc = //
     "0.5 * color, 0.5 * color, 1.0);\n"
     "}\n";
 
-static char* converProgSrc = //
+static char* convSrc = //
     "#version 460\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
     "layout(std430, binding = 0) buffer buff1 {\n"
@@ -66,15 +66,13 @@ int main(void) {
         return -1;
     }
 
-    mc_Program* renderProg
-        = mc_program_create_from_string(renderProgSrc, maxErrLen, error);
+    mc_Program* renderProg = mc_program_from_string(renSrc, maxErrLen, error);
     if (renderProg == NULL) {
         printf("error: %s\n", error);
         return -1;
     }
 
-    mc_Program* convertProg
-        = mc_program_create_from_string(converProgSrc, maxErrLen, error);
+    mc_Program* convertProg = mc_program_from_string(convSrc, maxErrLen, error);
     if (convertProg == NULL) {
         printf("error: %s\n", error);
         return -1;

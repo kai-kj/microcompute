@@ -30,7 +30,7 @@ static mc_Result check_program(GLuint program, uint32_t maxLen, char* err) {
     return ERROR("program link error");
 }
 
-mc_Program* mc_program_create_from_string(
+mc_Program* mc_program_from_string(
     const char* code,
     uint32_t maxErrorLength,
     char* error
@@ -60,7 +60,7 @@ mc_Program* mc_program_create_from_string(
     return program;
 }
 
-mc_Program* mc_program_create_from_file(
+mc_Program* mc_program_from_file(
     const char* path,
     uint32_t maxErrorLength,
     char* error
@@ -68,14 +68,13 @@ mc_Program* mc_program_create_from_file(
     char* code = mc_read_file(path, NULL);
     if (code == NULL) return NULL;
 
-    mc_Program* program
-        = mc_program_create_from_string(code, maxErrorLength, error);
+    mc_Program* program = mc_program_from_string(code, maxErrorLength, error);
     free(code);
     return program;
 }
 
 mc_Result mc_program_destroy(mc_Program* program) {
-    ASSERT(program != NULL, "`program` is NULL");
+    ASSERT(program != NULL, "program is NULL");
     if (program->shader != 0) glDeleteShader(program->shader);
     if (program->program != 0) glDeleteProgram(program->program);
     return GL_CHECK_ERROR();

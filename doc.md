@@ -190,7 +190,7 @@ performed in the same thread
 
 ### Program (compute shader) management
 - ```c
-  mc_Program* mc_program_create_from_string(
+  mc_Program* mc_program_from_string(
       const char* code,
       uint32_t maxErrorLength,
       char* error
@@ -208,7 +208,7 @@ performed in the same thread
 <br/>
 
 - ```c
-  mc_Program* mc_program_create_from_file(
+  mc_Program* mc_program_from_file(
       const char* path,
       uint32_t maxErrorLength,
       char* error

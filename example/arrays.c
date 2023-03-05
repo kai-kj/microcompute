@@ -25,7 +25,7 @@ int main(void) {
     int maxErrLen = 2048;
     char error[maxErrLen];
 
-    mc_Program* program = mc_program_create_from_string(src, maxErrLen, error);
+    mc_Program* program = mc_program_from_string(src, maxErrLen, error);
     if (!res.ok) {
         mc_result_pretty_print(res);
         printf("error: %s\n", error);
