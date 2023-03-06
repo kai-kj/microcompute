@@ -192,6 +192,16 @@ performed in the same thread
 
 <br/>
 
+- ```c
+  mc_Result mc_memory_barrier();
+  ```
+  Waits for all shader operations to finish.
+  
+  - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+  otherwise
+
+<br/>
+
 ### Program (compute shader) management
 - ```c
   mc_Program* mc_program_from_string(
