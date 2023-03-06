@@ -20,7 +20,7 @@ EXAMPLE_FOLDER := example
 
 #======================================================================================================================#
 
-CC                := gcc $(FLAGS) -isystem $(INCLUDE_FOLDER) -isystem C:\MinGW\include -I $(SRC_FOLDER)
+CC                := gcc $(FLAGS) -isystem $(INCLUDE_FOLDER) -isystem $(MINGW_PATH)/include -I $(SRC_FOLDER)
 AR                := ar rcs
 RM                := rm -rf
 CP                := cp
@@ -32,6 +32,10 @@ C_OBJECTS         := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(subst .c,.o,$(C_F
 EXAMPLE_C_FILES   := $(shell find $(EXAMPLE_FOLDER)/ -type f -name "*.c")
 EXAMPLES          := $(subst $(EXAMPLE_FOLDER)/,$(OUT_FOLDER)/,$(subst .c,,$(EXAMPLE_C_FILES)))
 STATIC_LIB        := $(LIB_FOLDER)/lib$(LIBRARY).a
+
+ifeq ($(strip $(MINGW_PATH)),)
+	$(error set MINGW_PATH=[[path to mingw root folder]], for example, [[C:\MinGW]])
+endif
 
 .PHONY: default all standalone_lib library examples doc clean
 
