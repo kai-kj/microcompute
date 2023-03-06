@@ -9,7 +9,7 @@ char* mc_read_file(const char* path, uint32_t* size) {
     fseek(fp, 0, SEEK_SET);
 
     char* contents = malloc(length);
-    fread(contents, 1, length, fp);
+    length = fread(contents, 1, length, fp);
     contents[length - 1] = '\0';
     fclose(fp);
 
