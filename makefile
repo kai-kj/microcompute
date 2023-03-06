@@ -5,7 +5,7 @@
 #---- BASIC -----------------------------------------------------------------------------------------------------------#
 
 LIBRARY        := microcompute
-LIBS           := -lmicrocompute -lgbm -lEGL -lGL -lGLEW
+LIBS           := -lmicrocompute -lgbm -lEGL -lGL
 FLAGS          := -Wall -Wextra -Wno-missing-braces -Wno-unused-parameter
 DEFS           := $(CFLAGS)
 

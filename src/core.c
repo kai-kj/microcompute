@@ -100,7 +100,7 @@ mc_Result mc_start(char* renderDevice) {
         "failed to make egl context current"
     );
 
-    ASSERT(glewInit(), "failed to initialize GLEW");
+    gladLoadGL();
 
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_debug_cb, NULL);
