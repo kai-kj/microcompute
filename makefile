@@ -1,4 +1,23 @@
 #======================================================================================================================#
+# CHECK
+#======================================================================================================================#
+
+ifneq ($(strip $(TARGET)),linux)
+ifneq ($(strip $(TARGET)),windows)
+$(error set TARGET=linux or TARGET=windows)
+endif
+endif
+
+ifeq ($(strip $(TARGET)),windows)
+ifeq ($(strip $(MAKECMDGOALS)),standalone_lib)
+$(error standalone_lib not available on windows)
+endif
+ifeq ($(strip $(MAKECMDGOALS)),examples)
+$(error examples not available on windows)
+endif
+endif
+
+#======================================================================================================================#
 # CONFIG
 #======================================================================================================================#
 
@@ -35,7 +54,7 @@ STATIC_LIB        := $(LIB_FOLDER)/lib$(LIBRARY).a
 
 .PHONY: default all standalone_lib library examples doc clean
 
-default: library doc
+default: library
 
 all: standalone_lib examples doc
 
