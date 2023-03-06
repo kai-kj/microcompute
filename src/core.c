@@ -117,3 +117,8 @@ mc_Result mc_stop() {
 }
 
 #endif
+
+mc_Result mc_memory_barrier() {
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    return OK;
+}

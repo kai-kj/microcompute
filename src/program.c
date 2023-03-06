@@ -93,7 +93,6 @@ mc_Result mc_program_dispatch(
 
     glUseProgram(program->program);
     glDispatchCompute(size.x, size.y, size.z);
-    glMemoryBarrier(program->program);
 
     return GL_CHECK_ERROR();
 }

@@ -198,6 +198,14 @@ mc_Result mc_start(char* renderDevice);
  */
 mc_Result mc_stop();
 
+/** code
+ * Waits for all shader operations to finish.
+ *
+ * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * otherwise
+ */
+mc_Result mc_memory_barrier();
+
 /**
  * ### Program (compute shader) management
  */
