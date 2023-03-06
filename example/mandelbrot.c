@@ -6,7 +6,7 @@
 #include "stb_image_write.h"
 
 static char* renSrc = //
-    "#version 460\n"
+    "#version 430\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
     "layout(std430, binding = 0) buffer buff1 {\n"
     "    vec4 floatData[];\n"
@@ -32,7 +32,7 @@ static char* renSrc = //
     "}\n";
 
 static char* convSrc = //
-    "#version 460\n"
+    "#version 430\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
     "layout(std430, binding = 0) buffer buff1 {\n"
     "    vec4 floatData[];\n"
