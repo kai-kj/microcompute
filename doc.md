@@ -11,6 +11,7 @@ performed in the same thread
 
 ## Documentation
 ### Structs
+
 - ```c
   typedef enum mc_Bool {
       MC_FALSE = 0,
@@ -20,6 +21,7 @@ performed in the same thread
   Bool type.
 
 <br/>
+
 
 - ```c
   typedef struct mc_Result {
@@ -39,6 +41,7 @@ performed in the same thread
 
 <br/>
 
+
 - ```c
   typedef struct mc_Program mc_Program;
   typedef struct mc_Buffer mc_Buffer;
@@ -46,6 +49,7 @@ performed in the same thread
   Private microcompute types.
 
 <br/>
+
 
 - ```c
   // float vectors
@@ -90,6 +94,7 @@ performed in the same thread
   Vector types, compatible with glsl vectors.
 
 <br/>
+
 
 - ```c
   typedef struct mc_mat22 {
@@ -146,6 +151,7 @@ performed in the same thread
 <br/>
 
 ### Enums
+
 - ```c
   typedef enum mc_DebugLevel {
       mc_DebugLevel_INFO,
@@ -161,6 +167,7 @@ performed in the same thread
 <br/>
 
 ### Core functionality
+
 - ```c
   mc_Result mc_start(char* renderDevice);
   ```
@@ -180,6 +187,7 @@ performed in the same thread
 
 <br/>
 
+
 - ```c
   mc_Result mc_stop();
   ```
@@ -192,6 +200,7 @@ performed in the same thread
 
 <br/>
 
+
 - ```c
   mc_Result mc_memory_barrier();
   ```
@@ -203,6 +212,7 @@ performed in the same thread
 <br/>
 
 ### Program (compute shader) management
+
 - ```c
   mc_Program* mc_program_from_string(
       const char* code,
@@ -220,6 +230,7 @@ performed in the same thread
   - returns: A non-`NULL` pointer on success, `NULL` otherwise
 
 <br/>
+
 
 - ```c
   mc_Program* mc_program_from_file(
@@ -239,6 +250,7 @@ performed in the same thread
 
 <br/>
 
+
 - ```c
   mc_Result mc_program_destroy(mc_Program* program);
   ```
@@ -249,6 +261,7 @@ performed in the same thread
   otherwise
 
 <br/>
+
 
 - ```c
   mc_Result mc_program_dispatch(
@@ -269,6 +282,7 @@ performed in the same thread
   otherwise
 
 <br/>
+
 
 - ```c
   // for float values
@@ -311,6 +325,7 @@ performed in the same thread
 <br/>
 
 ### Buffer management
+
 - ```c
   mc_Buffer* mc_buffer_create(uint64_t size);
   ```
@@ -322,6 +337,7 @@ performed in the same thread
 
 <br/>
 
+
 - ```c
   mc_Result mc_buffer_destroy(mc_Buffer* buffer);
   ```
@@ -332,6 +348,7 @@ performed in the same thread
   otherwise
 
 <br/>
+
 
 - ```c
   mc_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size);
@@ -345,6 +362,7 @@ performed in the same thread
 
 <br/>
 
+
 - ```c
   mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
   ```
@@ -356,6 +374,7 @@ performed in the same thread
   otherwise
 
 <br/>
+
 
 - ```c
   mc_Result mc_buffer_write(
@@ -376,6 +395,7 @@ performed in the same thread
   otherwise
 
 <br/>
+
 
 - ```c
   mc_Result mc_buffer_read(
@@ -398,6 +418,7 @@ performed in the same thread
 <br/>
 
 ### Misc functions
+
 - ```c
   void mc_result_pretty_print(mc_Result result);
   ```
