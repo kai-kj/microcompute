@@ -1,11 +1,8 @@
 #include "_microcompute.h"
 
-#ifdef STANDALONE
 struct mc_State {
-    int32_t rendererFd;
-    struct gbm_device* device;
-    EGLDisplay display;
-    EGLContext context;
+    EGLDisplay disp;
+    EGLContext ctx;
 };
 
 static struct mc_State state;
@@ -43,19 +40,13 @@ static void gl_debug_cb(
 #endif
 }
 
-mc_Result mc_start(char* renderDevice) {
-    state.rendererFd = open(renderDevice, O_RDWR);
-    ASSERT(state.rendererFd > 0, "failed to open render device");
-
-    state.device = gbm_create_device(state.rendererFd);
-    ASSERT(state.device != NULL, "failed to create gbm device");
-
-    state.display = eglGetDisplay(state.device);
-    ASSERT(state.display != NULL, "failed to get egl display");
+mc_Result mc_start() {
+    state.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    ASSERT(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
 
     EGLint major, minor;
     ASSERT(
-        eglInitialize(state.display, &major, &minor),
+        eglInitialize(state.disp, &major, &minor),
         "failed to initialize egl"
     );
 
@@ -66,41 +57,42 @@ mc_Result mc_start(char* renderDevice) {
 
     ASSERT(eglBindAPI(EGL_OPENGL_API), "failed to bind opengl to egl");
 
-    static const EGLint cfgAttrib[] = {
-        EGL_RENDERABLE_TYPE,
-        EGL_OPENGL_BIT,
-        EGL_NONE,
-    };
-
     EGLConfig eglCfg;
-    EGLint cfgCount;
 
     ASSERT(
-        eglChooseConfig(state.display, cfgAttrib, &eglCfg, 1, &cfgCount),
+        eglChooseConfig(
+            state.disp,
+            (EGLint[]){EGL_NONE},
+            &eglCfg,
+            1,
+            &(EGLint){0}
+        ),
         "failed to choose egl config"
     );
 
-    static const EGLint ctxAttrib[] = {
-        EGL_CONTEXT_MAJOR_VERSION,
-        4,
-        EGL_CONTEXT_MINOR_VERSION,
-        6,
-        EGL_CONTEXT_OPENGL_DEBUG,
-        EGL_TRUE,
-        EGL_NONE,
-    };
+    state.ctx = eglCreateContext(
+        state.disp,
+        eglCfg,
+        EGL_NO_CONTEXT,
+        (EGLint[]){
+            EGL_CONTEXT_MAJOR_VERSION,
+            4,
+            EGL_CONTEXT_MINOR_VERSION,
+            3,
+            EGL_CONTEXT_OPENGL_DEBUG,
+            EGL_TRUE,
+            EGL_NONE,
+        }
+    );
 
-    EGLContext ctx
-        = eglCreateContext(state.display, eglCfg, EGL_NO_CONTEXT, ctxAttrib);
-
-    ASSERT(ctx != EGL_NO_CONTEXT, "failed to create egl context");
+    ASSERT(state.ctx != EGL_NO_CONTEXT, "failed to create egl context");
 
     ASSERT(
-        eglMakeCurrent(state.display, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx),
+        eglMakeCurrent(state.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, state.ctx),
         "failed to make egl context current"
     );
 
-    gladLoadGL();
+    ASSERT(gladLoadGL() != 0, "failed to load GLAD");
 
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_debug_cb, NULL);
@@ -109,14 +101,10 @@ mc_Result mc_start(char* renderDevice) {
 }
 
 mc_Result mc_stop() {
-    if (state.context != 0) eglDestroyContext(state.display, state.context);
-    if (state.display != 0) eglTerminate(state.display);
-    if (state.device != NULL) gbm_device_destroy(state.device);
-    if (state.rendererFd != 0) close(state.rendererFd);
+    if (state.ctx != 0) eglDestroyContext(state.disp, state.ctx);
+    if (state.disp != 0) eglTerminate(state.disp);
     return GL_CHECK_ERROR();
 }
-
-#endif
 
 mc_Result mc_memory_barrier() {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);

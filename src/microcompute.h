@@ -172,26 +172,15 @@ typedef enum mc_DebugLevel {
  */
 
 /** code
- * Initialize the microcompute library. If any errors occur, it will call the
- * debug callback function, so `mc_set_debug_callback()` should be called before
- * calling `mc_start()`.
+ * Initialize the microcompute library.
  *
- * If the machine the library is being used on has multiple graphics cards, the
- * `renderDevice` parameter will determine which card is used.
- *
- * Only available if microcompute is compiled with STANDALONE.
- *
- * - `renderDevice`: The rendering device to be used by the library, should be
- * `/dev/dri/renderD...`
  * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
  * otherwise
  */
-mc_Result mc_start(char* renderDevice);
+mc_Result mc_start();
 
 /** code
  * Stops the microcompute library.
- *
- * Only available if microcompute is compiled with STANDALONE.
  *
  * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
  * otherwise

@@ -54,13 +54,13 @@ static char* convSrc = //
 int main(void) {
     mc_Result res;
 
-    int maxErrLen = 2048;
+    int maxErrLen = 512;
     char error[maxErrLen];
     int width = 800;
     int height = 600;
     int pixels = width * height;
 
-    res = mc_start("/dev/dri/renderD129");
+    res = mc_start();
     if (!res.ok) {
         mc_result_pretty_print(res);
         return -1;

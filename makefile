@@ -8,15 +8,6 @@ $(error set TARGET=linux or TARGET=windows)
 endif
 endif
 
-ifeq ($(strip $(TARGET)),windows)
-ifeq ($(strip $(MAKECMDGOALS)),standalone_lib)
-$(error standalone_lib not available on windows)
-endif
-ifeq ($(strip $(MAKECMDGOALS)),examples)
-$(error examples not available on windows)
-endif
-endif
-
 #======================================================================================================================#
 # CONFIG
 #======================================================================================================================#
@@ -24,8 +15,8 @@ endif
 #---- BASIC -----------------------------------------------------------------------------------------------------------#
 
 LIBRARY        := microcompute
-LIBS           := -lmicrocompute -lgbm -lEGL -lGL
-FLAGS          := -std=c11 -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-qual -Wno-unused-parameter -O3
+LIBS           := -lmicrocompute -lEGL -lGL
+FLAGS          := -std=c11 -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-qual -Wno-unused-parameter -Wno-cast-qual -O3
 DEFS           := $(CFLAGS)
 
 #---- PROJECT STRUCTURE -----------------------------------------------------------------------------------------------#
@@ -58,12 +49,8 @@ default: library
 
 all: standalone_lib examples doc
 
-standalone_lib: DEFS += -DSTANDALONE
-standalone_lib: library
-
 library: clean $(STATIC_LIB)
 
-examples: DEFS += -DSTANDALONE
 examples: $(EXAMPLES)
 
 doc:
@@ -89,7 +76,7 @@ $(STATIC_LIB): $(INCLUDE_FOLDER) $(LIB_FOLDER) $(C_OBJECTS)
 	$(CP) $(SRC_FOLDER)/$(LIBRARY).h $(INCLUDE_FOLDER)/$(LIBRARY).h
 
 $(EXAMPLES): $(OUT_FOLDER) $(STATIC_LIB)
-	$(CC) $(DEFS) -g $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
+	$(CC) $(DEFS) $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
 
 clean:
 	$(RM) $(BUILD_FOLDER) $(INCLUDE_FOLDER) $(LIB_FOLDER) $(OUT_FOLDER)

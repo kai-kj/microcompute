@@ -1,16 +1,9 @@
 #pragma once
 
 #include "glad/glad.h"
+#include "glad/glad_egl.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-#ifdef STANDALONE
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <fcntl.h>
-#include <gbm.h>
-#include <unistd.h>
-#endif
 
 #include "microcompute.h"
 
