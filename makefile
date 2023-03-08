@@ -8,6 +8,15 @@ $(error set TARGET=linux or TARGET=windows)
 endif
 endif
 
+ifeq ($(strip $(TARGET)),windows)
+ifeq ($(strip $(MAKECMDGOALS)),standalone)
+$(error standalone_lib not available on windows)
+endif
+ifeq ($(strip $(MAKECMDGOALS)),examples)
+$(error examples not available on windows)
+endif
+endif
+
 #======================================================================================================================#
 # CONFIG
 #======================================================================================================================#
@@ -43,14 +52,18 @@ EXAMPLE_C_FILES   := $(shell find $(EXAMPLE_FOLDER)/ -type f -name "*.c")
 EXAMPLES          := $(subst $(EXAMPLE_FOLDER)/,$(OUT_FOLDER)/,$(subst .c,,$(EXAMPLE_C_FILES)))
 STATIC_LIB        := $(LIB_FOLDER)/lib$(LIBRARY).a
 
-.PHONY: default all standalone_lib library examples doc clean
+.PHONY: default all standalone library examples doc clean
 
 default: library
 
-all: standalone_lib examples doc
+all: standalone examples doc
+
+standalone: DEFS += -DMC_STANDALONE_MODE
+standalone: library
 
 library: clean $(STATIC_LIB)
 
+examples: DEFS += -DMC_STANDALONE_MODE
 examples: $(EXAMPLES)
 
 doc:

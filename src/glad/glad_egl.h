@@ -7,7 +7,7 @@
     APIs: egl=1.5
     Profile: -
     Extensions:
-        
+
     Loader: True
     Local files: False
     Omit khrplatform: False
@@ -19,7 +19,6 @@
         https://glad.dav1d.de/#language=c&specification=egl&loader=on&api=egl%3D1.5
 */
 
-
 #ifndef __glad_egl_h_
 
 #ifdef __egl_h_
@@ -29,7 +28,8 @@
 #define __glad_egl_h_
 #define __egl_h_
 
-#if defined(_WIN32) && !defined(APIENTRY) && !defined(__CYGWIN__) && !defined(__SCITECH_SNAP__)
+#if defined(_WIN32) && !defined(APIENTRY) && !defined(__CYGWIN__)              \
+    && !defined(__SCITECH_SNAP__)
 #define APIENTRY __stdcall
 #endif
 
@@ -37,7 +37,7 @@
 #define APIENTRY
 #endif
 #ifndef APIENTRYP
-#define APIENTRYP APIENTRY *
+#define APIENTRYP APIENTRY*
 #endif
 #ifndef GLAPI
 #define GLAPI extern
@@ -47,13 +47,13 @@
 extern "C" {
 #endif
 
-typedef void* (* GLADloadproc)(const char *name);
+typedef void* (*GLADloadproc)(const char* name);
 
 GLAPI int gladLoadEGL(void);
 GLAPI int gladLoadEGLLoader(GLADloadproc);
 
-#include <KHR/khrplatform.h>
-#include <EGL/eglplatform.h>
+#include "eglplatform.h"
+#include "khrplatform.h"
 struct AHardwareBuffer;
 struct wl_buffer;
 struct wl_display;
@@ -62,22 +62,22 @@ typedef unsigned int EGLBoolean;
 typedef unsigned int EGLenum;
 typedef intptr_t EGLAttribKHR;
 typedef intptr_t EGLAttrib;
-typedef void *EGLClientBuffer;
-typedef void *EGLConfig;
-typedef void *EGLContext;
-typedef void *EGLDeviceEXT;
-typedef void *EGLDisplay;
-typedef void *EGLImage;
-typedef void *EGLImageKHR;
-typedef void *EGLLabelKHR;
-typedef void *EGLObjectKHR;
-typedef void *EGLOutputLayerEXT;
-typedef void *EGLOutputPortEXT;
-typedef void *EGLStreamKHR;
-typedef void *EGLSurface;
-typedef void *EGLSync;
-typedef void *EGLSyncKHR;
-typedef void *EGLSyncNV;
+typedef void* EGLClientBuffer;
+typedef void* EGLConfig;
+typedef void* EGLContext;
+typedef void* EGLDeviceEXT;
+typedef void* EGLDisplay;
+typedef void* EGLImage;
+typedef void* EGLImageKHR;
+typedef void* EGLLabelKHR;
+typedef void* EGLObjectKHR;
+typedef void* EGLOutputLayerEXT;
+typedef void* EGLOutputPortEXT;
+typedef void* EGLStreamKHR;
+typedef void* EGLSurface;
+typedef void* EGLSync;
+typedef void* EGLSyncKHR;
+typedef void* EGLSyncNV;
 typedef void (*__eglMustCastToProperFunctionPointerType)(void);
 typedef khronos_utime_nanoseconds_t EGLTimeKHR;
 typedef khronos_utime_nanoseconds_t EGLTime;
@@ -87,19 +87,34 @@ typedef khronos_uint64_t EGLuint64KHR;
 typedef khronos_stime_nanoseconds_t EGLnsecsANDROID;
 typedef int EGLNativeFileDescriptorKHR;
 typedef khronos_ssize_t EGLsizeiANDROID;
-typedef void (*EGLSetBlobFuncANDROID) (const void *key, EGLsizeiANDROID keySize, const void *value, EGLsizeiANDROID valueSize);
-typedef EGLsizeiANDROID (*EGLGetBlobFuncANDROID) (const void *key, EGLsizeiANDROID keySize, void *value, EGLsizeiANDROID valueSize);
+typedef void (*EGLSetBlobFuncANDROID
+)(const void* key,
+  EGLsizeiANDROID keySize,
+  const void* value,
+  EGLsizeiANDROID valueSize);
+typedef EGLsizeiANDROID (*EGLGetBlobFuncANDROID
+)(const void* key,
+  EGLsizeiANDROID keySize,
+  void* value,
+  EGLsizeiANDROID valueSize);
 struct EGLClientPixmapHI {
-    void  *pData;
+    void* pData;
     EGLint iWidth;
     EGLint iHeight;
     EGLint iStride;
 };
-typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLint messageType,EGLLabelKHR threadLabel,EGLLabelKHR objectLabel,const char* message);
+typedef void(APIENTRY* EGLDEBUGPROCKHR
+)(EGLenum error,
+  const char* command,
+  EGLint messageType,
+  EGLLabelKHR threadLabel,
+  EGLLabelKHR objectLabel,
+  const char* message);
 #define PFNEGLBINDWAYLANDDISPLAYWL PFNEGLBINDWAYLANDDISPLAYWLPROC
 #define PFNEGLUNBINDWAYLANDDISPLAYWL PFNEGLUNBINDWAYLANDDISPLAYWLPROC
 #define PFNEGLQUERYWAYLANDBUFFERWL PFNEGLQUERYWAYLANDBUFFERWLPROC
-#define PFNEGLCREATEWAYLANDBUFFERFROMIMAGEWL PFNEGLCREATEWAYLANDBUFFERFROMIMAGEWLPROC
+#define PFNEGLCREATEWAYLANDBUFFERFROMIMAGEWL                                   \
+    PFNEGLCREATEWAYLANDBUFFERFROMIMAGEWLPROC
 #define EGL_ALPHA_SIZE 0x3021
 #define EGL_BAD_ACCESS 0x3002
 #define EGL_BAD_ALLOC 0x3003
@@ -119,7 +134,7 @@ typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLin
 #define EGL_CONFIG_ID 0x3028
 #define EGL_CORE_NATIVE_ENGINE 0x305B
 #define EGL_DEPTH_SIZE 0x3025
-#define EGL_DONT_CARE EGL_CAST(EGLint,-1)
+#define EGL_DONT_CARE EGL_CAST(EGLint, -1)
 #define EGL_DRAW 0x3059
 #define EGL_EXTENSIONS 0x3055
 #define EGL_FALSE 0
@@ -136,9 +151,9 @@ typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLin
 #define EGL_NONE 0x3038
 #define EGL_NON_CONFORMANT_CONFIG 0x3051
 #define EGL_NOT_INITIALIZED 0x3001
-#define EGL_NO_CONTEXT EGL_CAST(EGLContext,0)
-#define EGL_NO_DISPLAY EGL_CAST(EGLDisplay,0)
-#define EGL_NO_SURFACE EGL_CAST(EGLSurface,0)
+#define EGL_NO_CONTEXT EGL_CAST(EGLContext, 0)
+#define EGL_NO_DISPLAY EGL_CAST(EGLDisplay, 0)
+#define EGL_NO_SURFACE EGL_CAST(EGLSurface, 0)
 #define EGL_PBUFFER_BIT 0x0001
 #define EGL_PIXMAP_BIT 0x0002
 #define EGL_READ 0x305A
@@ -200,7 +215,7 @@ typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLin
 #define EGL_RGB_BUFFER 0x308E
 #define EGL_SINGLE_BUFFER 0x3085
 #define EGL_SWAP_BEHAVIOR 0x3093
-#define EGL_UNKNOWN EGL_CAST(EGLint,-1)
+#define EGL_UNKNOWN EGL_CAST(EGLint, -1)
 #define EGL_VERTICAL_RESOLUTION 0x3091
 #define EGL_CONFORMANT 0x3042
 #define EGL_CONTEXT_CLIENT_VERSION 0x3098
@@ -214,7 +229,7 @@ typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLin
 #define EGL_VG_COLORSPACE_sRGB 0x3089
 #define EGL_VG_COLORSPACE_LINEAR 0x308A
 #define EGL_VG_COLORSPACE_LINEAR_BIT 0x0020
-#define EGL_DEFAULT_DISPLAY EGL_CAST(EGLNativeDisplayType,0)
+#define EGL_DEFAULT_DISPLAY EGL_CAST(EGLNativeDisplayType, 0)
 #define EGL_MULTISAMPLE_RESOLVE_BOX_BIT 0x0200
 #define EGL_MULTISAMPLE_RESOLVE 0x3099
 #define EGL_MULTISAMPLE_RESOLVE_DEFAULT 0x309A
@@ -247,7 +262,7 @@ typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLin
 #define EGL_FOREVER 0xFFFFFFFFFFFFFFFF
 #define EGL_TIMEOUT_EXPIRED 0x30F5
 #define EGL_CONDITION_SATISFIED 0x30F6
-#define EGL_NO_SYNC EGL_CAST(EGLSync,0)
+#define EGL_NO_SYNC EGL_CAST(EGLSync, 0)
 #define EGL_SYNC_FENCE 0x30F9
 #define EGL_GL_COLORSPACE 0x309D
 #define EGL_GL_COLORSPACE_SRGB 0x3089
@@ -264,50 +279,154 @@ typedef void (APIENTRY *EGLDEBUGPROCKHR)(EGLenum error,const char *command,EGLin
 #define EGL_GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0x30B7
 #define EGL_GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0x30B8
 #define EGL_IMAGE_PRESERVED 0x30D2
-#define EGL_NO_IMAGE EGL_CAST(EGLImage,0)
-EGLBoolean eglChooseConfig(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
-EGLBoolean eglCopyBuffers(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target);
-EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
-EGLSurface eglCreatePbufferSurface(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list);
-EGLSurface eglCreatePixmapSurface(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list);
-EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
+#define EGL_NO_IMAGE EGL_CAST(EGLImage, 0)
+EGLBoolean eglChooseConfig(
+    EGLDisplay dpy,
+    const EGLint* attrib_list,
+    EGLConfig* configs,
+    EGLint config_size,
+    EGLint* num_config
+);
+EGLBoolean eglCopyBuffers(
+    EGLDisplay dpy,
+    EGLSurface surface,
+    EGLNativePixmapType target
+);
+EGLContext eglCreateContext(
+    EGLDisplay dpy,
+    EGLConfig config,
+    EGLContext share_context,
+    const EGLint* attrib_list
+);
+EGLSurface eglCreatePbufferSurface(
+    EGLDisplay dpy,
+    EGLConfig config,
+    const EGLint* attrib_list
+);
+EGLSurface eglCreatePixmapSurface(
+    EGLDisplay dpy,
+    EGLConfig config,
+    EGLNativePixmapType pixmap,
+    const EGLint* attrib_list
+);
+EGLSurface eglCreateWindowSurface(
+    EGLDisplay dpy,
+    EGLConfig config,
+    EGLNativeWindowType win,
+    const EGLint* attrib_list
+);
 EGLBoolean eglDestroyContext(EGLDisplay dpy, EGLContext ctx);
 EGLBoolean eglDestroySurface(EGLDisplay dpy, EGLSurface surface);
-EGLBoolean eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
-EGLBoolean eglGetConfigs(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+EGLBoolean eglGetConfigAttrib(
+    EGLDisplay dpy,
+    EGLConfig config,
+    EGLint attribute,
+    EGLint* value
+);
+EGLBoolean eglGetConfigs(
+    EGLDisplay dpy,
+    EGLConfig* configs,
+    EGLint config_size,
+    EGLint* num_config
+);
 EGLDisplay eglGetCurrentDisplay(void);
 EGLSurface eglGetCurrentSurface(EGLint readdraw);
 EGLDisplay eglGetDisplay(EGLNativeDisplayType display_id);
 EGLint eglGetError(void);
-__eglMustCastToProperFunctionPointerType eglGetProcAddress(const char *procname);
-EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor);
-EGLBoolean eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
-EGLBoolean eglQueryContext(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
-const char *eglQueryString(EGLDisplay dpy, EGLint name);
-EGLBoolean eglQuerySurface(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
+__eglMustCastToProperFunctionPointerType eglGetProcAddress(const char* procname
+);
+EGLBoolean eglInitialize(EGLDisplay dpy, EGLint* major, EGLint* minor);
+EGLBoolean eglMakeCurrent(
+    EGLDisplay dpy,
+    EGLSurface draw,
+    EGLSurface read,
+    EGLContext ctx
+);
+EGLBoolean eglQueryContext(
+    EGLDisplay dpy,
+    EGLContext ctx,
+    EGLint attribute,
+    EGLint* value
+);
+const char* eglQueryString(EGLDisplay dpy, EGLint name);
+EGLBoolean eglQuerySurface(
+    EGLDisplay dpy,
+    EGLSurface surface,
+    EGLint attribute,
+    EGLint* value
+);
 EGLBoolean eglSwapBuffers(EGLDisplay dpy, EGLSurface surface);
 EGLBoolean eglTerminate(EGLDisplay dpy);
 EGLBoolean eglWaitGL(void);
 EGLBoolean eglWaitNative(EGLint engine);
 EGLBoolean eglBindTexImage(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
-EGLBoolean eglReleaseTexImage(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
-EGLBoolean eglSurfaceAttrib(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint value);
+EGLBoolean eglReleaseTexImage(
+    EGLDisplay dpy,
+    EGLSurface surface,
+    EGLint buffer
+);
+EGLBoolean eglSurfaceAttrib(
+    EGLDisplay dpy,
+    EGLSurface surface,
+    EGLint attribute,
+    EGLint value
+);
 EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval);
 EGLBoolean eglBindAPI(EGLenum api);
 EGLenum eglQueryAPI(void);
-EGLSurface eglCreatePbufferFromClientBuffer(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list);
+EGLSurface eglCreatePbufferFromClientBuffer(
+    EGLDisplay dpy,
+    EGLenum buftype,
+    EGLClientBuffer buffer,
+    EGLConfig config,
+    const EGLint* attrib_list
+);
 EGLBoolean eglReleaseThread(void);
 EGLBoolean eglWaitClient(void);
 EGLContext eglGetCurrentContext(void);
-EGLSync eglCreateSync(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list);
+EGLSync eglCreateSync(
+    EGLDisplay dpy,
+    EGLenum type,
+    const EGLAttrib* attrib_list
+);
 EGLBoolean eglDestroySync(EGLDisplay dpy, EGLSync sync);
-EGLint eglClientWaitSync(EGLDisplay dpy, EGLSync sync, EGLint flags, EGLTime timeout);
-EGLBoolean eglGetSyncAttrib(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value);
-EGLImage eglCreateImage(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list);
+EGLint eglClientWaitSync(
+    EGLDisplay dpy,
+    EGLSync sync,
+    EGLint flags,
+    EGLTime timeout
+);
+EGLBoolean eglGetSyncAttrib(
+    EGLDisplay dpy,
+    EGLSync sync,
+    EGLint attribute,
+    EGLAttrib* value
+);
+EGLImage eglCreateImage(
+    EGLDisplay dpy,
+    EGLContext ctx,
+    EGLenum target,
+    EGLClientBuffer buffer,
+    const EGLAttrib* attrib_list
+);
 EGLBoolean eglDestroyImage(EGLDisplay dpy, EGLImage image);
-EGLDisplay eglGetPlatformDisplay(EGLenum platform, void *native_display, const EGLAttrib *attrib_list);
-EGLSurface eglCreatePlatformWindowSurface(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list);
-EGLSurface eglCreatePlatformPixmapSurface(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list);
+EGLDisplay eglGetPlatformDisplay(
+    EGLenum platform,
+    void* native_display,
+    const EGLAttrib* attrib_list
+);
+EGLSurface eglCreatePlatformWindowSurface(
+    EGLDisplay dpy,
+    EGLConfig config,
+    void* native_window,
+    const EGLAttrib* attrib_list
+);
+EGLSurface eglCreatePlatformPixmapSurface(
+    EGLDisplay dpy,
+    EGLConfig config,
+    void* native_pixmap,
+    const EGLAttrib* attrib_list
+);
 EGLBoolean eglWaitSync(EGLDisplay dpy, EGLSync sync, EGLint flags);
 
 #ifdef __cplusplus

@@ -1,12 +1,15 @@
 #include "_microcompute.h"
 
+#ifdef MC_STANDALONE_MODE
 struct mc_State {
     EGLDisplay disp;
     EGLContext ctx;
 };
 
 static struct mc_State state;
+#endif
 
+#ifdef MC_DEBUG_ENABLE
 static void gl_debug_cb(
     GLenum source,
     GLenum type,
@@ -16,7 +19,6 @@ static void gl_debug_cb(
     const GLchar* msg,
     const void* data
 ) {
-#ifdef DEBUG
     char* sourceStr = (char*[]){
         "API",
         "WINDOW",
@@ -37,29 +39,30 @@ static void gl_debug_cb(
     }[type - GL_DEBUG_TYPE_ERROR];
 
     printf("GL: %s (%s): %s\n", sourceStr, typeStr, msg);
-#endif
 }
+#endif
 
+#ifdef MC_STANDALONE_MODE
 mc_Result mc_start() {
     state.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    ASSERT(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
+    MC_ASSERT(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
 
     EGLint major, minor;
-    ASSERT(
+    MC_ASSERT(
         eglInitialize(state.disp, &major, &minor),
         "failed to initialize egl"
     );
 
-    ASSERT(
+    MC_ASSERT(
         !(major < 1 || (major == 1 && minor < 5)),
         "egl version too low (min 1.5)"
     );
 
-    ASSERT(eglBindAPI(EGL_OPENGL_API), "failed to bind opengl to egl");
+    MC_ASSERT(eglBindAPI(EGL_OPENGL_API), "failed to bind opengl to egl");
 
     EGLConfig eglCfg;
 
-    ASSERT(
+    MC_ASSERT(
         eglChooseConfig(
             state.disp,
             (EGLint[]){EGL_NONE},
@@ -85,17 +88,19 @@ mc_Result mc_start() {
         }
     );
 
-    ASSERT(state.ctx != EGL_NO_CONTEXT, "failed to create egl context");
+    MC_ASSERT(state.ctx != EGL_NO_CONTEXT, "failed to create egl context");
 
-    ASSERT(
+    MC_ASSERT(
         eglMakeCurrent(state.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, state.ctx),
         "failed to make egl context current"
     );
 
-    ASSERT(gladLoadGL() != 0, "failed to load GLAD");
+    MC_ASSERT(gladLoadGL() != 0, "failed to load GLAD");
 
+#ifdef MC_DEBUG_ENABLE
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_debug_cb, NULL);
+#endif
 
     return GL_CHECK_ERROR();
 }
@@ -105,8 +110,9 @@ mc_Result mc_stop() {
     if (state.disp != 0) eglTerminate(state.disp);
     return GL_CHECK_ERROR();
 }
+#endif
 
 mc_Result mc_memory_barrier() {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    return OK;
+    return MC_OK;
 }

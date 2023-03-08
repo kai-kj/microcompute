@@ -3,7 +3,7 @@
 #define SET(program, name, fn, ...)                                            \
     do {                                                                       \
         GLint loc = glGetUniformLocation(program->program, name);              \
-        ASSERT(loc != -1, "failed to find uniform");                           \
+        MC_ASSERT(loc != -1, "failed to find uniform");                        \
         glUseProgram(program->program);                                        \
         fn(loc, __VA_ARGS__);                                                  \
         return GL_CHECK_ERROR();                                               \

@@ -1,11 +1,14 @@
 #pragma once
 
-#include "glad/glad.h"
-#include "glad/glad_egl.h"
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "glad/glad.h"
 #include "microcompute.h"
+
+#ifdef MC_STANDALONE_MODE
+#include "glad/glad_egl.h"
+#endif
 
 typedef struct mc_Program {
     GLint shader;
@@ -21,7 +24,7 @@ typedef struct mc_Buffer {
 mc_Result gl_check_error(uint32_t line, const char* file, const char* func);
 char* mc_read_file(const char* path, uint32_t* size);
 
-#define OK                                                                     \
+#define MC_OK                                                                  \
     ((mc_Result){                                                              \
         .ok = MC_TRUE,                                                         \
         .file = __FILE__,                                                      \
@@ -29,7 +32,7 @@ char* mc_read_file(const char* path, uint32_t* size);
         .func = __FUNCTION__,                                                  \
         .message = (char*){"no errors here :)"}})
 
-#define ERROR(msg)                                                             \
+#define MC_ERROR(msg)                                                          \
     ((mc_Result){                                                              \
         .ok = MC_FALSE,                                                        \
         .file = __FILE__,                                                      \
@@ -37,7 +40,7 @@ char* mc_read_file(const char* path, uint32_t* size);
         .func = __FUNCTION__,                                                  \
         .message = (char*){(msg)}})
 
-#define ASSERT(cond, msg)                                                      \
+#define MC_ASSERT(cond, msg)                                                   \
     do {                                                                       \
-        if (!(cond)) return ERROR((msg));                                      \
+        if (!(cond)) return MC_ERROR((msg));                                   \
     } while (0)

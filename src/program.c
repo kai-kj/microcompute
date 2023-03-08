@@ -7,12 +7,12 @@ static mc_Result check_shader(GLuint shader, uint32_t maxLen, char* err) {
 
     int32_t length;
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-    ASSERT(
+    MC_ASSERT(
         (uint32_t)length < maxLen,
         "error message longer than max error buffer size"
     );
     glGetShaderInfoLog(shader, length, NULL, err);
-    return ERROR("shader compile error");
+    return MC_ERROR("shader compile error");
 }
 
 static mc_Result check_program(GLuint program, uint32_t maxLen, char* err) {
@@ -22,12 +22,12 @@ static mc_Result check_program(GLuint program, uint32_t maxLen, char* err) {
 
     int32_t length;
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-    ASSERT(
+    MC_ASSERT(
         (uint32_t)length < maxLen,
         "error message longer than max error buffer size"
     );
     glGetProgramInfoLog(program, length, NULL, err);
-    return ERROR("program link error");
+    return MC_ERROR("program link error");
 }
 
 mc_Program* mc_program_from_string(
@@ -74,7 +74,7 @@ mc_Program* mc_program_from_file(
 }
 
 mc_Result mc_program_destroy(mc_Program* program) {
-    ASSERT(program != NULL, "program is NULL");
+    MC_ASSERT(program != NULL, "program is NULL");
     if (program->shader != 0) glDeleteShader(program->shader);
     if (program->program != 0) glDeleteProgram(program->program);
     return GL_CHECK_ERROR();
