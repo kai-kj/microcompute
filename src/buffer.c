@@ -7,19 +7,19 @@ mc_Buffer* mc_buffer_create(uint64_t size) {
     return buffer;
 }
 
-mc_Result mc_buffer_destroy(mc_Buffer* buffer) {
-    MC_ASSERT(buffer != NULL, "buffer is NULL");
+k_Result mc_buffer_destroy(mc_Buffer* buffer) {
+    K_ASSERT_ERR(buffer != NULL, "buffer is NULL");
     if (buffer->ssbo != 0) glDeleteBuffers(1, &buffer->ssbo);
     return GL_CHECK_ERROR();
 }
 
-mc_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size) {
+k_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_COPY);
     return GL_CHECK_ERROR();
 }
 
-mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size) {
+k_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
     GLint iSize;
     glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &iSize);
@@ -27,7 +27,7 @@ mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size) {
     return GL_CHECK_ERROR();
 }
 
-mc_Result mc_buffer_write(
+k_Result mc_buffer_write(
     mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
@@ -38,7 +38,7 @@ mc_Result mc_buffer_write(
     uint64_t buffSize;
     mc_buffer_get_size(buffer, &buffSize);
 
-    MC_ASSERT(
+    K_ASSERT_ERR(
         offset + size <= buffSize,
         "offset + size larger than buffer size"
     );
@@ -47,7 +47,7 @@ mc_Result mc_buffer_write(
     return GL_CHECK_ERROR();
 }
 
-mc_Result mc_buffer_read(
+k_Result mc_buffer_read(
     mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
@@ -58,7 +58,7 @@ mc_Result mc_buffer_read(
     uint64_t buffSize;
     mc_buffer_get_size(buffer, &buffSize);
 
-    MC_ASSERT(
+    K_ASSERT_ERR(
         offset + size <= buffSize,
         "offset + size larger than buffer size"
     );

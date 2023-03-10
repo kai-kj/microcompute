@@ -52,7 +52,7 @@ static char* convSrc = //
     "}\n";
 
 int main(void) {
-    mc_Result res;
+    k_Result res;
 
     int maxErrLen = 512;
     char error[maxErrLen];
@@ -62,7 +62,7 @@ int main(void) {
 
     res = mc_start();
     if (!res.ok) {
-        mc_result_pretty_print(res);
+        K_RESULT_PRINT(res);
         return -1;
     }
 
@@ -104,7 +104,7 @@ int main(void) {
 
     char* data = malloc(pixels * 4);
     mc_buffer_read(byteImage, 0, pixels * 4, data);
-    stbi_write_bmp("tmp/mandelbrot.bmp", width, height, 4, data);
+    stbi_write_bmp("../out/mandelbrot.bmp", width, height, 4, data);
     free(data);
 
     mc_buffer_destroy(floatImage);

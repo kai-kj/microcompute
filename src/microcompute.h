@@ -17,35 +17,11 @@
 
 #include <stdint.h>
 
+#include "k_tools/k_result.h"
+
 /**
  * ### Structs
  */
-
-/** code
- * Bool type.
- */
-
-typedef enum mc_Bool {
-    MC_FALSE = 0,
-    MC_TRUE = 1,
-} mc_Bool;
-
-/** code
- * Result type. Returned by all microcompute functions.
- * - `ok`: `MC_TRUE` if no errors, `MC_FALSE` otherwise
- * - `line`: The line number where the result was generated
- * - `file`: The name of the file where the result was generated
- * - `func`: The name of the function where the result was generated
- * - `message`: A message attached to the result
- */
-
-typedef struct mc_Result {
-    mc_Bool ok;
-    uint32_t line;
-    const char* file;
-    const char* func;
-    const char* message;
-} mc_Result;
 
 /** code
  * Private microcompute types.
@@ -107,47 +83,47 @@ typedef struct mc_uvec4 {
 
 typedef struct mc_mat22 {
     float values[4];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat22;
 
 typedef struct mc_mat33 {
     float values[9];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat33;
 
 typedef struct mc_mat44 {
     float values[16];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat44;
 
 typedef struct mc_mat23 {
     float values[6];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat23;
 
 typedef struct mc_mat32 {
     float values[6];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat32;
 
 typedef struct mc_mat24 {
     float values[8];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat24;
 
 typedef struct mc_mat42 {
     float values[8];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat42;
 
 typedef struct mc_mat34 {
     float values[12];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat34;
 
 typedef struct mc_mat43 {
     float values[12];
-    mc_Bool transpose;
+    k_Bool transpose;
 } mc_mat43;
 
 /**
@@ -174,26 +150,26 @@ typedef enum mc_DebugLevel {
 /** code
  * Initialize the microcompute library.
  *
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_start();
+k_Result mc_start();
 
 /** code
  * Stops the microcompute library.
  *
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_stop();
+k_Result mc_stop();
 
 /** code
  * Waits for all shader operations to finish.
  *
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_memory_barrier();
+k_Result mc_memory_barrier();
 
 /**
  * ### Program (compute shader) management
@@ -235,10 +211,10 @@ mc_Program* mc_program_from_file(
  * Destroy a program.
  *
  * - `program`: The program to destroy
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_program_destroy(mc_Program* program);
+k_Result mc_program_destroy(mc_Program* program);
 
 /** code
  * Dispatch (run) a program.
@@ -248,10 +224,10 @@ mc_Result mc_program_destroy(mc_Program* program);
  * - `bufferCount`: The number of buffers to pass to the program
  * - `buffers`: The buffers to pass to the program, the the buffers will be
  * bound according to their index in this array
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_program_dispatch(
+k_Result mc_program_dispatch(
     mc_Program* program,
     mc_ivec3 size,
     uint32_t bufferCount,
@@ -264,38 +240,38 @@ mc_Result mc_program_dispatch(
  * - `program`: The program in which to set the uniform value
  * - `name`: The name of the uniform to set
  * - `value`: The value of the uniform
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
 
 // for float values
-mc_Result mc_program_set_float(mc_Program* program, char* name, float value);
-mc_Result mc_program_set_vec2(mc_Program* program, char* name, mc_vec2 value);
-mc_Result mc_program_set_vec3(mc_Program* program, char* name, mc_vec3 value);
-mc_Result mc_program_set_vec4(mc_Program* program, char* name, mc_vec4 value);
+k_Result mc_program_set_float(mc_Program* program, char* name, float value);
+k_Result mc_program_set_vec2(mc_Program* program, char* name, mc_vec2 value);
+k_Result mc_program_set_vec3(mc_Program* program, char* name, mc_vec3 value);
+k_Result mc_program_set_vec4(mc_Program* program, char* name, mc_vec4 value);
 
 // for int values
-mc_Result mc_program_set_int(mc_Program* program, char* name, int32_t value);
-mc_Result mc_program_set_ivec2(mc_Program* program, char* name, mc_ivec2 value);
-mc_Result mc_program_set_ivec3(mc_Program* program, char* name, mc_ivec3 value);
-mc_Result mc_program_set_ivec4(mc_Program* program, char* name, mc_ivec4 value);
+k_Result mc_program_set_int(mc_Program* program, char* name, int32_t value);
+k_Result mc_program_set_ivec2(mc_Program* program, char* name, mc_ivec2 value);
+k_Result mc_program_set_ivec3(mc_Program* program, char* name, mc_ivec3 value);
+k_Result mc_program_set_ivec4(mc_Program* program, char* name, mc_ivec4 value);
 
 // for uint values
-mc_Result mc_program_set_uint(mc_Program* program, char* name, uint32_t value);
-mc_Result mc_program_set_uvec2(mc_Program* program, char* name, mc_uvec2 value);
-mc_Result mc_program_set_uvec3(mc_Program* program, char* name, mc_uvec3 value);
-mc_Result mc_program_set_uvec4(mc_Program* program, char* name, mc_uvec4 value);
+k_Result mc_program_set_uint(mc_Program* program, char* name, uint32_t value);
+k_Result mc_program_set_uvec2(mc_Program* program, char* name, mc_uvec2 value);
+k_Result mc_program_set_uvec3(mc_Program* program, char* name, mc_uvec3 value);
+k_Result mc_program_set_uvec4(mc_Program* program, char* name, mc_uvec4 value);
 
 // for matrix values
-mc_Result mc_program_set_mat22(mc_Program* program, char* name, mc_mat22 value);
-mc_Result mc_program_set_mat33(mc_Program* program, char* name, mc_mat33 value);
-mc_Result mc_program_set_mat44(mc_Program* program, char* name, mc_mat44 value);
-mc_Result mc_program_set_mat23(mc_Program* program, char* name, mc_mat23 value);
-mc_Result mc_program_set_mat32(mc_Program* program, char* name, mc_mat32 value);
-mc_Result mc_program_set_mat24(mc_Program* program, char* name, mc_mat24 value);
-mc_Result mc_program_set_mat42(mc_Program* program, char* name, mc_mat42 value);
-mc_Result mc_program_set_mat34(mc_Program* program, char* name, mc_mat34 value);
-mc_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 value);
+k_Result mc_program_set_mat22(mc_Program* program, char* name, mc_mat22 value);
+k_Result mc_program_set_mat33(mc_Program* program, char* name, mc_mat33 value);
+k_Result mc_program_set_mat44(mc_Program* program, char* name, mc_mat44 value);
+k_Result mc_program_set_mat23(mc_Program* program, char* name, mc_mat23 value);
+k_Result mc_program_set_mat32(mc_Program* program, char* name, mc_mat32 value);
+k_Result mc_program_set_mat24(mc_Program* program, char* name, mc_mat24 value);
+k_Result mc_program_set_mat42(mc_Program* program, char* name, mc_mat42 value);
+k_Result mc_program_set_mat34(mc_Program* program, char* name, mc_mat34 value);
+k_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 value);
 
 /**
  * ### Buffer management
@@ -314,30 +290,30 @@ mc_Buffer* mc_buffer_create(uint64_t size);
  * Destroy a buffer.
  *
  * - `buffer`: The buffer to destroy
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_buffer_destroy(mc_Buffer* buffer);
+k_Result mc_buffer_destroy(mc_Buffer* buffer);
 
 /** code
  * Resize a buffer.
  *
  * - `buffer`: The buffer to resize
  * - `binding`: The (new) size of the buffer
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size);
+k_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size);
 
 /** code
  * Get the current size of a buffer.
  *
  * - `buffer`: The buffer to get the size of
  * - returns: The current size of the buffer
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
+k_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
 
 /** code
  * Write data to a buffer. If `off` + `size` is larger than the size of the
@@ -347,10 +323,10 @@ mc_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size);
  * - `off`: The offset at which to start writing data to, measured in bytes
  * - `size`: The size (length) of the data to be written, measured in bytes
  * - `data`: The data to write
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_buffer_write(
+k_Result mc_buffer_write(
     mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
@@ -365,26 +341,15 @@ mc_Result mc_buffer_write(
  * - `off`: The offset at which to start reading data from, measured in bytes
  * - `size`: The size (length) of the data to be read, measured in bytes
  * - `data`: A buffer to write the data into. Must be pre-allocated
- * - returns: `mc_Result` with `ok = MC_TRUE` on success, `ok = MC_FALSE`
+ * - returns: `k_Result` with `ok = K_TRUE` on success, `ok = K_FALSE`
  * otherwise
  */
-mc_Result mc_buffer_read(
+k_Result mc_buffer_read(
     mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
     void* data
 );
-
-/**
- * ### Misc functions
- */
-
-/** code
- * Print the contents of a `mc_Result`.
- *
- * - `result`: The result to print
- */
-void mc_result_pretty_print(mc_Result result);
 
 /**
  * ## License

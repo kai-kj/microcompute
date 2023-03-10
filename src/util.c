@@ -17,44 +17,20 @@ char* mc_read_file(const char* path, uint32_t* size) {
     return contents;
 }
 
-void mc_result_pretty_print(mc_Result result) {
-    if (result.ok) {
-        printf(
-            "\e[1m\e[35m%s\e[39m, \e[4m%s:%d\e[24m\e[39m, \e[32mok\e[39m: "
-            "\e[0m%s\n",
-            result.func,
-            result.file,
-            result.line,
-            result.message
-        );
-    } else {
-        printf(
-            "\e[1m\e[35m%s\e[39m, \e[4m%s:%d\e[24m\e[39m, \e[31mERROR\e[39m: "
-            "\e[0m%s\n",
-            result.func,
-            result.file,
-            result.line,
-            result.message
-        );
-    }
-}
-
-mc_Result gl_check_error(uint32_t line, const char* file, const char* func) {
+k_Result gl_check_error(uint32_t line, const char* file, const char* func) {
     GLenum error = glGetError();
     if (error == GL_NO_ERROR)
-        return ((mc_Result){
-            .ok = MC_TRUE,
+        return ((k_Result){
+            .ok = K_TRUE,
             .file = file,
             .line = line,
-            .func = func,
             .message = (char*){"no errors here :)"}});
 
     else
-        return ((mc_Result){
-            .ok = MC_FALSE,
+        return ((k_Result){
+            .ok = K_FALSE,
             .file = file,
             .line = line,
-            .func = func,
             .message = (char*[]){
                 "gl error: GL_INVALID_ENUM",
                 "gl error: GL_INVALID_VALUE",

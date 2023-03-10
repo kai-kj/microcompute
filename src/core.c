@@ -43,26 +43,26 @@ static void gl_debug_cb(
 #endif
 
 #ifdef MC_STANDALONE_MODE
-mc_Result mc_start() {
+k_Result mc_start() {
     state.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    MC_ASSERT(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
+    K_ASSERT_ERR(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
 
     EGLint major, minor;
-    MC_ASSERT(
+    K_ASSERT_ERR(
         eglInitialize(state.disp, &major, &minor),
         "failed to initialize egl"
     );
 
-    MC_ASSERT(
+    K_ASSERT_ERR(
         !(major < 1 || (major == 1 && minor < 5)),
         "egl version too low (min 1.5)"
     );
 
-    MC_ASSERT(eglBindAPI(EGL_OPENGL_API), "failed to bind opengl to egl");
+    K_ASSERT_ERR(eglBindAPI(EGL_OPENGL_API), "failed to bind opengl to egl");
 
     EGLConfig eglCfg;
 
-    MC_ASSERT(
+    K_ASSERT_ERR(
         eglChooseConfig(
             state.disp,
             (EGLint[]){EGL_NONE},
@@ -88,14 +88,14 @@ mc_Result mc_start() {
         }
     );
 
-    MC_ASSERT(state.ctx != EGL_NO_CONTEXT, "failed to create egl context");
+    K_ASSERT_ERR(state.ctx != EGL_NO_CONTEXT, "failed to create egl context");
 
-    MC_ASSERT(
+    K_ASSERT_ERR(
         eglMakeCurrent(state.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, state.ctx),
         "failed to make egl context current"
     );
 
-    MC_ASSERT(gladLoadGL() != 0, "failed to load GLAD");
+    K_ASSERT_ERR(gladLoadGL() != 0, "failed to load GLAD");
 
 #ifdef MC_DEBUG_ENABLE
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -105,14 +105,14 @@ mc_Result mc_start() {
     return GL_CHECK_ERROR();
 }
 
-mc_Result mc_stop() {
+k_Result mc_stop() {
     if (state.ctx != 0) eglDestroyContext(state.disp, state.ctx);
     if (state.disp != 0) eglTerminate(state.disp);
     return GL_CHECK_ERROR();
 }
 #endif
 
-mc_Result mc_memory_barrier() {
+k_Result mc_memory_barrier() {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    return MC_OK;
+    return K_OK;
 }

@@ -1,6 +1,7 @@
-#include <microcompute.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "microcompute.h"
 
 static char* src = //
     "#version 430\n"
@@ -14,11 +15,11 @@ static char* src = //
     "}\n";
 
 int main(void) {
-    mc_Result res;
+    k_Result res;
 
     res = mc_start();
     if (!res.ok) {
-        mc_result_pretty_print(res);
+        K_RESULT_PRINT(res);
         return -1;
     }
 
@@ -27,7 +28,7 @@ int main(void) {
 
     mc_Program* program = mc_program_from_string(src, maxErrLen, error);
     if (!res.ok) {
-        mc_result_pretty_print(res);
+        K_RESULT_PRINT(res);
         printf("error: %s\n", error);
         return -1;
     }

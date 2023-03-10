@@ -1,82 +1,54 @@
 #======================================================================================================================#
-# CHECK
-#======================================================================================================================#
-
-ifneq ($(strip $(TARGET)),linux)
-ifneq ($(strip $(TARGET)),windows)
-$(error set TARGET=linux or TARGET=windows)
-endif
-endif
-
-ifeq ($(strip $(TARGET)),windows)
-ifeq ($(strip $(MAKECMDGOALS)),standalone)
-$(error standalone_lib not available on windows)
-endif
-ifeq ($(strip $(MAKECMDGOALS)),examples)
-$(error examples not available on windows)
-endif
-endif
-
-#======================================================================================================================#
 # CONFIG
 #======================================================================================================================#
 
 #---- BASIC -----------------------------------------------------------------------------------------------------------#
 
 LIBRARY        := microcompute
-LIBS           := -lmicrocompute -lEGL -lGL
 FLAGS          := -std=c11 -Wall -Wextra -Wshadow -Wpointer-arith -Wcast-qual -Wno-unused-parameter -Wno-cast-qual -O3
 DEFS           := $(CFLAGS)
+
+ifeq ($(strip $(STANDALONE)),true)
+DEFS += -DMC_STANDALONE_MODE
+endif
 
 #---- PROJECT STRUCTURE -----------------------------------------------------------------------------------------------#
 
 INCLUDE_FOLDER := include
 LIB_FOLDER     := lib
 BUILD_FOLDER   := build
+OUT_FOLDER     := out
 SRC_FOLDER     := src
-OUT_FOLDER     := tmp
-EXAMPLE_FOLDER := example
 
 #======================================================================================================================#
 
-CC                := gcc $(FLAGS) -isystem $(INCLUDE_FOLDER) -I $(SRC_FOLDER)
+CC                := gcc $(FLAGS) -I $(INCLUDE_FOLDER) -I $(SRC_FOLDER)
 AR                := ar rcs
 RM                := rm -rf
 CP                := cp
 MKDIR             := mkdir -p
-SRC_FOLDERS       := $(shell find $(SRC_FOLDER)/ -type d)
-BUILD_SUB_FOLDERS := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(SRC_FOLDERS))
+SRC_SUB_FOLDERS   := $(shell find $(SRC_FOLDER)/ -type d)
+BUILD_SUB_FOLDERS := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(SRC_SUB_FOLDERS))
 C_FILES           := $(shell find $(SRC_FOLDER)/ -type f -name "*.c")
 C_OBJECTS         := $(subst $(SRC_FOLDER)/,$(BUILD_FOLDER)/,$(subst .c,.o,$(C_FILES)))
-EXAMPLE_C_FILES   := $(shell find $(EXAMPLE_FOLDER)/ -type f -name "*.c")
-EXAMPLES          := $(subst $(EXAMPLE_FOLDER)/,$(OUT_FOLDER)/,$(subst .c,,$(EXAMPLE_C_FILES)))
-STATIC_LIB        := $(LIB_FOLDER)/lib$(LIBRARY).a
+STATIC_LIB        := $(OUT_FOLDER)/lib$(LIBRARY).a
 
-.PHONY: default all standalone library examples doc clean
+.PHONY: all library doc clean run_examples
 
-default: library
+all: library doc 
 
-all: standalone examples doc
-
-standalone: DEFS += -DMC_STANDALONE_MODE
-standalone: library
-
-library: clean $(STATIC_LIB)
-
-examples: DEFS += -DMC_STANDALONE_MODE
-examples: $(EXAMPLES)
+library: $(STATIC_LIB)
 
 doc:
-	python3 microdoc/doc_generator.py $(SRC_FOLDER)/$(LIBRARY).h doc.md
+	lua include/k_tools/k_doc.lua $(SRC_FOLDER)/$(LIBRARY).h doc.md
+
+run_examples: DEFS += -DMC_STANDALONE_MODE
+run_examples: library
+	cd examples; \
+	make
 
 $(OUT_FOLDER):
 	$(MKDIR) $(OUT_FOLDER)
-
-$(INCLUDE_FOLDER):
-	$(MKDIR) $(INCLUDE_FOLDER)
-
-$(LIB_FOLDER):
-	$(MKDIR) $(LIB_FOLDER)
 
 $(BUILD_SUB_FOLDERS):
 	$(MKDIR) $(BUILD_SUB_FOLDERS)
@@ -84,12 +56,11 @@ $(BUILD_SUB_FOLDERS):
 $(C_OBJECTS): $(BUILD_SUB_FOLDERS) $(C_FILES)
 	$(CC) $(DEFS) -c $(subst $(BUILD_FOLDER)/,$(SRC_FOLDER)/,$(subst .o,.c,$@)) -o $@
 
-$(STATIC_LIB): $(INCLUDE_FOLDER) $(LIB_FOLDER) $(C_OBJECTS)
+$(STATIC_LIB): $(OUT_FOLDER) $(C_OBJECTS)
 	$(AR) $(STATIC_LIB) $(C_OBJECTS)
-	$(CP) $(SRC_FOLDER)/$(LIBRARY).h $(INCLUDE_FOLDER)/$(LIBRARY).h
-
-$(EXAMPLES): $(OUT_FOLDER) $(STATIC_LIB)
-	$(CC) $(DEFS) $(subst $(OUT_FOLDER)/,$(EXAMPLE_FOLDER)/,$@).c -o $@ -L$(LIB_FOLDER) $(LIBS)
+	$(CP) $(SRC_FOLDER)/$(LIBRARY).h $(OUT_FOLDER)/$(LIBRARY).h
+	$(MKDIR) $(OUT_FOLDER)/k_tools
+	$(CP) $(INCLUDE_FOLDER)/k_tools/*.h $(OUT_FOLDER)/k_tools
 
 clean:
-	$(RM) $(BUILD_FOLDER) $(INCLUDE_FOLDER) $(LIB_FOLDER) $(OUT_FOLDER)
+	$(RM) $(BUILD_FOLDER) $(OUT_FOLDER)
