@@ -3,12 +3,11 @@
  *
  * [**Github**](https://github.com/kal39/microcompute)
  *
- * Usage notes:
- * - For `gcc`, use `-lmicrocompute -lgbm -lEGL -lGL -lGLEW`
- * - Because this library uses `OpenGL`, all `microcompute` operations must be
- * performed in the same thread
- * - For examples, see
- * [here](https://github.com/kal39/microcompute/blob/master/example)
+ * For examples, see
+ * - [Arrays](
+ *   https://github.com/kal39/microcompute/blob/master/examples/arrays.c)
+ * - [Mandelbrot set](
+ *   https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.c)
  *
  * ## Documentation
  */
