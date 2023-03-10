@@ -22,16 +22,17 @@ This library makes it easy to run simple OpenGL compute shaders. It can be used 
 
 ## Examples
 
-- [Array operations](https://github.com/kal39/microcompute/blob/master/example/arrays.c)
-- [Mandelbrot renderer](https://github.com/kal39/microcompute/blob/master/example/mandelbrot.c)
+- [Array operations](https://github.com/kal39/microcompute/blob/master/examples/arrays.c)
+- [Mandelbrot renderer](https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.c)
 
 ## Documentation
 
-See [doc.md](https://github.com/kal39/microcompute/blob/master/doc.md) (generated using [microdoc](https://github.com/kal39/microdoc)).
+See [doc.md](https://github.com/kal39/microcompute/blob/master/doc.md)
 
 ## Building
 
 To clone the repository, run:
+
 ```
 git clone git@github.com:kal39/microcompute.git
 cd microcompute
@@ -41,34 +42,39 @@ git submodule update --init --recursive
 ### Standalone version
 
 To compile the microcompute library, run:
+
 ```
-make standalone_lib
+make library STANDALONE=true
 ```
 
-A static library file will be generated in `lib/` and the header file will be available in `include/`.
+A static library file and header file will be generated in `out/`.
 
-The examples can be compiled by running:
+The examples can be compiled and run by:
+
 ```
-make examples
+make run_examples
 ```
 
 The compiled example binaries will be generated in `example/`.
 
 When using microcompute in this way, the following libraries are needed:
+
 ```
--lmicrocompute -lgbm -lEGL -lGL -lGLEW
+-lmicrocompute -lEGL -lGL
 ```
 
-### For use inside a OpenGL program 
+### For use inside a OpenGL program
 
 To compile the microcompute library, run:
+
 ```
 make library
 ```
 
 When using microcompute in this way, the following libraries are needed:
+
 ```
--lmicrocompute -lGL -lGLEW
+-lmicrocompute -lGL
 ```
 
 ## License
