@@ -1,3 +1,0 @@
-[submodule "include/k_tools"]
-	path = include/k_tools
-	url = git@github.com:kal39/k_tools.git

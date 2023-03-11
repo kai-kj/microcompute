@@ -43,7 +43,7 @@ cmake ..
 make
 ```
 
-The header files can be found in `include/`. `microcompute.h`, `k_tools/result.h`, and `k_tools/bool.h` are required. The library file can be found in `build/`.
+The header files can be found in `include/`, and the library file can be found in `build/`.
 
 To build the examples run:
 

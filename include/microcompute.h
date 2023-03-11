@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 
-#include "k_tools/k_result.h"
+#include "k_result.h"
 
 /**
  * ### Structs
