@@ -13,12 +13,7 @@
 
 ## About
 
-This library makes it easy to run simple OpenGL compute shaders. It can be used in two ways:
-
-- As a standalone library  
-  When used in this way, it is possible to run OpenGL compute shaders without creating a window. This is done by using [Linux DRI](https://en.wikipedia.org/wiki/Direct_Rendering_Infrastructure), allowing headless programs to utilise the GPU.
-- Inside a program that already uses OpenGL  
-  An example is the [microcanvas](https://github.com/kal39/microcanvas) library I am also working on.
+This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using [Linux DRI](https://en.wikipedia.org/wiki/Direct_Rendering_Infrastructure), allowing headless programs to utilise the GPU.
 
 ## Examples
 
@@ -27,7 +22,7 @@ This library makes it easy to run simple OpenGL compute shaders. It can be used 
 
 ## Documentation
 
-See [doc.md](https://github.com/kal39/microcompute/blob/master/doc.md)
+See [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md), this was generated using [`k_doc.lua`](https://github.com/kal39/k_tools/blob/main/k_doc.lua).
 
 ## Building
 
@@ -39,43 +34,27 @@ cd microcompute
 git submodule update --init --recursive
 ```
 
-### Standalone version
-
-To compile the microcompute library, run:
+To build the library run:
 
 ```
-make library STANDALONE=true
+mkdir build
+cd build
+cmake ..
+make
 ```
 
-A static library file and header file will be generated in `out/`.
+The header files can be found in `include/`. `microcompute.h`, `k_tools/result.h`, and `k_tools/bool.h` are required. The library file can be found in `build/`.
 
-The examples can be compiled and run by:
-
-```
-make run_examples
-```
-
-The compiled example binaries will be generated in `example/`.
-
-When using microcompute in this way, the following libraries are needed:
+To build the examples run:
 
 ```
--lmicrocompute -lEGL -lGL
+cd examples
+mkdir build
+cmake ..
+make
 ```
 
-### For use inside a OpenGL program
-
-To compile the microcompute library, run:
-
-```
-make library
-```
-
-When using microcompute in this way, the following libraries are needed:
-
-```
--lmicrocompute -lGL
-```
+The binaries can be found in `examples/build`.
 
 ## License
 
