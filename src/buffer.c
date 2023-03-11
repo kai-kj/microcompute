@@ -37,7 +37,6 @@ k_Result mc_buffer_write(
 
     uint64_t buffSize;
     mc_buffer_get_size(buffer, &buffSize);
-
     K_ASSERT_ERR(
         offset + size <= buffSize,
         "offset + size larger than buffer size"
@@ -57,7 +56,6 @@ k_Result mc_buffer_read(
 
     uint64_t buffSize;
     mc_buffer_get_size(buffer, &buffSize);
-
     K_ASSERT_ERR(
         offset + size <= buffSize,
         "offset + size larger than buffer size"

@@ -1,22 +1,5 @@
 #include "_microcompute.h"
 
-char* mc_read_file(const char* path, uint32_t* size) {
-    FILE* fp = fopen(path, "rb");
-    if (fp == NULL) return NULL;
-
-    fseek(fp, 0, SEEK_END);
-    long length = ftell(fp) + 1;
-    fseek(fp, 0, SEEK_SET);
-
-    char* contents = malloc(length);
-    length = fread(contents, 1, length, fp);
-    contents[length - 1] = '\0';
-    fclose(fp);
-
-    if (size != NULL) *size = length;
-    return contents;
-}
-
 k_Result gl_check_error(uint32_t line, const char* file, const char* func) {
     GLenum error = glGetError();
     if (error == GL_NO_ERROR)

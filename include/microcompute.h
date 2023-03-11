@@ -12,7 +12,8 @@
  * ## Documentation
  */
 
-#pragma once
+#ifndef MICROCOMPUTE_INCLUDE_GUARD
+#define MICROCOMPUTE_INCLUDE_GUARD
 
 #include <stdint.h>
 
@@ -376,3 +377,5 @@ k_Result mc_buffer_read(
  * SOFTWARE.
  * ```
  */
+
+#endif // MICROCOMPUTE_INCLUDE_GUARD

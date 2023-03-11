@@ -1,13 +1,11 @@
 #include "_microcompute.h"
 
-#ifdef MC_STANDALONE_MODE
 struct mc_State {
     EGLDisplay disp;
     EGLContext ctx;
 };
 
 static struct mc_State state;
-#endif
 
 #ifdef MC_DEBUG_ENABLE
 static void gl_debug_cb(
@@ -42,7 +40,6 @@ static void gl_debug_cb(
 }
 #endif
 
-#ifdef MC_STANDALONE_MODE
 k_Result mc_start() {
     state.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     K_ASSERT_ERR(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
@@ -110,7 +107,6 @@ k_Result mc_stop() {
     if (state.disp != 0) eglTerminate(state.disp);
     return GL_CHECK_ERROR();
 }
-#endif
 
 k_Result mc_memory_barrier() {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);

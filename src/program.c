@@ -1,5 +1,32 @@
 #include "_microcompute.h"
 
+#define MC_SET_VALUE(program, name, set_fn, ...)                               \
+    GLint loc = glGetUniformLocation(program->program, name);                  \
+    K_ASSERT_ERR(loc != -1, "failed to find uniform");                         \
+    glUseProgram(program->program);                                            \
+    set_fn(loc, __VA_ARGS__);                                                  \
+    return GL_CHECK_ERROR();
+
+#define MC_SET_MATRIX(program, name, set_fn, v)                                \
+    MC_SET_VALUE(program, name, set_fn, 1, v.transpose, v.values)
+
+static char* mc_read_file(const char* path, uint32_t* size) {
+    FILE* fp = fopen(path, "rb");
+    if (fp == NULL) return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    long length = ftell(fp) + 1;
+    fseek(fp, 0, SEEK_SET);
+
+    char* contents = malloc(length);
+    length = fread(contents, 1, length, fp);
+    contents[length - 1] = '\0';
+    fclose(fp);
+
+    if (size != NULL) *size = length;
+    return contents;
+}
+
 static k_Result check_shader(GLuint shader, uint32_t maxLen, char* err) {
     int32_t success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
@@ -42,20 +69,14 @@ mc_Program* mc_program_from_string(
     glCompileShader(program->shader);
 
     k_Result res = check_shader(program->shader, maxErrorLength, error);
-    if (!res.ok) {
-        free(program);
-        return NULL;
-    };
+    K_ASSERT_DO_RET(res.ok, free(program), NULL);
 
     program->program = glCreateProgram();
     glAttachShader(program->program, program->shader);
     glLinkProgram(program->program);
 
     res = check_program(program->program, maxErrorLength, error);
-    if (!res.ok) {
-        free(program);
-        return NULL;
-    };
+    K_ASSERT_DO_RET(res.ok, free(program), NULL);
 
     return program;
 }
@@ -66,7 +87,7 @@ mc_Program* mc_program_from_file(
     char* error
 ) {
     char* code = mc_read_file(path, NULL);
-    if (code == NULL) return NULL;
+    K_ASSERT_RET(code != NULL, NULL);
 
     mc_Program* program = mc_program_from_string(code, maxErrorLength, error);
     free(code);
@@ -93,6 +114,89 @@ k_Result mc_program_dispatch(
 
     glUseProgram(program->program);
     glDispatchCompute(size.x, size.y, size.z);
-
     return GL_CHECK_ERROR();
+}
+
+k_Result mc_program_set_float(mc_Program* program, char* name, float v) {
+    MC_SET_VALUE(program, name, glUniform1f, v);
+}
+
+k_Result mc_program_set_vec2(mc_Program* program, char* name, mc_vec2 v) {
+    MC_SET_VALUE(program, name, glUniform2f, v.x, v.y);
+}
+
+k_Result mc_program_set_vec3(mc_Program* program, char* name, mc_vec3 v) {
+    MC_SET_VALUE(program, name, glUniform3f, v.x, v.y, v.z);
+}
+
+k_Result mc_program_set_vec4(mc_Program* program, char* name, mc_vec4 v) {
+    MC_SET_VALUE(program, name, glUniform4f, v.x, v.y, v.z, v.w);
+}
+
+k_Result mc_program_set_int(mc_Program* program, char* name, int32_t v) {
+    MC_SET_VALUE(program, name, glUniform1i, v);
+}
+
+k_Result mc_program_set_ivec2(mc_Program* program, char* name, mc_ivec2 v) {
+    MC_SET_VALUE(program, name, glUniform2i, v.x, v.y);
+}
+
+k_Result mc_program_set_ivec3(mc_Program* program, char* name, mc_ivec3 v) {
+    MC_SET_VALUE(program, name, glUniform3i, v.x, v.y, v.z);
+}
+
+k_Result mc_program_set_ivec4(mc_Program* program, char* name, mc_ivec4 v) {
+    MC_SET_VALUE(program, name, glUniform4i, v.x, v.y, v.z, v.w);
+}
+
+k_Result mc_program_set_uint(mc_Program* program, char* name, uint32_t v) {
+    MC_SET_VALUE(program, name, glUniform1ui, v);
+}
+
+k_Result mc_program_set_uvec2(mc_Program* program, char* name, mc_uvec2 v) {
+    MC_SET_VALUE(program, name, glUniform2ui, v.x, v.y);
+}
+
+k_Result mc_program_set_uvec3(mc_Program* program, char* name, mc_uvec3 v) {
+    MC_SET_VALUE(program, name, glUniform3ui, v.x, v.y, v.z);
+}
+
+k_Result mc_program_set_uvec4(mc_Program* program, char* name, mc_uvec4 v) {
+    MC_SET_VALUE(program, name, glUniform4ui, v.x, v.y, v.z, v.w);
+}
+
+k_Result mc_program_set_mat22(mc_Program* program, char* name, mc_mat22 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix2fv, v);
+}
+
+k_Result mc_program_set_mat33(mc_Program* program, char* name, mc_mat33 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix3fv, v);
+}
+
+k_Result mc_program_set_mat44(mc_Program* program, char* name, mc_mat44 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix4fv, v);
+}
+
+k_Result mc_program_set_mat23(mc_Program* program, char* name, mc_mat23 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix2x3fv, v);
+}
+
+k_Result mc_program_set_mat32(mc_Program* program, char* name, mc_mat32 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix3x2fv, v);
+}
+
+k_Result mc_program_set_mat24(mc_Program* program, char* name, mc_mat24 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix2x4fv, v);
+}
+
+k_Result mc_program_set_mat42(mc_Program* program, char* name, mc_mat42 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix4x2fv, v);
+}
+
+k_Result mc_program_set_mat34(mc_Program* program, char* name, mc_mat34 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix3x4fv, v);
+}
+
+k_Result mc_program_set_mat43(mc_Program* program, char* name, mc_mat43 v) {
+    MC_SET_MATRIX(program, name, glUniformMatrix4x3fv, v);
 }
