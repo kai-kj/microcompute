@@ -14,7 +14,7 @@ static char* renSrc = //
     "    int maxIter;\n"
     "};\n"
     "layout(std430, binding = 1) buffer buff1 {\n"
-    "    vec4 floatData[];\n"
+    "    int img[];\n"
     "};\n"
     "void main(void) {\n"
     "    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n"
@@ -28,29 +28,10 @@ static char* renSrc = //
     "        z = vec2(z2.x - z2.y + z0.x, 2 * z.x * z.y + z0.y);\n"
     "        z2 = vec2(z.x * z.x, z.y * z.y);\n"
     "    }\n"
-    "    float color = float(i) / float(maxIter);\n"
-    "    floatData[(pos.y * size.x + pos.x)]\n"
-    "        = vec4(color, 0.5 * color, 0.5 * color, 1.0);\n"
-    "}\n";
-
-static char* convSrc = //
-    "#version 430\n"
-    "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
-    "layout(std430, binding = 0) buffer buff0 {\n"
-    "    vec4 floatData[];\n"
-    "};\n"
-    "layout(std430, binding = 1) buffer buff1 {\n"
-    "    int byteData[];\n"
-    "};\n"
-    "void main(void) {\n"
-    "    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);\n"
-    "    ivec2 size = ivec2(gl_NumWorkGroups.xy);\n"
-    "    ivec4 col = clamp(\n"
-    "        ivec4(floatData[(pos.y * size.x + pos.x)] * 255.0),\n"
-    "        0, 255\n"
-    "    );\n"
-    "    int bytes = col.r << 0 | col.g << 8 | col.b << 16 | col.a << 24;\n"
-    "    byteData[(pos.y * size.x + pos.x)] = bytes;\n"
+    "    float shade = float(i) / float(maxIter) * 255;\n"
+    "    ivec3 c = clamp(ivec3(vec3(shade.xxx)), 0, 255);\n"
+    "    img[pos.y * size.x + pos.x]\n"
+    "        = c.r << 0 | c.g << 8 | c.b << 16 | 255 << 24;\n"
     "}\n";
 
 typedef struct ShaderData {
@@ -64,64 +45,50 @@ void debug_cb(mc_DebugLevel level, const char* msg, void* arg) {
 }
 
 int main(void) {
+    int width = 1000, height = 1000;
+    mc_vec2 center = (mc_vec2){-0.7615, -0.08459};
+    mc_float zoom = 1000;
+    mc_int iterations = 500;
+
     char* error = NULL;
-    int width = 1000;
-    int height = 1000;
-    int pixels = width * height;
+    int size = width * height;
 
     if ((error = mc_start(debug_cb, NULL)) != NULL) {
         printf("error at mc_start: %s\n", error);
         return -1;
     }
 
-    mc_Program* renderProg = mc_program_from_string(renSrc);
-    if ((error = mc_program_check(renderProg)) != NULL) {
-        printf("error at mc_program_from_string: %s\n", error);
+    mc_Program* program = mc_program_from_string(renSrc);
+    if ((error = mc_program_check(program)) != NULL) {
+        printf("error at mc_program_from_string:\n%s\n", error);
         return -1;
     }
 
-    mc_Program* convertProg = mc_program_from_string(convSrc);
-    if ((error = mc_program_check(convertProg)) != NULL) {
-        printf("error at mc_program_from_string: %s\n", error);
-        return -1;
-    }
-
-    mc_Buffer* shaderData
-        = mc_buffer_create(MC_BUFFER_UNIFORM, sizeof(ShaderData));
-    mc_Buffer* floatImage
-        = mc_buffer_create(MC_BUFFER_STORAGE, sizeof(mc_vec4) * pixels);
-    mc_Buffer* byteImage
-        = mc_buffer_create(MC_BUFFER_STORAGE, sizeof(mc_int) * pixels);
+    mc_Buffer* data = mc_buffer_create(MC_BUFFER_UNIFORM, sizeof(ShaderData));
+    mc_Buffer* img = mc_buffer_create(MC_BUFFER_STORAGE, sizeof(mc_int) * size);
 
     mc_buffer_write(
-        shaderData,
+        data,
         0,
         sizeof(ShaderData),
-        &(ShaderData){(mc_vec2){-0.7615, -0.08459}, (mc_vec2){1000, 1000}, 1000}
+        &(ShaderData){center, (mc_vec2){zoom, zoom}, iterations}
     );
 
-    double time1 = mc_program_run_timed(
-        renderProg,
+    double time = mc_program_run_timed(
+        program,
         (mc_uvec3){width, height, 1},
-        (mc_Buffer*[]){shaderData, floatImage, NULL}
+        (mc_Buffer*[]){data, img, NULL}
     );
 
-    double time2 = mc_program_run_timed(
-        convertProg,
-        (mc_uvec3){width, height, 1},
-        (mc_Buffer*[]){floatImage, byteImage, NULL}
-    );
+    printf("compute time: %f\n", time);
 
-    printf("%f, %f\n", time1, time2);
+    char* img_bytes = malloc(size * 4);
+    mc_buffer_read(img, 0, sizeof(mc_int) * size, img_bytes);
+    stbi_write_bmp("mandelbrot.bmp", width, height, 4, img_bytes);
+    free(img_bytes);
 
-    char* data = malloc(pixels * 4);
-    mc_buffer_read(byteImage, 0, sizeof(mc_int) * pixels, data);
-    stbi_write_bmp("mandelbrot.bmp", width, height, 4, data);
-    free(data);
-
-    mc_buffer_destroy(shaderData);
-    mc_buffer_destroy(byteImage);
-    mc_program_destroy(renderProg);
-    mc_program_destroy(convertProg);
+    mc_buffer_destroy(data);
+    mc_buffer_destroy(img);
+    mc_program_destroy(program);
     mc_stop();
 }
