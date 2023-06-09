@@ -13,16 +13,15 @@
 
 ## About
 
-This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using [Linux DRI](https://en.wikipedia.org/wiki/Direct_Rendering_Infrastructure), allowing headless programs to utilise the GPU.
+This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using [Linux DRI](https://en.wikipedia.org/wiki/Direct_Rendering_Infrastructure), allowing headless programs to use the GPU.
 
 ## Examples
 
-- [Array operations](https://github.com/kal39/microcompute/blob/master/examples/arrays.c)
 - [Mandelbrot renderer](https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.c)
 
 ## Documentation
 
-See [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md), this was generated using [`k_doc.lua`](https://github.com/kal39/k_tools/blob/main/k_doc.lua).
+See [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md), this was generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html).
 
 ## Building
 

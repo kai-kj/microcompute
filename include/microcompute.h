@@ -6,9 +6,6 @@
  *
  * This library contains systems that can be used to easily run compute shaders
  * in GLSL.
- *
- * TODO:
- * - textures
  */
 
 #include <stdint.h>
@@ -122,7 +119,8 @@ typedef struct mc_uvec4 {
  *
  * - `cb`: A function to call when a error occurs, set to `NULL` to ignore
  * - `arg`: An pointer to pass to the debug callback, set to `NULL` to ignore
- * - returns: `NULL` on success, an error message otherwise (dont free)
+ * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
+ *            handled by the library, so dont free)
  */
 
 char* mc_start(mc_debug_cb cb, void* arg);
@@ -134,12 +132,14 @@ void mc_stop();
 
 /** code
  * Wait for all compute operations to finish.
+ *
  * - returns: The time spent waiting
  */
 double mc_wait();
 
 /** code
  * Get the current time in seconds.
+ *
  * - returns: The current time
  */
 double mc_get_time();
@@ -226,8 +226,8 @@ void mc_buffer_read(
 /** code
  * Create a program from a string.
  *
- * - `code`: A null-terminated GLSL code
- * - returns: `NULL` on fail, a program otherwise
+ * - `code`: A null-terminated string of GLSL code
+ * - returns: A program
  */
 
 mc_Program* mc_program_from_string(const char* code);
@@ -236,7 +236,7 @@ mc_Program* mc_program_from_string(const char* code);
  * Create a program from a file.
  *
  * - `path`: A null-terminated path to the file containing GLSL code
- * - returns: `NULL` on fail, a program otherwise
+ * - returns: A program
  */
 
 mc_Program* mc_program_from_file(const char* path);
