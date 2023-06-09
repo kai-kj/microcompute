@@ -1,66 +1,52 @@
-#include "_microcompute.h"
+#include "microcompute_internal.h"
 
-mc_Buffer* mc_buffer_create(uint64_t size) {
-    mc_Buffer* buffer = malloc(sizeof(*buffer));
-    glGenBuffers(1, &buffer->ssbo);
-    mc_buffer_resize(buffer, size);
+mc_Buffer* mc_buffer_create(mc_BufferType type, uint64_t size) {
+    mc_Buffer* buffer = malloc(sizeof *buffer);
+    buffer->type
+        = type == MC_BUFFER_UNIFORM ? GL_UNIFORM_BUFFER : GL_SHADER_STORAGE_BUFFER;
+    glGenBuffers(1, &buffer->buffer);
+    mc_buffer_set_size(buffer, size);
     return buffer;
 }
 
-k_Result mc_buffer_destroy(mc_Buffer* buffer) {
-    K_ASSERT_ERR(buffer != NULL, "buffer is NULL");
-    if (buffer->ssbo != 0) glDeleteBuffers(1, &buffer->ssbo);
-    return GL_CHECK_ERROR();
+void mc_buffer_destroy(mc_Buffer* buffer) {
+    if (!buffer) return;
+    if (buffer->buffer) glDeleteBuffers(1, &buffer->buffer);
+    free(buffer);
 }
 
-k_Result mc_buffer_resize(mc_Buffer* buffer, uint64_t size) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_COPY);
-    return GL_CHECK_ERROR();
+mc_BufferType mc_buffer_get_type(mc_Buffer* buffer) {
+    return buffer->type == GL_UNIFORM_BUFFER ? MC_BUFFER_UNIFORM : MC_BUFFER_STORAGE;
 }
 
-k_Result mc_buffer_get_size(mc_Buffer* buffer, uint64_t* size) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
-    GLint iSize;
-    glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &iSize);
-    *size = iSize;
-    return GL_CHECK_ERROR();
+uint64_t mc_buffer_get_size(mc_Buffer* buffer) {
+    GLint size;
+    glBindBuffer(buffer->type, buffer->buffer);
+    glGetBufferParameteriv(buffer->type, GL_BUFFER_SIZE, &size);
+    return size;
 }
 
-k_Result mc_buffer_write(
+void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size) {
+    glBindBuffer(buffer->type, buffer->buffer);
+    glBufferData(buffer->type, size, NULL, GL_DYNAMIC_DRAW);
+}
+
+void mc_buffer_write(
     mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
     void* data
 ) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
-
-    uint64_t buffSize;
-    mc_buffer_get_size(buffer, &buffSize);
-    K_ASSERT_ERR(
-        offset + size <= buffSize,
-        "offset + size larger than buffer size"
-    );
-
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
-    return GL_CHECK_ERROR();
+    glBindBuffer(buffer->type, buffer->buffer);
+    glBufferSubData(buffer->type, offset, size, data);
 }
 
-k_Result mc_buffer_read(
+void mc_buffer_read(
     mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
     void* data
 ) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->ssbo);
-
-    uint64_t buffSize;
-    mc_buffer_get_size(buffer, &buffSize);
-    K_ASSERT_ERR(
-        offset + size <= buffSize,
-        "offset + size larger than buffer size"
-    );
-
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
-    return GL_CHECK_ERROR();
+    glBindBuffer(buffer->type, buffer->buffer);
+    glGetBufferSubData(buffer->type, offset, size, data);
 }

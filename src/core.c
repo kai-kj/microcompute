@@ -1,77 +1,68 @@
-#include "_microcompute.h"
+#include "microcompute_internal.h"
 
 struct mc_State {
     EGLDisplay disp;
     EGLContext ctx;
+    mc_debug_cb* debug_cb;
+    void* debug_cb_arg;
 };
 
-static struct mc_State state;
+static struct mc_State S;
 
-#ifdef MC_DEBUG_ENABLE
 static void gl_debug_cb(
     GLenum source,
     GLenum type,
     GLuint id,
     GLenum severity,
     GLsizei length,
-    const GLchar* msg,
-    const void* data
+    const GLchar* message,
+    const void* arg
 ) {
-    char* sourceStr = (char*[]){
-        "API",
-        "WINDOW",
-        "SHADER",
-        "THIRD PARTY",
-        "APPLICATION",
-        "UNKNOWN",
-    }[source - GL_DEBUG_SOURCE_API];
+    if (!S.debug_cb) return;
 
-    char* typeStr = (char*[]){
-        "error",
-        "deprecated",
-        "undefined",
-        "portability",
-        "performance",
-        "other",
-        "marker",
-    }[type - GL_DEBUG_TYPE_ERROR];
+    mc_DebugLevel level;
+    switch (severity) {
+        case GL_DEBUG_SEVERITY_NOTIFICATION: level = MC_LVL_INFO; break;
+        case GL_DEBUG_SEVERITY_LOW: level = MC_LVL_LOW; break;
+        case GL_DEBUG_SEVERITY_MEDIUM: level = MC_LVL_MEDIUM; break;
+        case GL_DEBUG_SEVERITY_HIGH: level = MC_LVL_HIGH; break;
+        default: return;
+    }
 
-    printf("GL: %s (%s): %s\n", sourceStr, typeStr, msg);
+    uint32_t strLen = snprintf(NULL, 0, "GL: %s", message) + 1;
+    char* str = malloc(strLen);
+    snprintf(str, strLen, "GL: %s", message);
+
+    S.debug_cb(level, str, S.debug_cb_arg);
+
+    free(str);
 }
-#endif
 
-k_Result mc_start() {
-    state.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    K_ASSERT_ERR(state.disp != EGL_NO_DISPLAY, "failed to get egl disp");
+char* mc_start(mc_debug_cb cb, void* arg) {
+    S.debug_cb = cb;
+    S.debug_cb_arg = arg;
+
+    S.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (S.disp == EGL_NO_DISPLAY) return "failed to get egl disp";
 
     EGLint major, minor;
-    K_ASSERT_ERR(
-        eglInitialize(state.disp, &major, &minor),
-        "failed to initialize egl"
-    );
+    if (!eglInitialize(S.disp, &major, &minor)) return "failed to init egl";
+    if (major < 1 || (major == 1 && minor < 5)) return "egl version too low";
 
-    K_ASSERT_ERR(
-        !(major < 1 || (major == 1 && minor < 5)),
-        "egl version too low (min 1.5)"
-    );
-
-    K_ASSERT_ERR(eglBindAPI(EGL_OPENGL_API), "failed to bind opengl to egl");
+    if (!eglBindAPI(EGL_OPENGL_API)) return "failed to bind opengl to egl";
 
     EGLConfig eglCfg;
-
-    K_ASSERT_ERR(
-        eglChooseConfig(
-            state.disp,
+    if (!eglChooseConfig(
+            S.disp,
             (EGLint[]){EGL_NONE},
             &eglCfg,
             1,
             &(EGLint){0}
-        ),
-        "failed to choose egl config"
-    );
+        ))
+        return "failed to choose egl config";
 
-    state.ctx = eglCreateContext(
-        state.disp,
+    S.ctx = eglCreateContext(
+        S.disp,
         eglCfg,
         EGL_NO_CONTEXT,
         (EGLint[]){
@@ -85,30 +76,32 @@ k_Result mc_start() {
         }
     );
 
-    K_ASSERT_ERR(state.ctx != EGL_NO_CONTEXT, "failed to create egl context");
+    if (S.ctx == EGL_NO_CONTEXT) return "failed to create egl context";
 
-    K_ASSERT_ERR(
-        eglMakeCurrent(state.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, state.ctx),
-        "failed to make egl context current"
-    );
+    if (!eglMakeCurrent(S.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, S.ctx))
+        return "failed to make egl context current";
 
-    K_ASSERT_ERR(gladLoadGL() != 0, "failed to load GLAD");
+    if (gladLoadGL() == 0) return "failed to load GLAD";
 
-#ifdef MC_DEBUG_ENABLE
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_debug_cb, NULL);
-#endif
 
-    return GL_CHECK_ERROR();
+    return NULL;
 }
 
-k_Result mc_stop() {
-    if (state.ctx != 0) eglDestroyContext(state.disp, state.ctx);
-    if (state.disp != 0) eglTerminate(state.disp);
-    return GL_CHECK_ERROR();
+void mc_stop() {
+    if (S.ctx != 0) eglDestroyContext(S.disp, S.ctx);
+    if (S.disp != 0) eglTerminate(S.disp);
 }
 
-k_Result mc_memory_barrier() {
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    return K_OK;
+double mc_wait() {
+    double startTime = mc_get_time();
+    glFinish();
+    return mc_get_time() - startTime;
+}
+
+double mc_get_time() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
