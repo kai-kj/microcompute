@@ -2,8 +2,8 @@
 
 mc_Buffer* mc_buffer_create(mc_BufferType type, uint64_t size) {
     mc_Buffer* buffer = malloc(sizeof *buffer);
-    buffer->type
-        = type == MC_BUFFER_UNIFORM ? GL_UNIFORM_BUFFER : GL_SHADER_STORAGE_BUFFER;
+    buffer->type = type == MC_BUFFER_UNIFORM ? GL_UNIFORM_BUFFER
+                                             : GL_SHADER_STORAGE_BUFFER;
     glGenBuffers(1, &buffer->buffer);
     mc_buffer_set_size(buffer, size);
     return buffer;
@@ -16,7 +16,8 @@ void mc_buffer_destroy(mc_Buffer* buffer) {
 }
 
 mc_BufferType mc_buffer_get_type(mc_Buffer* buffer) {
-    return buffer->type == GL_UNIFORM_BUFFER ? MC_BUFFER_UNIFORM : MC_BUFFER_STORAGE;
+    return buffer->type == GL_UNIFORM_BUFFER ? MC_BUFFER_UNIFORM
+                                             : MC_BUFFER_STORAGE;
 }
 
 uint64_t mc_buffer_get_size(mc_Buffer* buffer) {

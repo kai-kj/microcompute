@@ -30,7 +30,6 @@ To clone the repository, run:
 ```
 git clone git@github.com:kal39/microcompute.git
 cd microcompute
-git submodule update --init --recursive
 ```
 
 To build the library run:

@@ -34,28 +34,7 @@ static char* alloc_string(char* string) {
     return error;
 }
 
-static char* read_file(const char* path) {
-    FILE* fp = fopen(path, "rb");
-    if (!fp) return NULL;
-
-    fseek(fp, 0, SEEK_END);
-    uint64_t length = ftell(fp) + 1;
-    fseek(fp, 0, SEEK_SET);
-
-    char* contents = malloc(length);
-    if (!contents) {
-        fclose(fp);
-        return NULL;
-    }
-
-    fread(contents, 1, length, fp);
-    contents[length - 1] = '\0';
-    fclose(fp);
-
-    return contents;
-}
-
-mc_Program* mc_program_from_string(const char* code) {
+mc_Program* mc_program_create(const char* code) {
     mc_Program* program = malloc(sizeof *program);
     program->error = NULL;
 
@@ -75,19 +54,6 @@ mc_Program* mc_program_from_string(const char* code) {
     }
 
     return program;
-}
-
-mc_Program* mc_program_from_file(const char* path) {
-    char* code = read_file(path);
-    if (!code) {
-        mc_Program* program = malloc(sizeof *program);
-        program->error = alloc_string("failed to read file");
-        return program;
-    } else {
-        mc_Program* program = mc_program_from_string(code);
-        free(code);
-        return program;
-    }
 }
 
 void mc_program_destroy(mc_Program* program) {

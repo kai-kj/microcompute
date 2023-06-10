@@ -58,9 +58,9 @@ int main(void) {
         return -1;
     }
 
-    mc_Program* program = mc_program_from_string(renSrc);
+    mc_Program* program = mc_program_create(renSrc);
     if ((error = mc_program_check(program)) != NULL) {
-        printf("error at mc_program_from_string:\n%s\n", error);
+        printf("error at mc_program_create:\n%s\n", error);
         return -1;
     }
 
@@ -80,7 +80,7 @@ int main(void) {
         (mc_Buffer*[]){data, img, NULL}
     );
 
-    printf("compute time: %f\n", time);
+    printf("compute time: %f[s]\n", time);
 
     char* img_bytes = malloc(size * 4);
     mc_buffer_read(img, 0, sizeof(mc_int) * size, img_bytes);

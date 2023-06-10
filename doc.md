@@ -251,23 +251,12 @@ data is transferred correctly.
 <br/>
 
 ```c
-mc_Program* mc_program_from_string(const char* code);
+mc_Program* mc_program_create(const char* code);
 ```
 
 Create a program from a string.
 
 - `code`: A null-terminated string of GLSL code
-- returns: A program
-
-<br/>
-
-```c
-mc_Program* mc_program_from_file(const char* path);
-```
-
-Create a program from a file.
-
-- `path`: A null-terminated path to the file containing GLSL code
 - returns: A program
 
 <br/>

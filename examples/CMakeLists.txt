@@ -6,5 +6,6 @@ find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
 add_subdirectory(../ microcompute)
 
 add_executable(mandelbrot mandelbrot.c)
+set_property(TARGET mandelbrot PROPERTY C_STANDARD 99)
 target_include_directories(mandelbrot PRIVATE ../include include)
 target_link_libraries(mandelbrot PRIVATE microcompute OpenGL::OpenGL OpenGL::EGL)

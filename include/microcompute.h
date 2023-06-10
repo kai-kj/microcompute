@@ -230,16 +230,7 @@ void mc_buffer_read(
  * - returns: A program
  */
 
-mc_Program* mc_program_from_string(const char* code);
-
-/** code
- * Create a program from a file.
- *
- * - `path`: A null-terminated path to the file containing GLSL code
- * - returns: A program
- */
-
-mc_Program* mc_program_from_file(const char* path);
+mc_Program* mc_program_create(const char* code);
 
 /** code
  * Destroy a program.
