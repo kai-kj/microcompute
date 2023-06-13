@@ -23,7 +23,7 @@ This library makes it easy to run simple OpenGL compute shaders without creating
 
 See [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md), this was generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html).
 
-## Building
+## Build examples
 
 To clone the repository, run:
 
@@ -32,27 +32,14 @@ git clone git@github.com:kal39/microcompute.git
 cd microcompute
 ```
 
-To build the library run:
+The header files can be found in `include/`.
 
-```
-mkdir build
-cd build
-cmake ..
-make
-```
-
-The header files can be found in `include/`, and the library file can be found in `build/`.
-
-To build the examples run:
+To build the examples, run:
 
 ```
 cd examples
-mkdir build
-cmake ..
 make
 ```
-
-The binaries can be found in `examples/build`.
 
 ## License
 
