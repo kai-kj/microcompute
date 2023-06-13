@@ -74,7 +74,7 @@ int main(void) {
         &(ShaderData){center, (mc_vec2){zoom, zoom}, iterations}
     );
 
-    double time = mc_program_run_timed(
+    double time = mc_program_run_blocking(
         program,
         (mc_uvec3){width, height, 1},
         (mc_Buffer*[]){data, img, NULL}

@@ -13,7 +13,7 @@
 
 ## About
 
-This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using [Linux DRI](https://en.wikipedia.org/wiki/Direct_Rendering_Infrastructure), allowing headless programs to use the GPU.
+This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using EGL, allowing headless programs to use the GPU.
 
 ## Examples
 

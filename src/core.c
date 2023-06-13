@@ -96,7 +96,7 @@ void mc_terminate() {
     if (S.disp != 0) eglTerminate(S.disp);
 }
 
-double mc_wait() {
+double mc_finish_tasks() {
     double startTime = mc_get_time();
     glFinish();
     return mc_get_time() - startTime;

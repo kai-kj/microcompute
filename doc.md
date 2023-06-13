@@ -138,7 +138,7 @@ Stop microcompute.
 <br/>
 
 ```c
-double mc_wait();
+double mc_finish_tasks();
 ```
 
 Wait for all compute operations to finish.
@@ -284,7 +284,7 @@ Check if there were any errors while compiling the shader code.
 <br/>
 
 ```c
-void mc_program_run(
+void mc_program_run_nonblocking(
     mc_Program* program,
     mc_uvec3 workgroup_size,
     mc_Buffer** buffers
@@ -301,7 +301,7 @@ binding set depending on its index in the `buffers` array.
 <br/>
 
 ```c
-double mc_program_run_timed(
+double mc_program_run_blocking(
     mc_Program* program,
     mc_uvec3 workgroup_size,
     mc_Buffer** buffers
@@ -311,33 +311,13 @@ double mc_program_run_timed(
 Run a program on the GPU. The buffers passed to the program will have their
 binding set depending on its index in the `buffers` array.
 
-Because this calls `mc_wait()` internally, it may significantly affect
-performance if called many times in succession.
+Because this calls `mc_finish_tasks()` internally, it may significantly
+affect performance if called many times in succession.
 
 - `program`: A program
 - `workgroup_size`: The number of work groups to dispatch in each dimension
 - `buffers`: A null-terminated array of buffers to pass to the program
 - returns: The time taken to run the program (in seconds)
-
-<br/>
-
-```c
-double mc_wait();
-```
-
-Wait for all programs to finish running.
-
-- returns: The time taken to wait for the programs (in seconds)
-
-<br/>
-
-```c
-double mc_get_time();
-```
-
-Get the current time.
-
-- returns: The current time (in seconds)
 
 <br/>
 

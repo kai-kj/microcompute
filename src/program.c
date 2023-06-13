@@ -68,7 +68,7 @@ char* mc_program_check(mc_Program* program) {
     return program->error;
 }
 
-void mc_program_run(
+void mc_program_run_nonblocking(
     mc_Program* program,
     mc_uvec3 workgroup_size,
     mc_Buffer** buffers
@@ -80,13 +80,13 @@ void mc_program_run(
     glDispatchCompute(workgroup_size.x, workgroup_size.y, workgroup_size.z);
 }
 
-double mc_program_run_timed(
+double mc_program_run_blocking(
     mc_Program* program,
     mc_uvec3 workgroup_size,
     mc_Buffer** buffers
 ) {
     double startTime = mc_get_time();
     mc_program_run(program, workgroup_size, buffers);
-    mc_wait();
+    mc_finish_tasks();
     return mc_get_time() - startTime;
 }

@@ -135,7 +135,7 @@ void mc_terminate();
  *
  * - returns: The time spent waiting
  */
-double mc_wait();
+double mc_finish_tasks();
 
 /** code
  * Get the current time in seconds.
@@ -259,7 +259,7 @@ char* mc_program_check(mc_Program* program);
  * - `buffers`: A null-terminated array of buffers to pass to the program
  */
 
-void mc_program_run(
+void mc_program_run_nonblocking(
     mc_Program* program,
     mc_uvec3 workgroup_size,
     mc_Buffer** buffers
@@ -269,8 +269,8 @@ void mc_program_run(
  * Run a program on the GPU. The buffers passed to the program will have their
  * binding set depending on its index in the `buffers` array.
  *
- * Because this calls `mc_wait()` internally, it may significantly affect
- * performance if called many times in succession.
+ * Because this calls `mc_finish_tasks()` internally, it may significantly
+ * affect performance if called many times in succession.
  *
  * - `program`: A program
  * - `workgroup_size`: The number of work groups to dispatch in each dimension
@@ -278,27 +278,11 @@ void mc_program_run(
  * - returns: The time taken to run the program (in seconds)
  */
 
-double mc_program_run_timed(
+double mc_program_run_blocking(
     mc_Program* program,
     mc_uvec3 workgroup_size,
     mc_Buffer** buffers
 );
-
-/** code
- * Wait for all programs to finish running.
- *
- * - returns: The time taken to wait for the programs (in seconds)
- */
-
-double mc_wait();
-
-/** code
- * Get the current time.
- *
- * - returns: The current time (in seconds)
- */
-
-double mc_get_time();
 
 /** text
  * ## Licence
