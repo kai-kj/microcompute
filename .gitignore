@@ -1,4 +1,5 @@
 .vscode/
 examples/*
+!examples/makefile
 !examples/include
-!examples/mandelbrot.c
+!examples/*.c
