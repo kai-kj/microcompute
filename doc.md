@@ -158,12 +158,22 @@ Get the current time in seconds.
 <br/>
 
 ```c
-mc_Buffer* mc_buffer_create(mc_BufferType type, uint64_t size);
+mc_Buffer* mc_buffer_create_uniform(uint64_t size);
 ```
 
-Create a buffer.
+Create a uniform buffer.
 
-- `type`: `MC_BUFFER_TYPE_UNIFORM` or `MC_BUFFER_TYPE_STORAGE`
+- `size`: The initial size of the buffer, can be changed later
+- returns: `NULL` on fail, a buffer otherwise
+
+<br/>
+
+```c
+mc_Buffer* mc_buffer_create_storage(uint64_t size);
+```
+
+Create a SSBO buffer.
+
 - `size`: The initial size of the buffer, can be changed later
 - returns: `NULL` on fail, a buffer otherwise
 
@@ -286,7 +296,7 @@ Check if there were any errors while compiling the shader code.
 ```c
 void mc_program_run_nonblocking(
     mc_Program* program,
-    mc_uvec3 workgroup_size,
+    mc_uvec3 workgroupSize,
     mc_Buffer** buffers
 );
 ```
@@ -295,7 +305,7 @@ Run a program on the GPU. The buffers passed to the program will have their
 binding set depending on its index in the `buffers` array.
 
 - `program`: A program
-- `workgroup_size`: The number of work groups to dispatch in each dimension
+- `workgroupSize`: The number of work groups to dispatch in each dimension
 - `buffers`: A null-terminated array of buffers to pass to the program
 
 <br/>
@@ -303,7 +313,7 @@ binding set depending on its index in the `buffers` array.
 ```c
 double mc_program_run_blocking(
     mc_Program* program,
-    mc_uvec3 workgroup_size,
+    mc_uvec3 workgroupSize,
     mc_Buffer** buffers
 );
 ```
@@ -315,7 +325,7 @@ Because this calls `mc_finish_tasks()` internally, it may significantly
 affect performance if called many times in succession.
 
 - `program`: A program
-- `workgroup_size`: The number of work groups to dispatch in each dimension
+- `workgroupSize`: The number of work groups to dispatch in each dimension
 - `buffers`: A null-terminated array of buffers to pass to the program
 - returns: The time taken to run the program (in seconds)
 

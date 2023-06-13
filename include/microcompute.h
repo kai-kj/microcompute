@@ -19,7 +19,6 @@
 /** code
  * The severity of a debug message.
  */
-
 typedef enum mc_DebugLevel {
     MC_LVL_INFO,
     MC_LVL_LOW,
@@ -35,14 +34,12 @@ typedef enum mc_DebugLevel {
  *          dont free
  * - `arg`: A pointer to some user defined data passed to `mc_set_debug_cb()`
  */
-
 typedef void(mc_debug_cb)(mc_DebugLevel level, const char* msg, void* arg);
 
 /** code
  * Possible buffer types. `MC_BUFFER_TYPE_UNIFORM` is a uniform buffer, and
  * `MC_BUFFER_TYPE_STORAGE` is a SSBO.
  */
-
 typedef enum mc_BufferType {
     MC_BUFFER_UNIFORM,
     MC_BUFFER_STORAGE
@@ -51,13 +48,11 @@ typedef enum mc_BufferType {
 /** code
  * Buffer type.
  */
-
 typedef struct mc_Buffer mc_Buffer;
 
 /** code
  * Program type.
  */
-
 typedef struct mc_Program mc_Program;
 
 /** code
@@ -122,7 +117,6 @@ typedef struct mc_uvec4 {
  * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
  *            handled by the library, so dont free)
  */
-
 char* mc_initialize(mc_debug_cb cb, void* arg);
 
 /** code
@@ -145,21 +139,26 @@ double mc_finish_tasks();
 double mc_get_time();
 
 /** code
- * Create a buffer.
+ * Create a uniform buffer.
  *
- * - `type`: `MC_BUFFER_TYPE_UNIFORM` or `MC_BUFFER_TYPE_STORAGE`
  * - `size`: The initial size of the buffer, can be changed later
  * - returns: `NULL` on fail, a buffer otherwise
  */
+mc_Buffer* mc_buffer_create_uniform(uint64_t size);
 
-mc_Buffer* mc_buffer_create(mc_BufferType type, uint64_t size);
+/** code
+ * Create a SSBO buffer.
+ *
+ * - `size`: The initial size of the buffer, can be changed later
+ * - returns: `NULL` on fail, a buffer otherwise
+ */
+mc_Buffer* mc_buffer_create_storage(uint64_t size);
 
 /** code
  * Destroy a buffer.
  *
  * - `buffer`: A buffer
  */
-
 void mc_buffer_destroy(mc_Buffer* buffer);
 
 /** code
@@ -168,7 +167,6 @@ void mc_buffer_destroy(mc_Buffer* buffer);
  * - `buffer`: A buffer
  * - returns: The type of the buffer
  */
-
 mc_BufferType mc_buffer_get_type(mc_Buffer* buffer);
 
 /** code
@@ -177,7 +175,6 @@ mc_BufferType mc_buffer_get_type(mc_Buffer* buffer);
  * - `buffer`: A buffer
  * - returns: The size of the buffer (in bytes)
  */
-
 uint64_t mc_buffer_get_size(mc_Buffer* buffer);
 
 /** code
@@ -186,7 +183,6 @@ uint64_t mc_buffer_get_size(mc_Buffer* buffer);
  * - `buffer`: A buffer
  * - `size`: The new size of the buffer (in bytes)
  */
-
 void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size);
 
 /** code
@@ -198,7 +194,6 @@ void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size);
  * - `size`: The size of the data to write
  * - `data`: A pointer to the data
  */
-
 void mc_buffer_write(
     mc_Buffer* buffer,
     uint64_t offset,
@@ -215,7 +210,6 @@ void mc_buffer_write(
  * - `size`: The size of the data to read
  * - `data`: A pointer to write the data to (pre-allocated with enough space)
  */
-
 void mc_buffer_read(
     mc_Buffer* buffer,
     uint64_t offset,
@@ -229,7 +223,6 @@ void mc_buffer_read(
  * - `code`: A null-terminated string of GLSL code
  * - returns: A program
  */
-
 mc_Program* mc_program_create(const char* code);
 
 /** code
@@ -237,7 +230,6 @@ mc_Program* mc_program_create(const char* code);
  *
  * - `program`: A program
  */
-
 void mc_program_destroy(mc_Program* program);
 
 /** code
@@ -247,7 +239,6 @@ void mc_program_destroy(mc_Program* program);
  * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
  *            handled by the library, so dont free)
  */
-
 char* mc_program_check(mc_Program* program);
 
 /** code
@@ -255,13 +246,12 @@ char* mc_program_check(mc_Program* program);
  * binding set depending on its index in the `buffers` array.
  *
  * - `program`: A program
- * - `workgroup_size`: The number of work groups to dispatch in each dimension
+ * - `workgroupSize`: The number of work groups to dispatch in each dimension
  * - `buffers`: A null-terminated array of buffers to pass to the program
  */
-
 void mc_program_run_nonblocking(
     mc_Program* program,
-    mc_uvec3 workgroup_size,
+    mc_uvec3 workgroupSize,
     mc_Buffer** buffers
 );
 
@@ -273,14 +263,14 @@ void mc_program_run_nonblocking(
  * affect performance if called many times in succession.
  *
  * - `program`: A program
- * - `workgroup_size`: The number of work groups to dispatch in each dimension
+ * - `workgroupSize`: The number of work groups to dispatch in each dimension
  * - `buffers`: A null-terminated array of buffers to pass to the program
  * - returns: The time taken to run the program (in seconds)
  */
 
 double mc_program_run_blocking(
     mc_Program* program,
-    mc_uvec3 workgroup_size,
+    mc_uvec3 workgroupSize,
     mc_Buffer** buffers
 );
 
@@ -469,10 +459,17 @@ double mc_get_time() {
     return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
 
-mc_Buffer* mc_buffer_create(mc_BufferType type, uint64_t size) {
+mc_Buffer* mc_buffer_create_uniform(uint64_t size) {
     mc_Buffer* buffer = malloc(sizeof *buffer);
-    buffer->type = type == MC_BUFFER_UNIFORM ? GL_UNIFORM_BUFFER
-                                             : GL_SHADER_STORAGE_BUFFER;
+    buffer->type = GL_UNIFORM_BUFFER;
+    glGenBuffers(1, &buffer->buffer);
+    mc_buffer_set_size(buffer, size);
+    return buffer;
+}
+
+mc_Buffer* mc_buffer_create_storage(uint64_t size) {
+    mc_Buffer* buffer = malloc(sizeof *buffer);
+    buffer->type = GL_SHADER_STORAGE_BUFFER;
     glGenBuffers(1, &buffer->buffer);
     mc_buffer_set_size(buffer, size);
     return buffer;
@@ -558,27 +555,28 @@ char* mc_program_check(mc_Program* program) {
 
 void mc_program_run_nonblocking(
     mc_Program* program,
-    mc_uvec3 workgroup_size,
+    mc_uvec3 workgroupSize,
     mc_Buffer** buffers
 ) {
     if (program->error) return;
     glUseProgram(program->program);
-    for (uint32_t i = 0; buffers[i] != NULL; i++)
-        glBindBufferBase(buffers[i]->type, i, buffers[i]->buffer);
-    glDispatchCompute(workgroup_size.x, workgroup_size.y, workgroup_size.z);
+    for (uint32_t i = 0; buffers[i] != NULL; i++) {
+        mc_Buffer* buffer = buffers[i];
+        glBindBufferBase(buffer->type, i, buffer->buffer);
+    }
+    glDispatchCompute(workgroupSize.x, workgroupSize.y, workgroupSize.z);
 }
 
 double mc_program_run_blocking(
     mc_Program* program,
-    mc_uvec3 workgroup_size,
+    mc_uvec3 workgroupSize,
     mc_Buffer** buffers
 ) {
     double startTime = mc_get_time();
-    mc_program_run_nonblocking(program, workgroup_size, buffers);
+    mc_program_run_nonblocking(program, workgroupSize, buffers);
     mc_finish_tasks();
     return mc_get_time() - startTime;
 }
 
 #endif // MICROCOMPUTE_IMPLEMENTATION
-
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD

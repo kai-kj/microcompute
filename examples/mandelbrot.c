@@ -12,7 +12,7 @@ static char* renSrc = //
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
     "layout(std140, binding = 0) uniform buff0 {\n"
     "    vec2 center;\n"
-    "    vec2 zoom;\n"
+    "    float zoom;\n"
     "    int maxIter;\n"
     "};\n"
     "layout(std430, binding = 1) buffer buff1 {\n"
@@ -38,7 +38,7 @@ static char* renSrc = //
 
 typedef struct ShaderData {
     mc_vec2 center;
-    mc_vec2 zoom;
+    mc_float zoom;
     mc_int maxIter;
 } ShaderData;
 
@@ -47,13 +47,13 @@ void debug_cb(mc_DebugLevel level, const char* msg, void* arg) {
 }
 
 int main(void) {
-    int width = 1000, height = 1000;
+    mc_uvec3 size = (mc_uvec3){1000, 1000, 1};
     mc_vec2 center = (mc_vec2){-0.7615, -0.08459};
     mc_float zoom = 1000;
     mc_int iterations = 500;
 
     char* error = NULL;
-    int size = width * height;
+    int totalSize = size.x * size.y;
 
     if ((error = mc_initialize(debug_cb, NULL)) != NULL) {
         printf("error at mc_initialize: %s\n", error);
@@ -66,31 +66,24 @@ int main(void) {
         return -1;
     }
 
-    mc_Buffer* data = mc_buffer_create(MC_BUFFER_UNIFORM, sizeof(ShaderData));
-    mc_Buffer* img = mc_buffer_create(MC_BUFFER_STORAGE, sizeof(mc_int) * size);
+    mc_Buffer* dataBuff = mc_buffer_create_uniform(sizeof(ShaderData));
+    mc_Buffer* imgBuff = mc_buffer_create_storage(sizeof(mc_int) * totalSize);
 
-    mc_buffer_write(
-        data,
-        0,
-        sizeof(ShaderData),
-        &(ShaderData){center, (mc_vec2){zoom, zoom}, iterations}
-    );
+    ShaderData data = (ShaderData){center, zoom, iterations};
+    mc_buffer_write(dataBuff, 0, sizeof(ShaderData), &data);
 
-    double time = mc_program_run_blocking(
-        program,
-        (mc_uvec3){width, height, 1},
-        (mc_Buffer*[]){data, img, NULL}
-    );
+    mc_Buffer** buffers = (mc_Buffer*[]){dataBuff, imgBuff, NULL};
+    double time = mc_program_run_blocking(program, size, buffers);
 
     printf("compute time: %f[s]\n", time);
 
-    char* img_bytes = malloc(size * 4);
-    mc_buffer_read(img, 0, sizeof(mc_int) * size, img_bytes);
-    stbi_write_bmp("mandelbrot.bmp", width, height, 4, img_bytes);
+    char* img_bytes = malloc(totalSize * 4);
+    mc_buffer_read(imgBuff, 0, sizeof(mc_int) * totalSize, img_bytes);
+    stbi_write_bmp("mandelbrot.bmp", size.x, size.y, 4, img_bytes);
     free(img_bytes);
 
-    mc_buffer_destroy(data);
-    mc_buffer_destroy(img);
+    mc_buffer_destroy(dataBuff);
+    mc_buffer_destroy(imgBuff);
     mc_program_destroy(program);
     mc_terminate();
 }
