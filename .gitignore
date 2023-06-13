@@ -1,3 +1,4 @@
-build/
-examples/build
 .vscode/
+examples/*
+!examples/include
+!examples/mandelbrot.c

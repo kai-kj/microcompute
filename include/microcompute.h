@@ -311,4 +311,274 @@ double mc_program_run_blocking(
  * ```
  */
 
+#ifdef MICROCOMPUTE_IMPLEMENTATION
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+
+#define GLAD_GL_IMPLEMENTATION
+#define GLAD_EGL_IMPLEMENTATION
+
+#include "egl.h"
+#include "gl.h"
+
+struct mc_State {
+    EGLDisplay disp;
+    EGLContext ctx;
+    mc_debug_cb* debug_cb;
+    void* debug_cb_arg;
+};
+
+typedef struct mc_Program {
+    GLint shader;
+    GLint program;
+    char* error;
+} mc_Program;
+
+typedef struct mc_Buffer {
+    GLuint buffer;
+    GLenum type;
+} mc_Buffer;
+
+static struct mc_State S;
+
+static void mc_gl_debug_cb(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* arg
+) {
+    if (!S.debug_cb) return;
+
+    mc_DebugLevel level;
+    switch (severity) {
+        case GL_DEBUG_SEVERITY_NOTIFICATION: level = MC_LVL_INFO; break;
+        case GL_DEBUG_SEVERITY_LOW: level = MC_LVL_LOW; break;
+        case GL_DEBUG_SEVERITY_MEDIUM: level = MC_LVL_MEDIUM; break;
+        case GL_DEBUG_SEVERITY_HIGH: level = MC_LVL_HIGH; break;
+        default: return;
+    }
+
+    uint32_t strLen = snprintf(NULL, 0, "GL: %s", message) + 1;
+    char* str = malloc(strLen);
+    snprintf(str, strLen, "GL: %s", message);
+
+    S.debug_cb(level, str, S.debug_cb_arg);
+
+    free(str);
+}
+
+static char* mc_get_shader_errors(GLuint shader) {
+    int32_t success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (success) return NULL;
+
+    GLint len;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+    char* error = malloc(len);
+    glGetShaderInfoLog(shader, len, NULL, error);
+
+    return error;
+}
+
+static char* mc_get_program_errors(GLuint program) {
+    int32_t success;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (success) return NULL;
+
+    GLint len;
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
+    char* error = malloc(len);
+    glGetProgramInfoLog(program, len, NULL, error);
+
+    return error;
+}
+
+char* mc_initialize(mc_debug_cb cb, void* arg) {
+    S.debug_cb = cb;
+    S.debug_cb_arg = arg;
+
+    if (!gladLoaderLoadEGL(NULL)) return "failed to load egl";
+    S.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (S.disp == EGL_NO_DISPLAY) return "failed to get egl disp";
+
+    EGLint major, minor;
+    if (!eglInitialize(S.disp, &major, &minor)) return "failed to init egl";
+    if (major < 1 || (major == 1 && minor < 5)) return "egl version too low";
+
+    if (!gladLoaderLoadEGL(S.disp)) return "failed to reload egl";
+    if (!eglBindAPI(EGL_OPENGL_API)) return "failed to bind opengl to egl";
+
+    EGLConfig eglCfg;
+    if (!eglChooseConfig(
+            S.disp,
+            (EGLint[]){EGL_NONE},
+            &eglCfg,
+            1,
+            &(EGLint){0}
+        ))
+        return "failed to choose egl config";
+
+    S.ctx = eglCreateContext(
+        S.disp,
+        eglCfg,
+        EGL_NO_CONTEXT,
+        (EGLint[]){
+            EGL_CONTEXT_MAJOR_VERSION,
+            4,
+            EGL_CONTEXT_MINOR_VERSION,
+            3,
+            EGL_CONTEXT_OPENGL_DEBUG,
+            EGL_TRUE,
+            EGL_NONE,
+        }
+    );
+
+    if (S.ctx == EGL_NO_CONTEXT) return "failed to create egl context";
+
+    if (!eglMakeCurrent(S.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, S.ctx))
+        return "failed to make egl context current";
+
+    if (gladLoaderLoadGL() == 0) return "failed to load gl";
+
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(mc_gl_debug_cb, NULL);
+
+    return NULL;
+}
+
+void mc_terminate() {
+    if (S.ctx != 0) eglDestroyContext(S.disp, S.ctx);
+    if (S.disp != 0) eglTerminate(S.disp);
+}
+
+double mc_finish_tasks() {
+    double startTime = mc_get_time();
+    glFinish();
+    return mc_get_time() - startTime;
+}
+
+double mc_get_time() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
+}
+
+mc_Buffer* mc_buffer_create(mc_BufferType type, uint64_t size) {
+    mc_Buffer* buffer = malloc(sizeof *buffer);
+    buffer->type = type == MC_BUFFER_UNIFORM ? GL_UNIFORM_BUFFER
+                                             : GL_SHADER_STORAGE_BUFFER;
+    glGenBuffers(1, &buffer->buffer);
+    mc_buffer_set_size(buffer, size);
+    return buffer;
+}
+
+void mc_buffer_destroy(mc_Buffer* buffer) {
+    if (!buffer) return;
+    if (buffer->buffer) glDeleteBuffers(1, &buffer->buffer);
+    free(buffer);
+}
+
+mc_BufferType mc_buffer_get_type(mc_Buffer* buffer) {
+    return buffer->type == GL_UNIFORM_BUFFER ? MC_BUFFER_UNIFORM
+                                             : MC_BUFFER_STORAGE;
+}
+
+uint64_t mc_buffer_get_size(mc_Buffer* buffer) {
+    GLint size;
+    glBindBuffer(buffer->type, buffer->buffer);
+    glGetBufferParameteriv(buffer->type, GL_BUFFER_SIZE, &size);
+    return size;
+}
+
+void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size) {
+    glBindBuffer(buffer->type, buffer->buffer);
+    glBufferData(buffer->type, size, NULL, GL_DYNAMIC_DRAW);
+}
+
+void mc_buffer_write(
+    mc_Buffer* buffer,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    glBindBuffer(buffer->type, buffer->buffer);
+    glBufferSubData(buffer->type, offset, size, data);
+}
+
+void mc_buffer_read(
+    mc_Buffer* buffer,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    glBindBuffer(buffer->type, buffer->buffer);
+    glGetBufferSubData(buffer->type, offset, size, data);
+}
+
+mc_Program* mc_program_create(const char* code) {
+    mc_Program* program = malloc(sizeof *program);
+    program->error = NULL;
+
+    program->shader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(program->shader, 1, &code, NULL);
+    glCompileShader(program->shader);
+
+    if ((program->error = mc_get_shader_errors(program->shader)))
+        return program;
+
+    program->program = glCreateProgram();
+    glAttachShader(program->program, program->shader);
+    glLinkProgram(program->program);
+
+    if ((program->error = mc_get_program_errors(program->program))) {
+        glDeleteShader(program->shader);
+        return program;
+    }
+
+    return program;
+}
+
+void mc_program_destroy(mc_Program* program) {
+    if (!program) return;
+    if (program->shader) glDeleteShader(program->shader);
+    if (program->program) glDeleteProgram(program->program);
+    if (program->error) free(program->error);
+    free(program);
+}
+
+char* mc_program_check(mc_Program* program) {
+    return program->error;
+}
+
+void mc_program_run_nonblocking(
+    mc_Program* program,
+    mc_uvec3 workgroup_size,
+    mc_Buffer** buffers
+) {
+    if (program->error) return;
+    glUseProgram(program->program);
+    for (uint32_t i = 0; buffers[i] != NULL; i++)
+        glBindBufferBase(buffers[i]->type, i, buffers[i]->buffer);
+    glDispatchCompute(workgroup_size.x, workgroup_size.y, workgroup_size.z);
+}
+
+double mc_program_run_blocking(
+    mc_Program* program,
+    mc_uvec3 workgroup_size,
+    mc_Buffer** buffers
+) {
+    double startTime = mc_get_time();
+    mc_program_run_nonblocking(program, workgroup_size, buffers);
+    mc_finish_tasks();
+    return mc_get_time() - startTime;
+}
+
+#endif // MICROCOMPUTE_IMPLEMENTATION
+
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD

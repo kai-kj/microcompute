@@ -1,6 +1,8 @@
-#include <microcompute.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#define MICROCOMPUTE_IMPLEMENTATION
+#include "microcompute.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
