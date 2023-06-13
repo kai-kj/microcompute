@@ -123,12 +123,12 @@ typedef struct mc_uvec4 {
  *            handled by the library, so dont free)
  */
 
-char* mc_start(mc_debug_cb cb, void* arg);
+char* mc_initialize(mc_debug_cb cb, void* arg);
 
 /** code
  * Stop microcompute.
  */
-void mc_stop();
+void mc_terminate();
 
 /** code
  * Wait for all compute operations to finish.

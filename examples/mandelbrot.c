@@ -53,8 +53,8 @@ int main(void) {
     char* error = NULL;
     int size = width * height;
 
-    if ((error = mc_start(debug_cb, NULL)) != NULL) {
-        printf("error at mc_start: %s\n", error);
+    if ((error = mc_initialize(debug_cb, NULL)) != NULL) {
+        printf("error at mc_initialize: %s\n", error);
         return -1;
     }
 
@@ -90,5 +90,5 @@ int main(void) {
     mc_buffer_destroy(data);
     mc_buffer_destroy(img);
     mc_program_destroy(program);
-    mc_stop();
+    mc_terminate();
 }

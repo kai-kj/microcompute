@@ -38,10 +38,11 @@ static void gl_debug_cb(
     free(str);
 }
 
-char* mc_start(mc_debug_cb cb, void* arg) {
+char* mc_initialize(mc_debug_cb cb, void* arg) {
     S.debug_cb = cb;
     S.debug_cb_arg = arg;
 
+    if (!gladLoaderLoadEGL(NULL)) return "failed to load egl";
     S.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (S.disp == EGL_NO_DISPLAY) return "failed to get egl disp";
 
@@ -49,6 +50,7 @@ char* mc_start(mc_debug_cb cb, void* arg) {
     if (!eglInitialize(S.disp, &major, &minor)) return "failed to init egl";
     if (major < 1 || (major == 1 && minor < 5)) return "egl version too low";
 
+    if (!gladLoaderLoadEGL(S.disp)) return "failed to reload egl";
     if (!eglBindAPI(EGL_OPENGL_API)) return "failed to bind opengl to egl";
 
     EGLConfig eglCfg;
@@ -81,7 +83,7 @@ char* mc_start(mc_debug_cb cb, void* arg) {
     if (!eglMakeCurrent(S.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, S.ctx))
         return "failed to make egl context current";
 
-    if (gladLoadGL() == 0) return "failed to load GLAD";
+    if (gladLoaderLoadGL() == 0) return "failed to load gl";
 
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_debug_cb, NULL);
@@ -89,7 +91,7 @@ char* mc_start(mc_debug_cb cb, void* arg) {
     return NULL;
 }
 
-void mc_stop() {
+void mc_terminate() {
     if (S.ctx != 0) eglDestroyContext(S.disp, S.ctx);
     if (S.disp != 0) eglTerminate(S.disp);
 }

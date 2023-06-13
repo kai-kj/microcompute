@@ -5,8 +5,8 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "glad/glad.h"
-#include "glad/glad_egl.h"
+#include "egl.h"
+#include "gl.h"
 #include "microcompute.h"
 
 typedef struct mc_Program {

@@ -117,7 +117,7 @@ GLSL.
 ## Functions
 
 ```c
-char* mc_start(mc_debug_cb cb, void* arg);
+char* mc_initialize(mc_debug_cb cb, void* arg);
 ```
 
 Initialize microcompute.
@@ -130,7 +130,7 @@ Initialize microcompute.
 <br/>
 
 ```c
-void mc_stop();
+void mc_terminate();
 ```
 
 Stop microcompute.
