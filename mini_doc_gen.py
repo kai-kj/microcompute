@@ -22,7 +22,7 @@ def t_iter(txt):
         match d_start(l).groups()[0]:
             case "code":
                 d, s = "".join(d_iter(txt)), "".join(s_iter(txt)).strip()
-                yield "\n```c\n" + s + "\n```\n\n" + d + "\n<br/>\n"
+                yield "\n```c\n" + s + "\n```\n\n" + d + "\n----\n"
             case "text": yield "\n" + "".join(d_iter(txt))
             case other: raise ValueError("unknown doc type found: " + other)
 

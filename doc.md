@@ -17,7 +17,7 @@ typedef enum mc_DebugLevel {
 
 The severity of a debug message.
 
-<br/>
+----
 
 ```c
 typedef void(mc_debug_cb)(mc_DebugLevel level, const char* msg, void* arg);
@@ -30,7 +30,7 @@ The debug callback type passed to `mc_set_debug_cb()`.
          dont free
 - `arg`: A pointer to some user defined data passed to `mc_set_debug_cb()`
 
-<br/>
+----
 
 ```c
 typedef enum mc_BufferType {
@@ -42,7 +42,37 @@ typedef enum mc_BufferType {
 Possible buffer types. `MC_BUFFER_TYPE_UNIFORM` is a uniform buffer, and
 `MC_BUFFER_TYPE_STORAGE` is a SSBO.
 
-<br/>
+----
+
+```c
+typedef enum mc_ValueType {
+    MC_FLOAT = 0x00010101,
+    MC_VEC2 = 0x00020202,
+    MC_VEC3 = 0x00040303,
+    MC_VEC4 = 0x00040404,
+    MC_INT = 0x00010105,
+    MC_IVEC2 = 0x00020206,
+    MC_IVEC3 = 0x00040307,
+    MC_IVEC4 = 0x00040408,
+    MC_UINT = 0x00010109,
+    MC_UVEC2 = 0x0002020A,
+    MC_UVEC3 = 0x0004030B,
+    MC_UVEC4 = 0x0004040C,
+} mc_ValueType;
+```
+
+All basic value types supported by `mc_buffer_pack()` and
+`mc_buffer_unpack()`.
+
+----
+
+```c
+#define MC_ARRAY(len) (((len)&0xFF) << 24)
+```
+
+Use with `mc_ValueType` to indicate an array of values.
+
+----
 
 ```c
 typedef struct mc_Buffer mc_Buffer;
@@ -50,7 +80,7 @@ typedef struct mc_Buffer mc_Buffer;
 
 Buffer type.
 
-<br/>
+----
 
 ```c
 typedef struct mc_Program mc_Program;
@@ -58,7 +88,7 @@ typedef struct mc_Program mc_Program;
 
 Program type.
 
-<br/>
+----
 
 ```c
 typedef float mc_float;
@@ -68,7 +98,7 @@ typedef uint32_t mc_uint;
 
 Basic scalar data types that can be used in GLSL.
 
-<br/>
+----
 
 ```c
 typedef struct mc_vec2 {
@@ -76,7 +106,7 @@ typedef struct mc_vec2 {
 } mc_vec2;
 
 typedef struct mc_vec3 {
-    mc_float x, y, z, _;
+    mc_float x, y, z;
 } mc_vec3;
 
 typedef struct mc_vec4 {
@@ -88,7 +118,7 @@ typedef struct mc_ivec2 {
 } mc_ivec2;
 
 typedef struct mc_ivec3 {
-    mc_int x, y, z, _;
+    mc_int x, y, z;
 } mc_ivec3;
 
 typedef struct mc_ivec4 {
@@ -100,7 +130,7 @@ typedef struct mc_uvec2 {
 } mc_uvec2;
 
 typedef struct mc_uvec3 {
-    mc_uint x, y, z, _;
+    mc_uint x, y, z;
 } mc_uvec3;
 
 typedef struct mc_uvec4 {
@@ -108,11 +138,9 @@ typedef struct mc_uvec4 {
 } mc_uvec4;
 ```
 
-These are the basic vector types. `vec3`, `ivec3`, and `uvec3` have an
-additional component `_`, used to match the padding of the std430 layout in
-GLSL.
+The basic vector types.
 
-<br/>
+----
 
 ## Functions
 
@@ -127,7 +155,7 @@ Initialize microcompute.
 - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
            handled by the library, so dont free)
 
-<br/>
+----
 
 ```c
 void mc_terminate();
@@ -135,7 +163,7 @@ void mc_terminate();
 
 Stop microcompute.
 
-<br/>
+----
 
 ```c
 double mc_finish_tasks();
@@ -145,7 +173,7 @@ Wait for all compute operations to finish.
 
 - returns: The time spent waiting
 
-<br/>
+----
 
 ```c
 double mc_get_time();
@@ -155,7 +183,7 @@ Get the current time in seconds.
 
 - returns: The current time
 
-<br/>
+----
 
 ```c
 mc_Buffer* mc_buffer_create_uniform(uint64_t size);
@@ -166,7 +194,7 @@ Create a uniform buffer.
 - `size`: The initial size of the buffer, can be changed later
 - returns: `NULL` on fail, a buffer otherwise
 
-<br/>
+----
 
 ```c
 mc_Buffer* mc_buffer_create_storage(uint64_t size);
@@ -177,7 +205,7 @@ Create a SSBO buffer.
 - `size`: The initial size of the buffer, can be changed later
 - returns: `NULL` on fail, a buffer otherwise
 
-<br/>
+----
 
 ```c
 void mc_buffer_destroy(mc_Buffer* buffer);
@@ -187,7 +215,7 @@ Destroy a buffer.
 
 - `buffer`: A buffer
 
-<br/>
+----
 
 ```c
 mc_BufferType mc_buffer_get_type(mc_Buffer* buffer);
@@ -198,7 +226,7 @@ Get the current type of a buffer.
 - `buffer`: A buffer
 - returns: The type of the buffer
 
-<br/>
+----
 
 ```c
 uint64_t mc_buffer_get_size(mc_Buffer* buffer);
@@ -209,7 +237,7 @@ Get the current size of a buffer.
 - `buffer`: A buffer
 - returns: The size of the buffer (in bytes)
 
-<br/>
+----
 
 ```c
 void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size);
@@ -220,7 +248,7 @@ Set the size of a buffer.
 - `buffer`: A buffer
 - `size`: The new size of the buffer (in bytes)
 
-<br/>
+----
 
 ```c
 void mc_buffer_write(
@@ -239,7 +267,7 @@ data is transferred correctly.
 - `size`: The size of the data to write
 - `data`: A pointer to the data
 
-<br/>
+----
 
 ```c
 void mc_buffer_read(
@@ -258,7 +286,57 @@ data is transferred correctly.
 - `size`: The size of the data to read
 - `data`: A pointer to write the data to (pre-allocated with enough space)
 
-<br/>
+----
+
+```c
+#define mc_buffer_pack(buffer, ...)                                            \
+    mc_buffer_pack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+```
+
+Pack and write data to a buffer. Takes care of alignment automatically. No
+support for structs, only basic variables and arrays. The maximum size of a
+buffer that can be automatically packed is 1024 bytes.
+
+The arguments should be formatted as follows:
+1. Pass the type of the value with `mc_ValueType`
+2. Pass a reference to the value
+3. Repeat 1. and 2. for every value
+
+Arrays can be specified by performing a bit-wise or (`|`) between the type of
+the value (`mc_ValueType`) and `MC_ARRAY(len)`, where `len` is the length of
+the array. The array can be passed directly (dont reference the array).
+
+For example:
+```c
+int a = 12;
+float b[] = {1.0, 2.0, 3.0};
+mc_buffer_pack(buff, MC_INT, &a, MC_FLOAT | MC_ARRAY(3), &b)
+```
+will write the integer `12` and the float array `{1.0, 2.0, 3.0}` to the
+buffer.
+
+- `buffer`: A buffer
+- `...`: Arguments explained above
+- returns: The number of bytes written to the buffer, 0 on failure.
+
+----
+
+```c
+#define mc_buffer_unpack(buffer, ...)                                          \
+    mc_buffer_unpack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+```
+
+Read and unpack data from a buffer. Takes care of alignment automatically. No
+support for structs, only basic variables and arrays. The maximum size of a
+buffer that can be automatically packed is 1024 bytes.
+
+See `mc_buffer_pack()` for more info.
+
+- `buffer`: A buffer
+- `...`: Arguments explained above
+- returns: The number of bytes read from the buffer, 0 on failure.
+
+----
 
 ```c
 mc_Program* mc_program_create(const char* code);
@@ -269,7 +347,7 @@ Create a program from a string.
 - `code`: A null-terminated string of GLSL code
 - returns: A program
 
-<br/>
+----
 
 ```c
 void mc_program_destroy(mc_Program* program);
@@ -279,7 +357,7 @@ Destroy a program.
 
 - `program`: A program
 
-<br/>
+----
 
 ```c
 char* mc_program_check(mc_Program* program);
@@ -291,7 +369,7 @@ Check if there were any errors while compiling the shader code.
 - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
            handled by the library, so dont free)
 
-<br/>
+----
 
 ```c
 void mc_program_run_nonblocking(
@@ -308,7 +386,7 @@ binding set depending on its index in the `buffers` array.
 - `workgroupSize`: The number of work groups to dispatch in each dimension
 - `buffers`: A null-terminated array of buffers to pass to the program
 
-<br/>
+----
 
 ```c
 double mc_program_run_blocking(
@@ -329,7 +407,16 @@ affect performance if called many times in succession.
 - `buffers`: A null-terminated array of buffers to pass to the program
 - returns: The time taken to run the program (in seconds)
 
-<br/>
+----
+
+```c
+size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
+size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
+```
+
+Wrapped functions. Do not use them directly, use the wrapping macros.
+
+----
 
 ## Licence
 

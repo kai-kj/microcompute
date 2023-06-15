@@ -46,6 +46,30 @@ typedef enum mc_BufferType {
 } mc_BufferType;
 
 /** code
+ * All basic value types supported by `mc_buffer_pack()` and
+ * `mc_buffer_unpack()`.
+ */
+typedef enum mc_ValueType {
+    MC_FLOAT = 0x00010101,
+    MC_VEC2 = 0x00020202,
+    MC_VEC3 = 0x00040303,
+    MC_VEC4 = 0x00040404,
+    MC_INT = 0x00010105,
+    MC_IVEC2 = 0x00020206,
+    MC_IVEC3 = 0x00040307,
+    MC_IVEC4 = 0x00040408,
+    MC_UINT = 0x00010109,
+    MC_UVEC2 = 0x0002020A,
+    MC_UVEC3 = 0x0004030B,
+    MC_UVEC4 = 0x0004040C,
+} mc_ValueType;
+
+/** code
+ * Use with `mc_ValueType` to indicate an array of values.
+ */
+#define MC_ARRAY(len) (((len)&0xFF) << 24)
+
+/** code
  * Buffer type.
  */
 typedef struct mc_Buffer mc_Buffer;
@@ -64,9 +88,7 @@ typedef int32_t mc_int;
 typedef uint32_t mc_uint;
 
 /** code
- * These are the basic vector types. `vec3`, `ivec3`, and `uvec3` have an
- * additional component `_`, used to match the padding of the std430 layout in
- * GLSL.
+ * The basic vector types.
  */
 
 typedef struct mc_vec2 {
@@ -74,7 +96,7 @@ typedef struct mc_vec2 {
 } mc_vec2;
 
 typedef struct mc_vec3 {
-    mc_float x, y, z, _;
+    mc_float x, y, z;
 } mc_vec3;
 
 typedef struct mc_vec4 {
@@ -86,7 +108,7 @@ typedef struct mc_ivec2 {
 } mc_ivec2;
 
 typedef struct mc_ivec3 {
-    mc_int x, y, z, _;
+    mc_int x, y, z;
 } mc_ivec3;
 
 typedef struct mc_ivec4 {
@@ -98,7 +120,7 @@ typedef struct mc_uvec2 {
 } mc_uvec2;
 
 typedef struct mc_uvec3 {
-    mc_uint x, y, z, _;
+    mc_uint x, y, z;
 } mc_uvec3;
 
 typedef struct mc_uvec4 {
@@ -218,6 +240,50 @@ void mc_buffer_read(
 );
 
 /** code
+ * Pack and write data to a buffer. Takes care of alignment automatically. No
+ * support for structs, only basic variables and arrays. The maximum size of a
+ * buffer that can be automatically packed is 1024 bytes.
+ *
+ * The arguments should be formatted as follows:
+ * 1. Pass the type of the value with `mc_ValueType`
+ * 2. Pass a reference to the value
+ * 3. Repeat 1. and 2. for every value
+ *
+ * Arrays can be specified by performing a bit-wise or (`|`) between the type of
+ * the value (`mc_ValueType`) and `MC_ARRAY(len)`, where `len` is the length of
+ * the array. The array can be passed directly (dont reference the array).
+ *
+ * For example:
+ * ```c
+ * int a = 12;
+ * float b[] = {1.0, 2.0, 3.0};
+ * mc_buffer_pack(buff, MC_INT, &a, MC_FLOAT | MC_ARRAY(3), &b)
+ * ```
+ * will write the integer `12` and the float array `{1.0, 2.0, 3.0}` to the
+ * buffer.
+ *
+ * - `buffer`: A buffer
+ * - `...`: Arguments explained above
+ * - returns: The number of bytes written to the buffer, 0 on failure.
+ */
+#define mc_buffer_pack(buffer, ...)                                            \
+    mc_buffer_pack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+
+/** code
+ * Read and unpack data from a buffer. Takes care of alignment automatically. No
+ * support for structs, only basic variables and arrays. The maximum size of a
+ * buffer that can be automatically packed is 1024 bytes.
+ *
+ * See `mc_buffer_pack()` for more info.
+ *
+ * - `buffer`: A buffer
+ * - `...`: Arguments explained above
+ * - returns: The number of bytes read from the buffer, 0 on failure.
+ */
+#define mc_buffer_unpack(buffer, ...)                                          \
+    mc_buffer_unpack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+
+/** code
  * Create a program from a string.
  *
  * - `code`: A null-terminated string of GLSL code
@@ -274,6 +340,13 @@ double mc_program_run_blocking(
     mc_Buffer** buffers
 );
 
+/** code
+ * Wrapped functions. Do not use them directly, use the wrapping macros.
+ */
+
+size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
+size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
+
 /** text
  * ## Licence
  *
@@ -303,6 +376,7 @@ double mc_program_run_blocking(
 
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -333,6 +407,12 @@ typedef struct mc_Buffer {
 } mc_Buffer;
 
 static struct mc_State S;
+
+#define MC_TYPE_SIZE(type) (((type) >> 8) & 0xFF)
+#define MC_TYPE_ALIGN(type) (((type) >> 16) & 0xFF)
+#define MC_TYPE_ARRAY_LEN(type) (((type) >> 24) & 0xFF)
+#define MC_ALIGN_POS(pos, align)                                               \
+    ((pos) % (align) != 0 ? pos + align - ((pos) % (align)) : pos)
 
 static void mc_gl_debug_cb(
     GLenum source,
@@ -387,6 +467,55 @@ static char* mc_get_program_errors(GLuint program) {
     glGetProgramInfoLog(program, len, NULL, error);
 
     return error;
+}
+
+static size_t mc_buffer_iter(mc_Buffer* buffer, int upload, va_list args) {
+    int data[256] = {0};
+    int pos = 0;
+
+    if (!upload) {
+        uint64_t size = mc_buffer_get_size(buffer);
+        mc_buffer_read(buffer, 0, size > 256 ? 256 : size, data);
+    }
+
+    while (pos < 256) {
+        mc_BufferType type = va_arg(args, mc_ValueType);
+        if (!type) break;
+
+        int size = MC_TYPE_SIZE(type);
+        int align = MC_TYPE_ALIGN(type);
+        int arrLen = MC_TYPE_ARRAY_LEN(type);
+        void* val = va_arg(args, void*);
+
+        if (arrLen == 0) {
+            pos = MC_ALIGN_POS(pos, align);
+            if (upload) memcpy(&(data[pos]), val, size * sizeof(int));
+            else memcpy(val, &(data[pos]), size * sizeof(int));
+            pos += size;
+        } else {
+            if (buffer->type == GL_UNIFORM_BUFFER)
+                align = MC_TYPE_ALIGN(MC_VEC4);
+
+            for (int i = 0; i < arrLen; i++) {
+                pos = MC_ALIGN_POS(pos, align);
+                void* element = (int*)val + i * size;
+                if (upload) memcpy(&(data[pos]), element, size * sizeof(int));
+                else memcpy(element, &(data[pos]), size * sizeof(int));
+                pos += size;
+            }
+        }
+    }
+
+    if (pos >= 256) return 0;
+
+    // for (int i = 0; i < 256; i++) printf("[%03d]: %08X\n", i, data[i]);
+
+    if (upload) {
+        mc_buffer_set_size(buffer, pos * sizeof(int));
+        mc_buffer_write(buffer, 0, pos * sizeof(int), data);
+    }
+
+    return pos * sizeof(int);
 }
 
 char* mc_initialize(mc_debug_cb cb, void* arg) {
@@ -518,6 +647,22 @@ void mc_buffer_read(
     glGetBufferSubData(buffer->type, offset, size, data);
 }
 
+size_t mc_buffer_pack__(mc_Buffer* buffer, ...) {
+    va_list args;
+    va_start(args, buffer);
+    size_t len = mc_buffer_iter(buffer, 1, args);
+    va_end(args);
+    return len;
+}
+
+size_t mc_buffer_unpack__(mc_Buffer* buffer, ...) {
+    va_list args;
+    va_start(args, buffer);
+    size_t len = mc_buffer_iter(buffer, 0, args);
+    va_end(args);
+    return len;
+}
+
 mc_Program* mc_program_create(const char* code) {
     mc_Program* program = malloc(sizeof *program);
     program->error = NULL;
@@ -577,6 +722,11 @@ double mc_program_run_blocking(
     mc_finish_tasks();
     return mc_get_time() - startTime;
 }
+
+#undef MC_TYPE_SIZE
+#undef MC_TYPE_ALIGN
+#undef MC_TYPE_ARRAY_LEN
+#undef MC_ALIGN_POS
 
 #endif // MICROCOMPUTE_IMPLEMENTATION
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD
