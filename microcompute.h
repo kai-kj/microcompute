@@ -311,8 +311,8 @@ double mc_program_run_blocking(
 #define GLAD_GL_IMPLEMENTATION
 #define GLAD_EGL_IMPLEMENTATION
 
-#include "egl.h"
-#include "gl.h"
+#include "microcompute_egl.h"
+#include "microcompute_gl.h"
 
 struct mc_State {
     EGLDisplay disp;

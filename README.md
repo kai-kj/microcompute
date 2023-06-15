@@ -32,8 +32,6 @@ git clone git@github.com:kal39/microcompute.git
 cd microcompute
 ```
 
-The header files can be found in `include/`.
-
 To build the examples, run:
 
 ```
