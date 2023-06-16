@@ -6,12 +6,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-/**
- * TODO:
- * - buffer_unpack()
- * - variadic mc_program_run
- */
-
 static char* renSrc = //
     "#version 430\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
