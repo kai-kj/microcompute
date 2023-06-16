@@ -10,8 +10,6 @@
 
 #include <stdint.h>
 
-// #include "microalgebra.h"
-
 /** text
  * ## Types
  */
@@ -72,12 +70,12 @@ typedef enum mc_ValueType {
 /** code
  * Buffer type.
  */
-typedef struct mc_Buffer mc_Buffer;
+typedef struct mc_Buffer__ mc_Buffer;
 
 /** code
  * Program type.
  */
-typedef struct mc_Program mc_Program;
+typedef struct mc_Program__ mc_Program;
 
 /** code
  * Basic scalar data types that can be used in GLSL.
@@ -267,7 +265,7 @@ void mc_buffer_read(
  * - returns: The number of bytes written to the buffer, 0 on failure.
  */
 #define mc_buffer_pack(buffer, ...)                                            \
-    mc_buffer_pack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+    mc_buffer_pack__(buffer, ##__VA_ARGS__, NULL);
 
 /** code
  * Read and unpack data from a buffer. Takes care of alignment automatically. No
@@ -281,7 +279,7 @@ void mc_buffer_read(
  * - returns: The number of bytes read from the buffer, 0 on failure.
  */
 #define mc_buffer_unpack(buffer, ...)                                          \
-    mc_buffer_unpack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+    mc_buffer_unpack__(buffer, ##__VA_ARGS__, NULL);
 
 /** code
  * Create a program from a string.
@@ -309,36 +307,31 @@ char* mc_program_check(mc_Program* program);
 
 /** code
  * Run a program on the GPU. The buffers passed to the program will have their
- * binding set depending on its index in the `buffers` array.
+ * binding set depending on its index in `...`.
  *
  * - `program`: A program
- * - `workgroupSize`: The number of work groups to dispatch in each dimension
- * - `buffers`: A null-terminated array of buffers to pass to the program
+ * - `size`: The number of work groups to dispatch in each dimension
+ * - `...`: Buffers to pass to the program
+ * - returns: The time taken to run the program (in seconds), it is nonblocking,
+ *            so the returned value should be approx 0
  */
-void mc_program_run_nonblocking(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    mc_Buffer** buffers
-);
+#define mc_program_run_nonblocking(program, size, ...)                         \
+    mc_program_run_nonblocking__(program, size, ##__VA_ARGS__, NULL)
 
 /** code
  * Run a program on the GPU. The buffers passed to the program will have their
- * binding set depending on its index in the `buffers` array.
+ * binding set depending on its index in `...`.
  *
  * Because this calls `mc_finish_tasks()` internally, it may significantly
  * affect performance if called many times in succession.
  *
  * - `program`: A program
- * - `workgroupSize`: The number of work groups to dispatch in each dimension
- * - `buffers`: A null-terminated array of buffers to pass to the program
+ * - `size`: The number of work groups to dispatch in each dimension
+ * - `...`: Buffers to pass to the program
  * - returns: The time taken to run the program (in seconds)
  */
-
-double mc_program_run_blocking(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    mc_Buffer** buffers
-);
+#define mc_program_run_blocking(program, size, ...)                            \
+    mc_program_run_blocking__(program, size, ##__VA_ARGS__, NULL)
 
 /** code
  * Wrapped functions. Do not use them directly, use the wrapping macros.
@@ -346,6 +339,8 @@ double mc_program_run_blocking(
 
 size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
 size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
+double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...);
+double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
 
 /** text
  * ## Licence
@@ -395,16 +390,16 @@ struct mc_State {
     void* debug_cb_arg;
 };
 
-typedef struct mc_Program {
+typedef struct mc_Program__ {
     GLint shader;
     GLint program;
     char* error;
-} mc_Program;
+} mc_Program__;
 
-typedef struct mc_Buffer {
+typedef struct mc_Buffer__ {
     GLuint buffer;
     GLenum type;
-} mc_Buffer;
+} mc_Buffer__;
 
 static struct mc_State S;
 
@@ -414,7 +409,7 @@ static struct mc_State S;
 #define MC_ALIGN_POS(pos, align)                                               \
     ((pos) % (align) != 0 ? pos + align - ((pos) % (align)) : pos)
 
-static void mc_gl_debug_cb(
+static void mc_gl_debug_cb__(
     GLenum source,
     GLenum type,
     GLuint id,
@@ -443,7 +438,7 @@ static void mc_gl_debug_cb(
     free(str);
 }
 
-static char* mc_get_shader_errors(GLuint shader) {
+static char* mc_get_shader_errors__(GLuint shader) {
     int32_t success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (success) return NULL;
@@ -456,7 +451,7 @@ static char* mc_get_shader_errors(GLuint shader) {
     return error;
 }
 
-static char* mc_get_program_errors(GLuint program) {
+static char* mc_get_program_errors__(GLuint program) {
     int32_t success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (success) return NULL;
@@ -469,7 +464,7 @@ static char* mc_get_program_errors(GLuint program) {
     return error;
 }
 
-static size_t mc_buffer_iter(mc_Buffer* buffer, int upload, va_list args) {
+static size_t mc_buffer_iter__(mc_Buffer* buffer, int upload, va_list args) {
     int data[256] = {0};
     int pos = 0;
 
@@ -479,7 +474,7 @@ static size_t mc_buffer_iter(mc_Buffer* buffer, int upload, va_list args) {
     }
 
     while (pos < 256) {
-        mc_BufferType type = va_arg(args, mc_ValueType);
+        mc_ValueType type = va_arg(args, mc_ValueType);
         if (!type) break;
 
         int size = MC_TYPE_SIZE(type);
@@ -508,14 +503,27 @@ static size_t mc_buffer_iter(mc_Buffer* buffer, int upload, va_list args) {
 
     if (pos >= 256) return 0;
 
-    // for (int i = 0; i < 256; i++) printf("[%03d]: %08X\n", i, data[i]);
-
     if (upload) {
         mc_buffer_set_size(buffer, pos * sizeof(int));
         mc_buffer_write(buffer, 0, pos * sizeof(int), data);
     }
 
     return pos * sizeof(int);
+}
+
+static void mc_program_run__(
+    mc_Program* program,
+    mc_uvec3 workgroupSize,
+    va_list args
+) {
+    if (program->error) return;
+    glUseProgram(program->program);
+
+    mc_Buffer* buffer;
+    for (int i = 0; (buffer = va_arg(args, mc_Buffer*)); i++)
+        glBindBufferBase(buffer->type, i, buffer->buffer);
+
+    glDispatchCompute(workgroupSize.x, workgroupSize.y, workgroupSize.z);
 }
 
 char* mc_initialize(mc_debug_cb cb, void* arg) {
@@ -566,7 +574,7 @@ char* mc_initialize(mc_debug_cb cb, void* arg) {
     if (gladLoaderLoadGL() == 0) return "failed to load gl";
 
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(mc_gl_debug_cb, NULL);
+    glDebugMessageCallback(mc_gl_debug_cb__, NULL);
 
     return NULL;
 }
@@ -650,7 +658,7 @@ void mc_buffer_read(
 size_t mc_buffer_pack__(mc_Buffer* buffer, ...) {
     va_list args;
     va_start(args, buffer);
-    size_t len = mc_buffer_iter(buffer, 1, args);
+    size_t len = mc_buffer_iter__(buffer, 1, args);
     va_end(args);
     return len;
 }
@@ -658,7 +666,7 @@ size_t mc_buffer_pack__(mc_Buffer* buffer, ...) {
 size_t mc_buffer_unpack__(mc_Buffer* buffer, ...) {
     va_list args;
     va_start(args, buffer);
-    size_t len = mc_buffer_iter(buffer, 0, args);
+    size_t len = mc_buffer_iter__(buffer, 0, args);
     va_end(args);
     return len;
 }
@@ -671,14 +679,14 @@ mc_Program* mc_program_create(const char* code) {
     glShaderSource(program->shader, 1, &code, NULL);
     glCompileShader(program->shader);
 
-    if ((program->error = mc_get_shader_errors(program->shader)))
+    if ((program->error = mc_get_shader_errors__(program->shader)))
         return program;
 
     program->program = glCreateProgram();
     glAttachShader(program->program, program->shader);
     glLinkProgram(program->program);
 
-    if ((program->error = mc_get_program_errors(program->program))) {
+    if ((program->error = mc_get_program_errors__(program->program))) {
         glDeleteShader(program->shader);
         return program;
     }
@@ -698,29 +706,29 @@ char* mc_program_check(mc_Program* program) {
     return program->error;
 }
 
-void mc_program_run_nonblocking(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    mc_Buffer** buffers
-) {
-    if (program->error) return;
-    glUseProgram(program->program);
-    for (uint32_t i = 0; buffers[i] != NULL; i++) {
-        mc_Buffer* buffer = buffers[i];
-        glBindBufferBase(buffer->type, i, buffer->buffer);
-    }
-    glDispatchCompute(workgroupSize.x, workgroupSize.y, workgroupSize.z);
+double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...) {
+    va_list args;
+    va_start(args, size);
+
+    double startTime = mc_get_time();
+    mc_program_run__(program, size, args);
+    double time = mc_get_time() - startTime;
+
+    va_end(args);
+    return time;
 }
 
-double mc_program_run_blocking(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    mc_Buffer** buffers
-) {
+double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...) {
+    va_list args;
+    va_start(args, size);
+
     double startTime = mc_get_time();
-    mc_program_run_nonblocking(program, workgroupSize, buffers);
+    mc_program_run__(program, size, args);
     mc_finish_tasks();
-    return mc_get_time() - startTime;
+    double time = mc_get_time() - startTime;
+
+    va_end(args);
+    return time;
 }
 
 #undef MC_TYPE_SIZE

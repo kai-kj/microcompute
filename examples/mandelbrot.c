@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 #define MICROCOMPUTE_IMPLEMENTATION
 #include "microcompute.h"
@@ -42,7 +41,7 @@ static char* renSrc = //
     "        = c.r << 0 | c.g << 8 | c.b << 16 | 255 << 24;\n"
     "}\n";
 
-typedef struct ShaderData {
+typedef struct {
     mc_int maxIter;
     mc_vec2 center;
     mc_float zoom;
@@ -77,15 +76,13 @@ int main(void) {
 
     mc_buffer_pack(dBuff, MC_INT, &maxIter, MC_VEC2, &center, MC_FLOAT, &zoom);
 
-    mc_Buffer** buffers = (mc_Buffer*[]){dBuff, iBuff, NULL};
-    double time = mc_program_run_blocking(program, size, buffers);
+    double time = mc_program_run_blocking(program, size, dBuff, iBuff);
 
     printf("compute time: %f[s]\n", time);
 
-    char* img_bytes = malloc(totalSize * 4);
+    char img_bytes[totalSize * 4];
     mc_buffer_read(iBuff, 0, sizeof(mc_int) * totalSize, img_bytes);
     stbi_write_bmp("mandelbrot.bmp", size.x, size.y, 4, img_bytes);
-    free(img_bytes);
 
     mc_buffer_destroy(dBuff);
     mc_buffer_destroy(iBuff);

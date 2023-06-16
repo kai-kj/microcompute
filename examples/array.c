@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 #define MICROCOMPUTE_IMPLEMENTATION
 #include "microcompute.h"
@@ -53,13 +52,11 @@ int main(void) {
     mc_buffer_pack(buff1, MC_FLOAT | MC_ARRAY(5), arr1Data);
     mc_buffer_pack(buff2, MC_FLOAT | MC_ARRAY(5), arr2Data);
 
-    mc_Buffer** buffers = (mc_Buffer*[]){buff1, buff2, NULL};
-    double time = mc_program_run_blocking(program, size, buffers);
+    double time = mc_program_run_blocking(program, size, buff1, buff2);
 
     printf("compute time: %f[s]\n", time);
 
-    mc_float arrOutData[5] = {};
-
+    mc_float arrOutData[5];
     mc_buffer_unpack(buff2, MC_FLOAT | MC_ARRAY(5), arrOutData);
 
     for (int i = 0; i < 5; i++) printf("%f\n", arrOutData[i]);

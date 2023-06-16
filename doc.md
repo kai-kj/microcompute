@@ -75,7 +75,7 @@ Use with `mc_ValueType` to indicate an array of values.
 ----
 
 ```c
-typedef struct mc_Buffer mc_Buffer;
+typedef struct mc_Buffer__ mc_Buffer;
 ```
 
 Buffer type.
@@ -83,7 +83,7 @@ Buffer type.
 ----
 
 ```c
-typedef struct mc_Program mc_Program;
+typedef struct mc_Program__ mc_Program;
 ```
 
 Program type.
@@ -290,7 +290,7 @@ data is transferred correctly.
 
 ```c
 #define mc_buffer_pack(buffer, ...)                                            \
-    mc_buffer_pack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+    mc_buffer_pack__(buffer, ##__VA_ARGS__, NULL);
 ```
 
 Pack and write data to a buffer. Takes care of alignment automatically. No
@@ -323,7 +323,7 @@ buffer.
 
 ```c
 #define mc_buffer_unpack(buffer, ...)                                          \
-    mc_buffer_unpack__(buffer, __VA_ARGS__ __VA_OPT__(, ) 0);
+    mc_buffer_unpack__(buffer, ##__VA_ARGS__, NULL);
 ```
 
 Read and unpack data from a buffer. Takes care of alignment automatically. No
@@ -372,39 +372,35 @@ Check if there were any errors while compiling the shader code.
 ----
 
 ```c
-void mc_program_run_nonblocking(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    mc_Buffer** buffers
-);
+#define mc_program_run_nonblocking(program, size, ...)                         \
+    mc_program_run_nonblocking__(program, size, ##__VA_ARGS__, NULL)
 ```
 
 Run a program on the GPU. The buffers passed to the program will have their
-binding set depending on its index in the `buffers` array.
+binding set depending on its index in `...`.
 
 - `program`: A program
-- `workgroupSize`: The number of work groups to dispatch in each dimension
-- `buffers`: A null-terminated array of buffers to pass to the program
+- `size`: The number of work groups to dispatch in each dimension
+- `...`: Buffers to pass to the program
+- returns: The time taken to run the program (in seconds), it is nonblocking,
+           so the returned value should be approx 0
 
 ----
 
 ```c
-double mc_program_run_blocking(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    mc_Buffer** buffers
-);
+#define mc_program_run_blocking(program, size, ...)                            \
+    mc_program_run_blocking__(program, size, ##__VA_ARGS__, NULL)
 ```
 
 Run a program on the GPU. The buffers passed to the program will have their
-binding set depending on its index in the `buffers` array.
+binding set depending on its index in `...`.
 
 Because this calls `mc_finish_tasks()` internally, it may significantly
 affect performance if called many times in succession.
 
 - `program`: A program
-- `workgroupSize`: The number of work groups to dispatch in each dimension
-- `buffers`: A null-terminated array of buffers to pass to the program
+- `size`: The number of work groups to dispatch in each dimension
+- `...`: Buffers to pass to the program
 - returns: The time taken to run the program (in seconds)
 
 ----
@@ -412,6 +408,8 @@ affect performance if called many times in succession.
 ```c
 size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
 size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
+double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...);
+double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
 ```
 
 Wrapped functions. Do not use them directly, use the wrapping macros.

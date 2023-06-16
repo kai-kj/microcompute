@@ -1,10 +1,15 @@
+CC       := gcc -g -O3 -std=c99 -Wall -Wextra -pedantic -Wno-unused-parameter
+INCLUDES := -I include/ -I ../
+
+.PHONY: all clean
+
 all: array mandelbrot
 
 array: array.c ../microcompute.h
-	gcc -g array.c -I include/ -I ../ -o array
+	$(CC) $(INCLUDES) $@.c -o $@
 
-mandelbrot: mandelbrot.c ../microcompute.h
-	gcc -g mandelbrot.c -I include/ -I ../ -o mandelbrot
+mandelbrot: array.c ../microcompute.h
+	$(CC) $(INCLUDES) $@.c -o $@
 
 clean:
-	rm -f mandelbrot mandelbrot.bmp
+	rm -f array mandelbrot mandelbrot.bmp

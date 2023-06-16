@@ -5,9 +5,6 @@
 	<img src="https://img.shields.io/github/license/kal39/microcompute">
 	<img src="https://img.shields.io/github/repo-size/kal39/microcompute">
 	<img src="https://img.shields.io/github/languages/top/kal39/microcompute">
-	<br>
-	<img src="https://img.shields.io/github/issues/kal39/microcompute">
-	<img src="https://img.shields.io/github/v/release/kal39/microcompute?sort=semver">
 	</p>
 </p>
 
@@ -17,6 +14,7 @@ This library makes it easy to run simple OpenGL compute shaders without creating
 
 ## Examples
 
+- [Array operations](https://github.com/kal39/microcompute/blob/master/examples/array.c)
 - [Mandelbrot renderer](https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.c)
 
 ## Documentation
