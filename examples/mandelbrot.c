@@ -9,7 +9,7 @@
 static char* renSrc = //
     "#version 430\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
-    "layout(std140, binding = 0) uniform dBuff {\n"
+    "layout(std430, binding = 0) buffer dBuff {\n"
     "    int maxIter;\n"
     "    vec2 center;\n"
     "    float zoom;\n"
@@ -65,8 +65,8 @@ int main(void) {
         return -1;
     }
 
-    mc_Buffer* dBuff = mc_buffer_create_uniform(sizeof(ShaderData));
-    mc_Buffer* iBuff = mc_buffer_create_storage(sizeof(mc_int) * totalSize);
+    mc_Buffer* dBuff = mc_buffer_create(sizeof(ShaderData));
+    mc_Buffer* iBuff = mc_buffer_create(sizeof(mc_int) * totalSize);
 
     mc_buffer_pack(dBuff, MC_INT, &maxIter, MC_VEC2, &center, MC_FLOAT, &zoom);
 

@@ -35,15 +35,6 @@ typedef enum mc_DebugLevel {
 typedef void(mc_debug_cb)(mc_DebugLevel level, const char* msg, void* arg);
 
 /** code
- * Possible buffer types. `MC_BUFFER_TYPE_UNIFORM` is a uniform buffer, and
- * `MC_BUFFER_TYPE_STORAGE` is a SSBO.
- */
-typedef enum mc_BufferType {
-    MC_BUFFER_UNIFORM,
-    MC_BUFFER_STORAGE
-} mc_BufferType;
-
-/** code
  * All basic value types supported by `mc_buffer_pack()` and
  * `mc_buffer_unpack()`.
  */
@@ -159,20 +150,12 @@ double mc_finish_tasks();
 double mc_get_time();
 
 /** code
- * Create a uniform buffer.
- *
- * - `size`: The initial size of the buffer, can be changed later
- * - returns: `NULL` on fail, a buffer otherwise
- */
-mc_Buffer* mc_buffer_create_uniform(uint64_t size);
-
-/** code
  * Create a SSBO buffer.
  *
  * - `size`: The initial size of the buffer, can be changed later
  * - returns: `NULL` on fail, a buffer otherwise
  */
-mc_Buffer* mc_buffer_create_storage(uint64_t size);
+mc_Buffer* mc_buffer_create(uint64_t size);
 
 /** code
  * Destroy a buffer.
@@ -180,14 +163,6 @@ mc_Buffer* mc_buffer_create_storage(uint64_t size);
  * - `buffer`: A buffer
  */
 void mc_buffer_destroy(mc_Buffer* buffer);
-
-/** code
- * Get the current type of a buffer.
- *
- * - `buffer`: A buffer
- * - returns: The type of the buffer
- */
-mc_BufferType mc_buffer_get_type(mc_Buffer* buffer);
 
 /** code
  * Get the current size of a buffer.
@@ -398,7 +373,6 @@ typedef struct mc_Program__ {
 
 typedef struct mc_Buffer__ {
     GLuint buffer;
-    GLenum type;
 } mc_Buffer__;
 
 static struct mc_State S;
@@ -488,9 +462,6 @@ static size_t mc_buffer_iter__(mc_Buffer* buffer, int upload, va_list args) {
             else memcpy(val, &(data[pos]), size * sizeof(int));
             pos += size;
         } else {
-            if (buffer->type == GL_UNIFORM_BUFFER)
-                align = MC_TYPE_ALIGN(MC_VEC4);
-
             for (int i = 0; i < arrLen; i++) {
                 pos = MC_ALIGN_POS(pos, align);
                 void* element = (int*)val + i * size;
@@ -521,7 +492,7 @@ static void mc_program_run__(
 
     mc_Buffer* buffer;
     for (int i = 0; (buffer = va_arg(args, mc_Buffer*)); i++)
-        glBindBufferBase(buffer->type, i, buffer->buffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, buffer->buffer);
 
     glDispatchCompute(workgroupSize.x, workgroupSize.y, workgroupSize.z);
 }
@@ -596,17 +567,8 @@ double mc_get_time() {
     return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
 
-mc_Buffer* mc_buffer_create_uniform(uint64_t size) {
+mc_Buffer* mc_buffer_create(uint64_t size) {
     mc_Buffer* buffer = malloc(sizeof *buffer);
-    buffer->type = GL_UNIFORM_BUFFER;
-    glGenBuffers(1, &buffer->buffer);
-    mc_buffer_set_size(buffer, size);
-    return buffer;
-}
-
-mc_Buffer* mc_buffer_create_storage(uint64_t size) {
-    mc_Buffer* buffer = malloc(sizeof *buffer);
-    buffer->type = GL_SHADER_STORAGE_BUFFER;
     glGenBuffers(1, &buffer->buffer);
     mc_buffer_set_size(buffer, size);
     return buffer;
@@ -618,21 +580,16 @@ void mc_buffer_destroy(mc_Buffer* buffer) {
     free(buffer);
 }
 
-mc_BufferType mc_buffer_get_type(mc_Buffer* buffer) {
-    return buffer->type == GL_UNIFORM_BUFFER ? MC_BUFFER_UNIFORM
-                                             : MC_BUFFER_STORAGE;
-}
-
 uint64_t mc_buffer_get_size(mc_Buffer* buffer) {
     GLint size;
-    glBindBuffer(buffer->type, buffer->buffer);
-    glGetBufferParameteriv(buffer->type, GL_BUFFER_SIZE, &size);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
+    glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &size);
     return size;
 }
 
 void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size) {
-    glBindBuffer(buffer->type, buffer->buffer);
-    glBufferData(buffer->type, size, NULL, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_DRAW);
 }
 
 void mc_buffer_write(
@@ -641,8 +598,8 @@ void mc_buffer_write(
     uint64_t size,
     void* data
 ) {
-    glBindBuffer(buffer->type, buffer->buffer);
-    glBufferSubData(buffer->type, offset, size, data);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
 }
 
 void mc_buffer_read(
@@ -651,8 +608,8 @@ void mc_buffer_read(
     uint64_t size,
     void* data
 ) {
-    glBindBuffer(buffer->type, buffer->buffer);
-    glGetBufferSubData(buffer->type, offset, size, data);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
 }
 
 size_t mc_buffer_pack__(mc_Buffer* buffer, ...) {

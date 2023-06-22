@@ -6,7 +6,7 @@
 static char* renSrc = //
     "#version 430\n"
     "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
-    "layout(std140, binding = 0) uniform buff1 {\n"
+    "layout(std430, binding = 0) buffer buff1 {\n"
     "    float data1[5];\n"
     "};\n"
     "layout(std430, binding = 1) buffer buff2 {\n"
@@ -46,8 +46,8 @@ int main(void) {
         return -1;
     }
 
-    mc_Buffer* buff1 = mc_buffer_create_uniform(sizeof arr1Data);
-    mc_Buffer* buff2 = mc_buffer_create_storage(sizeof arr2Data);
+    mc_Buffer* buff1 = mc_buffer_create(sizeof arr1Data);
+    mc_Buffer* buff2 = mc_buffer_create(sizeof arr2Data);
 
     mc_buffer_pack(buff1, MC_FLOAT | MC_ARRAY(5), arr1Data);
     mc_buffer_pack(buff2, MC_FLOAT | MC_ARRAY(5), arr2Data);

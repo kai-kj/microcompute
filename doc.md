@@ -33,18 +33,6 @@ The debug callback type passed to `mc_set_debug_cb()`.
 ----
 
 ```c
-typedef enum mc_BufferType {
-    MC_BUFFER_UNIFORM,
-    MC_BUFFER_STORAGE
-} mc_BufferType;
-```
-
-Possible buffer types. `MC_BUFFER_TYPE_UNIFORM` is a uniform buffer, and
-`MC_BUFFER_TYPE_STORAGE` is a SSBO.
-
-----
-
-```c
 typedef enum mc_ValueType {
     MC_FLOAT = 0x00010101,
     MC_VEC2 = 0x00020202,
@@ -186,18 +174,7 @@ Get the current time in seconds.
 ----
 
 ```c
-mc_Buffer* mc_buffer_create_uniform(uint64_t size);
-```
-
-Create a uniform buffer.
-
-- `size`: The initial size of the buffer, can be changed later
-- returns: `NULL` on fail, a buffer otherwise
-
-----
-
-```c
-mc_Buffer* mc_buffer_create_storage(uint64_t size);
+mc_Buffer* mc_buffer_create(uint64_t size);
 ```
 
 Create a SSBO buffer.
@@ -214,17 +191,6 @@ void mc_buffer_destroy(mc_Buffer* buffer);
 Destroy a buffer.
 
 - `buffer`: A buffer
-
-----
-
-```c
-mc_BufferType mc_buffer_get_type(mc_Buffer* buffer);
-```
-
-Get the current type of a buffer.
-
-- `buffer`: A buffer
-- returns: The type of the buffer
 
 ----
 
