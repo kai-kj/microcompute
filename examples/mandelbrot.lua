@@ -1,15 +1,11 @@
 package.path = '../?.lua;' .. package.path
-local mc = require("microcompute")(
-    "../microcompute_lua.so",
-    function (lvl, msg) print(lvl .. ": " .. msg) end
-)
 
 local code = [[
     #version 430
 
     layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-    layout(std140, binding = 0) buffer dBuff {
+    layout(std430, binding = 0) buffer dBuff {
         float maxIter;
         vec2 center;
         float zoom;
@@ -35,25 +31,32 @@ local code = [[
     }
 ]]
 
+local mc = require("microcompute")(
+    "../microcompute_lua.so",
+    function (lvl, msg) print(lvl .. ": " .. msg) end
+)
+
 local size = mc.vec3(1000, 1000, 1);
 local center = mc.vec2(-0.7615, -0.08459);
 local zoom = 1000;
-local maxIter = 500;
+local maxIter = 1000;
 
 local program = mc.program(code)
-if type(program) == "string" then print(program) end
+if type(program) == "string" then
+    print(program)
+    return
+end
 
-local data = mc.struct{maxIter, center, zoom}
+local settings = mc.struct{maxIter, center, zoom}
 
 local img = {}
 for i = 1, size[1] * size[2] do img[i] = 0 end
 img = mc.struct(img)
 
-local dbuff = mc.buffer()
-local ibuff = mc.buffer()
+local dbuff = mc.buffer(settings.size)
+local ibuff = mc.buffer(img.size)
 
-dbuff:write(data)
-ibuff:write(img)
+dbuff:write(settings)
 
 program:run(size, dbuff, ibuff)
 

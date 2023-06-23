@@ -1,23 +1,44 @@
 local math = require("math")
 local ffi = require("ffi")
 
+--- @class mc
+--- @field package cfuncs table
 local mc = {}
 
-local function isnumber(v) return type(v) == "number" end
-local function istable(v) return type(v) == "table" end
-
+--- @param curr integer
+--- @param align integer
+--- @return integer
 local function calc_offset(curr, align)
     return (align - curr % align) % align
 end
 
+--- @class vector
+--- @field public size integer
+--- @field private align integer
 local vector = {}
+
 vector.__index = vector
+
+--- @param v any
+--- @return boolean
 local function isvector(v) return getmetatable(v) == vector end
 
-function mc.vec2(x, y) return vector.new(2, x, y) end
-function mc.vec3(x, y, z) return vector.new(3, x, y, z) end
-function mc.vec4(x, y, z, w) return vector.new(4, x, y, z, w) end
+--- @param ... number
+--- @return vector
+function mc.vec2(...) return vector.new(2, ...) end
 
+--- @param ... number
+--- @return vector
+function mc.vec3(...) return vector.new(3, ...) end
+
+--- @param ... number
+--- @return vector
+function mc.vec4(...) return vector.new(4, ...) end
+
+--- @private
+--- @param size integer
+--- @param ... number
+--- @return vector
 function vector.new(size, ...)
     local args = { ... }
     assert(#args == 0 or #args == size, "not enough elements supplied")
@@ -30,40 +51,64 @@ function vector.new(size, ...)
     for i = 1, self.size do
         if #args == 0 then self[i] = 0
         else self[i] = args[i] end
-        assert(isnumber(self[i]), "values must be numbers")
     end
     return self
 end
 
+--- @return table
+function vector:value()
+    local value = {}
+    for i, k in ipairs(self) do value[i] = k end
+    return value
+end
+
+--- @package
+--- @param buff ffi.cdata*
+--- @param align? integer
+--- @return nil
 function vector:pack_into(buff, align)
     align = math.max(self.align, align and align or self.align)
     for i = 1, #self do
-        mc._cfuncs.databuff_write(buff, i == 1 and align or 1, self[i])
+        mc.cfuncs.databuff_write(buff, i == 1 and align or 1, self[i])
     end
 end
 
+--- @package
+--- @param buff ffi.cdata*
+--- @param align? integer
+--- @return nil
 function vector:unpack_from(buff, align)
     align = math.max(self.align, align and align or self.align)
     for i = 1, #self do
-        self[i] = mc._cfuncs.databuff_read(buff, i == 1 and align or 1)
+        self[i] = mc.cfuncs.databuff_read(buff, i == 1 and align or 1)
     end
 end
 
+--- @return string
 function vector:__tostring()
     local str = "( "
     for i = 1, #self do str = str .. self[i] .. " " end
     return str .. ")"
 end
 
+--- @class struct
+--- @field public size integer
+--- @field private align integer
 local struct = {}
+
 struct.__index = struct
+
+--- @param v any
+--- @return boolean
 local function isstruct(v) return getmetatable(v) == struct end
 
+--- @param values table
+--- @return struct
 function mc.struct(values) return struct.new(values) end
 
+--- @param values table
+--- @return struct
 function struct.new(values)
-    assert(istable(values), "values must be table")
-
     local self = {}
     setmetatable(self, struct)
 
@@ -71,7 +116,7 @@ function struct.new(values)
     self.align = 1
     for i = 1, #values do
         self[i] = values[i]
-        if isnumber(self[i]) then
+        if type(self[i]) == "number" then
             self.size = self.size + 1
         elseif isvector(self[i]) or isstruct(self[i]) then
             self.align = math.max(self.align, self[i].align)
@@ -85,111 +130,165 @@ function struct.new(values)
     return self
 end
 
+--- @return table
+function struct:value()
+    local value = {}
+    for i, k in ipairs(self) do value[i] = k end
+    return value
+end
+
+--- @package
+--- @param buff ffi.cdata*
+--- @param align? integer
+--- @return nil
 function struct:pack_into(buff, align)
     align = math.max(self.align, align and align or self.align)
     for i = 1, #self do
-        if isnumber(self[i]) then mc._cfuncs.databuff_write(buff, align, self[i])
-        else self[i]:pack_into(buff, align) end
+        if type(self[i]) == "number" then
+            mc.cfuncs.databuff_write(buff, align, self[i])
+        else
+            self[i]:pack_into(buff, align)
+        end
     end
 end
 
+--- @package
+--- @param buff ffi.cdata*
+--- @param align? integer
+--- @return nil
 function struct:unpack_from(buff, align)
     align = math.max(self.align, align and align or self.align)
     for i = 1, #self do
-        if isnumber(self[i]) then self[i] = mc._cfuncs.databuff_read(buff, align)
-        else self[i]:unpack_from(buff, align) end
+        if type(self[i]) == "number" then
+            self[i] = mc.cfuncs.databuff_read(buff, align)
+        else
+            self[i]:unpack_from(buff, align)
+        end
     end
 end
 
+--- @return string
 function struct:__tostring()
     local str = "{ "
     for i = 1, #self do str = str .. tostring(self[i]) .. " " end
     return str .. "}"
 end
 
+--- @return nil
 function mc.terminate()
-    mc._cfuncs.mc_terminate()
-    mc.initialized = false
+    mc.cfuncs.mc_terminate()
 end
 
+--- @return nil
 function mc.finishtasks()
-    mc._cfuncs.mc_finish_tasks()
+    mc.cfuncs.mc_finish_tasks()
 end
 
+--- @return number
 function mc.gettime()
-    mc._cfuncs.mc_get_time()
+    return mc.cfuncs.mc_get_time()
 end
 
+--- @class buffer
+--- @field private size integer
+--- @field package mcbuff ffi.cdata*
 local buffer = {}
-buffer.__index = buffer
-setmetatable(buffer, { __call = buffer.new })
 
-function mc.buffer() return buffer.new() end
+buffer.__index = buffer
+
+--- @param size integer
+--- @return buffer
+function mc.buffer(size) return buffer.new(size) end
+
+--- @param v any
+--- @return boolean
 local function isbuffer(v) return getmetatable(v) == buffer end
 
-function buffer.new()
+--- @param size integer
+--- @return buffer
+function buffer.new(size)
     local self = {}
     setmetatable(self, buffer)
-    self.mcbuff = mc._cfuncs.mc_buffer_create(0)
-    ffi.gc(self.mcbuff, mc._cfuncs.mc_buffer_destroy)
+
+    self.size = size
+    self.mcbuff = mc.cfuncs.mc_buffer_create(self.size and self.size * 4 or 0)
+    ffi.gc(self.mcbuff, mc.cfuncs.mc_buffer_destroy)
     return self
 end
 
-function buffer:write(data)
-    assert(isvector(data) or istable(vector), "data must be vector or table")
-
-    local databuff = mc._cfuncs.databuff_create(data.size)
-    ffi.gc(databuff, mc._cfuncs.databuff_destroy)
-    data:pack_into(databuff)
-    mc._cfuncs.lmc_buffer_write(self.mcbuff, databuff)
+--- @param size integer
+--- @return nil
+function buffer:setsize(size)
+    self.size = size
+    mc.cfuncs.mc_buffer_set_size(self.mcbuff, self.size * 4)
 end
 
-function buffer:read(data)
-    assert(isvector(data) or istable(vector), "data must be vector or table")
+--- @param data vector|struct
+--- @return nil
+function buffer:write(data)
+    assert(data.size <= self.size, "data too large")
 
-    local databuff = mc._cfuncs.databuff_create(data.size)
-    ffi.gc(databuff, mc._cfuncs.databuff_destroy)
-    mc._cfuncs.lmc_buffer_read(self.mcbuff, databuff)
+    local databuff = mc.cfuncs.databuff_create(data.size)
+    ffi.gc(databuff, mc.cfuncs.databuff_destroy)
+    data:pack_into(databuff)
+    mc.cfuncs.lmc_buffer_write(self.mcbuff, databuff)
+end
+
+--- @param data vector|struct
+--- @return nil
+function buffer:read(data)
+    assert(data.size <= self.size, "data too large")
+
+    local databuff = mc.cfuncs.databuff_create(data.size)
+    ffi.gc(databuff, mc.cfuncs.databuff_destroy)
+    mc.cfuncs.lmc_buffer_read(self.mcbuff, databuff)
     data:unpack_from(databuff)
 end
 
+--- @class program
+--- @field ptr ffi.cdata*
 local program = {}
+
 program.__index = program
 
+--- @param data string
+--- @return program|string
 function mc.program(data) return program.new(data) end
 
+--- @param code string
+--- @return program|string
 function program.new(code)
-    assert(type(code) == "string", "code must be a string")
-
     local self = {}
     setmetatable(self, program)
 
-    self.ptr = mc._cfuncs.mc_program_create(code)
-    ffi.gc(self.ptr, function(ptr) mc._cfuncs.mc_program_destroy(ptr) end)
-    local res = mc._cfuncs.mc_program_check(self.ptr)
+    self.ptr = mc.cfuncs.mc_program_create(code)
+    ffi.gc(self.ptr, function(ptr) mc.cfuncs.mc_program_destroy(ptr) end)
+    local res = mc.cfuncs.mc_program_check(self.ptr)
 
-    if mc._cfuncs.is_null(res) ~= 1 then return ffi.string(res):sub(1, -2)
+    if mc.cfuncs.is_null(res) ~= 1 then return ffi.string(res):sub(1, -2)
     else return self end
 end
 
+--- @param size vector
+--- @param ... buffer
+--- @return nil
 function program:run(size, ...)
-    assert(isvector(size) and size.size == 3, "size must be vec3")
+    assert(size.size == 3, "size must be vec3")
 
     local buffs = {}
-    for i, v in ipairs({...}) do
-        assert(isbuffer(v), "... must be buffers")
-        buffs[i] = v.mcbuff
-    end
-    buffs[#buffs + 1] = mc._cfuncs.make_null()
-    
-    mc._cfuncs.lmc_program_run(self.ptr, size[1], size[2], size[3], unpack(buffs))
+    for i, v in ipairs({...}) do buffs[i] = v.mcbuff end
+    buffs[#buffs + 1] = mc.cfuncs.make_null()
+
+    mc.cfuncs.lmc_program_run(
+        self.ptr, size[1], size[2], size[3], unpack(buffs)
+    )
 end
 
+--- @param libpath string
+--- @param cb function
+--- @return mc|string
 return function (libpath, cb)
-    assert(type(libpath) == "string", "libpath must be string")
-    assert(type(cb) == "function", "cb must be a function")
-
-    mc._cfuncs = ffi.load(libpath)
+    mc.cfuncs = ffi.load(libpath)
     ffi.cdef[[
         void free(void *ptr);
         int is_null(void *ptr);
@@ -207,6 +306,7 @@ return function (libpath, cb)
         
         void* mc_buffer_create(unsigned long size);
         void mc_buffer_destroy(void* buffer);
+        void mc_buffer_set_size(void* buffer, unsigned long size);
         void lmc_buffer_write(void* buffer, void* databuff);
         void lmc_buffer_read(void* buffer, void* databuff);
         
@@ -221,6 +321,6 @@ return function (libpath, cb)
         cb(t[lvl + 1], ffi.string(msg))
     end
 
-    local ret = ffi.string(mc._cfuncs.lmc_initialize(cbwrap))
+    local ret = ffi.string(mc.cfuncs.lmc_initialize(cbwrap))
     if ret == "success" then return mc else return ret end
 end

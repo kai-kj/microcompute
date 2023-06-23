@@ -1,8 +1,4 @@
 package.path = '../?.lua;' .. package.path
-local mc = require("microcompute")(
-    "../microcompute_lua.so",
-    function (lvl, msg) print(lvl .. ": " .. msg) end
-)
 
 local code = [[  
     #version 430
@@ -24,21 +20,25 @@ local code = [[
     }
 ]]
 
+local mc = require("microcompute")(
+    "../microcompute_lua.so",
+    function (lvl, msg) print(lvl .. ": " .. msg) end
+)
+
 local program = mc.program(code)
-if type(program) == "string" then print(program) end
 
-local arr1 = {}
-for i = 1, 5 do arr1[i] = math.random() * 100 end
-arr1 = mc.struct(arr1)
+if type(program) == "string" then
+    print(program)
+    return
+end
 
-local arr2 = {}
-for i = 1, 5 do arr2[i] = math.random() * 100 end
-arr2 = mc.struct(arr2)
+local arr1 = mc.struct({1.1, 2.2, 3.3, 4.4, 5.5})
+local arr2 = mc.struct({600, 700, 800, 900, 1000})
 
 print("   " .. tostring(arr1) .. " * " .. tostring(arr2))
 
-local buff1 = mc.buffer()
-local buff2 = mc.buffer()
+local buff1 = mc.buffer(arr1.size)
+local buff2 = mc.buffer(arr2.size)
 
 buff1:write(arr1)
 buff2:write(arr2)

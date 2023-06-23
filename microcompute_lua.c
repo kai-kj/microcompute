@@ -56,7 +56,6 @@ void databuff_destroy(Databuff* databuff) {
 }
 
 void lmc_buffer_write(mc_Buffer* buffer, Databuff* databuff) {
-    mc_buffer_set_size(buffer, databuff->size * 4);
     mc_buffer_write(buffer, 0, databuff->size * 4, databuff->data);
 }
 
