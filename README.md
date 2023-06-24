@@ -12,30 +12,31 @@
 
 This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using EGL, allowing headless programs to use the GPU.
 
+Bindings to lua are also provided in `lua_interface/`. [`luajit`](https://luajit.org/luajit.html) is needed for this library.
+
 ## Examples
 
-- [Array operations](https://github.com/kal39/microcompute/blob/master/examples/array.c)
-- [Mandelbrot renderer](https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.c)
+- Array operations
+  - [`array.c`](https://github.com/kal39/microcompute/blob/master/examples/c/array.c)
+  - [`array.lua`](https://github.com/kal39/microcompute/blob/master/examples/lua/array.lua)
+- Mandelbrot renderer
+  - [`mandelbrot.c`](https://github.com/kal39/microcompute/blob/master/examples/c/mandelbrot.c)
+  - [`mandelbrot.lua`](https://github.com/kal39/microcompute/blob/master/examples/lua/mandelbrot.lua)
 
 ## Documentation
 
-See [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md), this was generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html).
+- C
+  - [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md)
+  - [`microcompute.h`](https://github.com/kal39/microcompute/blob/master/microcompute.h) (generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html))
+- lua
+  - [`microcompute.lua`](https://github.com/kal39/microcompute/blob/master/lua_interface/microcompute.lua)
 
-## Build examples
+## Building
 
-To clone the repository, run:
-
-```
-git clone git@github.com:kal39/microcompute.git
-cd microcompute
-```
-
-To build the examples, run:
-
-```
-cd examples
-make
-```
+- To build the C examples, simply run `make` in `examples/c`.
+- The examples can be run with `./array` or `./mandelbrot` (in `examples/c`).
+- To build the lua interface, simply run `make` in `microcompute/lua_interface`.
+- The lua examples can be run with `luajit array.lua` and `luajit mandelbrot.lua` (in `examples/lua`)
 
 ## License
 
