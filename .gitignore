@@ -1,7 +1,10 @@
 .vscode/
 *.so
-examples/*
-!examples/makefile
-!examples/include
-!examples/*.c
-!examples/*.lua
+
+examples/c/*
+!examples/c/makefile
+!examples/c/include
+!examples/c/*.c
+
+examples/lua/*
+!examples/lua/*.lua

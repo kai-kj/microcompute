@@ -1,4 +1,4 @@
-package.path = "../?.lua;" .. package.path
+package.path = "../../lua_interface/?.lua;" .. package.path
 
 local code = [[
     #version 430
@@ -21,7 +21,7 @@ local code = [[
 ]]
 
 local mc = require("microcompute")(
-    "../microcompute_lua.so",
+    "../../lua_interface/microcompute_lua.so",
     function(lvl, msg) print(lvl .. ": " .. msg) end
 )
 

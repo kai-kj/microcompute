@@ -1,3 +1,5 @@
+assert(type(jit) == "table", "use luajit to use this library")
+
 local math = require("math")
 local ffi = require("ffi")
 
