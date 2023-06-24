@@ -1,4 +1,4 @@
-package.path = '../?.lua;' .. package.path
+package.path = "../?.lua;" .. package.path
 
 local code = [[
     #version 430
@@ -33,7 +33,7 @@ local code = [[
 
 local mc = require("microcompute")(
     "../microcompute_lua.so",
-    function (lvl, msg) print(lvl .. ": " .. msg) end
+    function(lvl, msg) print(lvl .. ": " .. msg) end
 )
 
 local size = mc.vec3(1000, 1000, 1);
@@ -47,7 +47,7 @@ if type(program) == "string" then
     return
 end
 
-local settings = mc.struct{maxIter, center, zoom}
+local settings = mc.struct { maxIter, center, zoom }
 
 local img = {}
 for i = 1, size[1] * size[2] do img[i] = 0 end
@@ -74,4 +74,3 @@ for i = 1, size[2] do
 end
 
 file:close()
-

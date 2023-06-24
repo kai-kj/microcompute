@@ -1,18 +1,18 @@
-package.path = '../?.lua;' .. package.path
+package.path = "../?.lua;" .. package.path
 
-local code = [[  
+local code = [[
     #version 430
-    
+
     layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-    
+
     layout(std430, binding = 0) buffer buff1 {
         float data1[5];
     };
-    
+
     layout(std430, binding = 1) buffer buff2 {
         float data2[5];
     };
-    
+
     void main(void) {
         ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
         ivec2 size = ivec2(gl_NumWorkGroups.xy);
@@ -22,7 +22,7 @@ local code = [[
 
 local mc = require("microcompute")(
     "../microcompute_lua.so",
-    function (lvl, msg) print(lvl .. ": " .. msg) end
+    function(lvl, msg) print(lvl .. ": " .. msg) end
 )
 
 local program = mc.program(code)
@@ -32,8 +32,8 @@ if type(program) == "string" then
     return
 end
 
-local arr1 = mc.struct({1.1, 2.2, 3.3, 4.4, 5.5})
-local arr2 = mc.struct({600, 700, 800, 900, 1000})
+local arr1 = mc.struct({ 1.1, 2.2, 3.3, 4.4, 5.5 })
+local arr2 = mc.struct({ 600, 700, 800, 900, 1000 })
 
 print("   " .. tostring(arr1) .. " * " .. tostring(arr2))
 

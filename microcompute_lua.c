@@ -23,14 +23,6 @@ static int calc_offset(int pos, int align) {
     return (align - pos % align) % align;
 }
 
-int is_null(void* ptr) {
-    return ptr == NULL;
-}
-
-void* make_null() {
-    return NULL;
-}
-
 Databuff* databuff_create(int size) {
     Databuff* databuff = malloc(sizeof *databuff);
     databuff->size = size;
