@@ -1,321 +1,51 @@
 #ifndef MICROCOMPUTE_H_INCLUDE_GUARD
 #define MICROCOMPUTE_H_INCLUDE_GUARD
 
-/** text
- * # `microcompute.h`
- *
- * This library contains systems that can be used to easily run compute shaders
- * in GLSL.
- */
-
 #include <stdint.h>
 
-/** text
- * ## Types
- */
+typedef struct mc_State mc_State_t;
+typedef struct mc_Program mc_Program_t;
 
-/** code
- * The severity of a debug message.
- */
-typedef enum mc_DebugLevel {
-    MC_LVL_INFO,
-    MC_LVL_LOW,
-    MC_LVL_MEDIUM,
-    MC_LVL_HIGH,
-} mc_DebugLevel;
+mc_State_t* mc_state_create();
 
-/** code
- * The debug callback type passed to `mc_set_debug_cb()`.
- *
- * - `level`: A `mc_DebugLevel` indicating the severity of the message
- * - `msg`: The message (NULL terminated), memory is handled the library, so
- *          dont free
- * - `arg`: A pointer to some user defined data passed to `mc_set_debug_cb()`
- */
-typedef void(mc_debug_cb)(mc_DebugLevel level, const char* msg, void* arg);
+void mc_state_destroy(mc_State_t* self);
 
-/** code
- * All basic value types supported by `mc_buffer_pack()` and
- * `mc_buffer_unpack()`.
- */
-typedef enum mc_ValueType {
-    MC_FLOAT = 0x00010101,
-    MC_VEC2 = 0x00020202,
-    MC_VEC3 = 0x00040303,
-    MC_VEC4 = 0x00040404,
-    MC_INT = 0x00010105,
-    MC_IVEC2 = 0x00020206,
-    MC_IVEC3 = 0x00040307,
-    MC_IVEC4 = 0x00040408,
-    MC_UINT = 0x00010109,
-    MC_UVEC2 = 0x0002020A,
-    MC_UVEC3 = 0x0004030B,
-    MC_UVEC4 = 0x0004040C,
-} mc_ValueType;
+mc_Program_t* mc_program_create(
+    mc_State_t* state,
+    uint64_t shaderLength,
+    uint32_t* shader,
+    uint32_t bufferCount,
+    uint64_t* bufferSizes
+);
 
-/** code
- * Use with `mc_ValueType` to indicate an array of values.
- */
-#define MC_ARRAY(len) (((len)&0xFF) << 24)
+void mc_program_destroy(mc_Program_t* self);
 
-/** code
- * Buffer type.
- */
-typedef struct mc_Buffer__ mc_Buffer;
+uint32_t mc_program_get_buffer_count(mc_Program_t* self);
 
-/** code
- * Program type.
- */
-typedef struct mc_Program__ mc_Program;
+uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n);
 
-/** code
- * Basic scalar data types that can be used in GLSL.
- */
-
-typedef float mc_float;
-typedef int32_t mc_int;
-typedef uint32_t mc_uint;
-
-/** code
- * The basic vector types.
- */
-
-typedef struct mc_vec2 {
-    mc_float x, y;
-} mc_vec2;
-
-typedef struct mc_vec3 {
-    mc_float x, y, z;
-} mc_vec3;
-
-typedef struct mc_vec4 {
-    mc_float x, y, z, w;
-} mc_vec4;
-
-typedef struct mc_ivec2 {
-    mc_int x, y;
-} mc_ivec2;
-
-typedef struct mc_ivec3 {
-    mc_int x, y, z;
-} mc_ivec3;
-
-typedef struct mc_ivec4 {
-    mc_int x, y, z, w;
-} mc_ivec4;
-
-typedef struct mc_uvec2 {
-    mc_uint x, y;
-} mc_uvec2;
-
-typedef struct mc_uvec3 {
-    mc_uint x, y, z;
-} mc_uvec3;
-
-typedef struct mc_uvec4 {
-    mc_uint x, y, z, w;
-} mc_uvec4;
-
-/** text
- * ## Functions
- */
-
-/** code
- * Initialize microcompute.
- *
- * - `cb`: A function to call when a error occurs, set to `NULL` to ignore
- * - `arg`: An pointer to pass to the debug callback, set to `NULL` to ignore
- * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
- *            handled by the library, so dont free)
- */
-char* mc_initialize(mc_debug_cb cb, void* arg);
-
-/** code
- * Stop microcompute.
- */
-void mc_terminate();
-
-/** code
- * Wait for all compute operations to finish.
- *
- * - returns: The time spent waiting
- */
-double mc_finish_tasks();
-
-/** code
- * Get the current time in seconds.
- *
- * - returns: The current time
- */
-double mc_get_time();
-
-/** code
- * Create a SSBO buffer.
- *
- * - `size`: The initial size of the buffer, can be changed later
- * - returns: `NULL` on fail, a buffer otherwise
- */
-mc_Buffer* mc_buffer_create(uint64_t size);
-
-/** code
- * Destroy a buffer.
- *
- * - `buffer`: A buffer
- */
-void mc_buffer_destroy(mc_Buffer* buffer);
-
-/** code
- * Get the current size of a buffer.
- *
- * - `buffer`: A buffer
- * - returns: The size of the buffer (in bytes)
- */
-uint64_t mc_buffer_get_size(mc_Buffer* buffer);
-
-/** code
- * Set the size of a buffer.
- *
- * - `buffer`: A buffer
- * - `size`: The new size of the buffer (in bytes)
- */
-void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size);
-
-/** code
- * Write data to a buffer. Check the std140 and std430 layouts to make sure the
- * data is transferred correctly.
- *
- * - `buffer`: A buffer
- * - `offset`: The offset from witch to start writing the data
- * - `size`: The size of the data to write
- * - `data`: A pointer to the data
- */
-void mc_buffer_write(
-    mc_Buffer* buffer,
+uint64_t mc_program_nth_buffer_write(
+    mc_Program_t* self,
+    uint32_t n,
     uint64_t offset,
     uint64_t size,
     void* data
 );
 
-/** code
- * Read data from a buffer. Check the std140 and std430 layouts to make sure the
- * data is transferred correctly.
- *
- * - `buffer`: A buffer
- * - `offset`: The offset from witch to start reading the data
- * - `size`: The size of the data to read
- * - `data`: A pointer to write the data to (pre-allocated with enough space)
- */
-void mc_buffer_read(
-    mc_Buffer* buffer,
+uint64_t mc_program_nth_buffer_read(
+    mc_Program_t* self,
+    uint32_t n,
     uint64_t offset,
     uint64_t size,
     void* data
 );
 
-/** code
- * Pack and write data to a buffer. Takes care of alignment automatically. No
- * support for structs, only basic variables and arrays. The maximum size of a
- * buffer that can be automatically packed is 1024 bytes.
- *
- * The arguments should be formatted as follows:
- * 1. Pass the type of the value with `mc_ValueType`
- * 2. Pass a reference to the value
- * 3. Repeat 1. and 2. for every value
- *
- * Arrays can be specified by performing a bit-wise or (`|`) between the type of
- * the value (`mc_ValueType`) and `MC_ARRAY(len)`, where `len` is the length of
- * the array. The array can be passed directly (dont reference the array).
- *
- * For example:
- * ```c
- * int a = 12;
- * float b[] = {1.0, 2.0, 3.0};
- * mc_buffer_pack(buff, MC_INT, &a, MC_FLOAT | MC_ARRAY(3), &b)
- * ```
- * will write the integer `12` and the float array `{1.0, 2.0, 3.0}` to the
- * buffer.
- *
- * - `buffer`: A buffer
- * - `...`: Arguments explained above
- * - returns: The number of bytes written to the buffer, 0 on failure.
- */
-#define mc_buffer_pack(buffer, ...)                                            \
-    mc_buffer_pack__(buffer, ##__VA_ARGS__, NULL);
-
-/** code
- * Read and unpack data from a buffer. Takes care of alignment automatically. No
- * support for structs, only basic variables and arrays. The maximum size of a
- * buffer that can be automatically packed is 1024 bytes.
- *
- * See `mc_buffer_pack()` for more info.
- *
- * - `buffer`: A buffer
- * - `...`: Arguments explained above
- * - returns: The number of bytes read from the buffer, 0 on failure.
- */
-#define mc_buffer_unpack(buffer, ...)                                          \
-    mc_buffer_unpack__(buffer, ##__VA_ARGS__, NULL);
-
-/** code
- * Create a program from a string.
- *
- * - `code`: A null-terminated string of GLSL code
- * - returns: A program
- */
-mc_Program* mc_program_create(const char* code);
-
-/** code
- * Destroy a program.
- *
- * - `program`: A program
- */
-void mc_program_destroy(mc_Program* program);
-
-/** code
- * Check if there were any errors while compiling the shader code.
- *
- * - `program`: A program
- * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
- *            handled by the library, so dont free)
- */
-char* mc_program_check(mc_Program* program);
-
-/** code
- * Run a program on the GPU. The buffers passed to the program will have their
- * binding set depending on its index in `...`.
- *
- * - `program`: A program
- * - `size`: The number of work groups to dispatch in each dimension
- * - `...`: Buffers to pass to the program
- * - returns: The time taken to run the program (in seconds), it is nonblocking,
- *            so the returned value should be approx 0
- */
-#define mc_program_run_nonblocking(program, size, ...)                         \
-    mc_program_run_nonblocking__(program, size, ##__VA_ARGS__, NULL)
-
-/** code
- * Run a program on the GPU. The buffers passed to the program will have their
- * binding set depending on its index in `...`.
- *
- * Because this calls `mc_finish_tasks()` internally, it may significantly
- * affect performance if called many times in succession.
- *
- * - `program`: A program
- * - `size`: The number of work groups to dispatch in each dimension
- * - `...`: Buffers to pass to the program
- * - returns: The time taken to run the program (in seconds)
- */
-#define mc_program_run_blocking(program, size, ...)                            \
-    mc_program_run_blocking__(program, size, ##__VA_ARGS__, NULL)
-
-/** code
- * Wrapped functions. Do not use them directly, use the wrapping macros.
- */
-
-size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
-size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
-double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...);
-double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
+void mc_program_dispatch(
+    mc_Program_t* self,
+    uint32_t x,
+    uint32_t y,
+    uint32_t z
+);
 
 /** text
  * ## Licence
@@ -346,352 +76,920 @@ double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
 
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
+#include <stdbool.h>
+#include <stdio.h>  // TODO: remove
+#include <stdlib.h> // TODO: custom allocators
+#include <string.h> // TODO: custom allocators
+#include <vulkan/vulkan.h>
 
-#define GLAD_GL_IMPLEMENTATION
-#define GLAD_EGL_IMPLEMENTATION
+#define ENABLE_VALIDATION_LAYERS true // TODO: undef
 
-#include "microcompute_egl.h"
-#include "microcompute_gl.h"
+#define MC_MESSENGER_CREATE_INFO                                               \
+    (VkDebugUtilsMessengerCreateInfoEXT) {                                     \
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,      \
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT     \
+                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT        \
+                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT     \
+                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,      \
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT             \
+                     | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT          \
+                     | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,        \
+        .pfnUserCallback = mc_debug_callback, .pUserData = NULL,               \
+    }
 
 struct mc_State {
-    EGLDisplay disp;
-    EGLContext ctx;
-    mc_debug_cb* debug_cb;
-    void* debug_cb_arg;
+    bool isInitialized;
+
+    VkInstance instance;
+    VkDebugUtilsMessengerEXT messenger;
+    VkPhysicalDevice physicalDevice;
+    uint32_t queueFamilyIndex;
+    VkDevice device;
+
+    PFN_vkCreateDebugUtilsMessengerEXT create_messenger;
+    PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger;
 };
 
-typedef struct mc_Program__ {
-    GLint shader;
-    GLint program;
-    char* error;
-} mc_Program__;
+struct mc_Buffer {
+    bool isInitialized;
+    mc_State_t* state;
 
-typedef struct mc_Buffer__ {
-    GLuint buffer;
-} mc_Buffer__;
+    uint64_t size;
+    void* mappedMemory;
+    VkDeviceMemory memory;
+    VkBuffer buffer;
+};
 
-static struct mc_State S;
+struct mc_Program {
+    bool isInitialized;
+    mc_State_t* state;
 
-#define MC_TYPE_SIZE(type) (((type) >> 8) & 0xFF)
-#define MC_TYPE_ALIGN(type) (((type) >> 16) & 0xFF)
-#define MC_TYPE_ARRAY_LEN(type) (((type) >> 24) & 0xFF)
-#define MC_ALIGN_POS(pos, align)                                               \
-    ((pos) % (align) != 0 ? pos + align - ((pos) % (align)) : pos)
+    uint32_t bufferCount;
+    struct mc_Buffer* buffers;
 
-static void mc_gl_debug_cb__(
-    GLenum source,
-    GLenum type,
-    GLuint id,
-    GLenum severity,
-    GLsizei length,
-    const GLchar* message,
-    const void* arg
+    VkShaderModule shaderModule;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline pipeline;
+    VkDescriptorPool descriptorPool;
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+};
+
+static VkBool32 mc_debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT type,
+    const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
+    __attribute__((unused)) void* userData
 ) {
-    if (!S.debug_cb) return;
-
-    mc_DebugLevel level;
+    char* severityStr;
     switch (severity) {
-        case GL_DEBUG_SEVERITY_NOTIFICATION: level = MC_LVL_INFO; break;
-        case GL_DEBUG_SEVERITY_LOW: level = MC_LVL_LOW; break;
-        case GL_DEBUG_SEVERITY_MEDIUM: level = MC_LVL_MEDIUM; break;
-        case GL_DEBUG_SEVERITY_HIGH: level = MC_LVL_HIGH; break;
-        default: return;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+            severityStr = "verbose";
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+            severityStr = "info";
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+            severityStr = "warning";
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+            severityStr = "error";
+            break;
+        default: severityStr = "unknown"; break;
     }
 
-    uint32_t strLen = snprintf(NULL, 0, "GL: %s", message) + 1;
-    char* str = malloc(strLen);
-    snprintf(str, strLen, "GL: %s", message);
-
-    S.debug_cb(level, str, S.debug_cb_arg);
-
-    free(str);
-}
-
-static char* mc_get_shader_errors__(GLuint shader) {
-    int32_t success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (success) return NULL;
-
-    GLint len;
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-    char* error = malloc(len);
-    glGetShaderInfoLog(shader, len, NULL, error);
-
-    return error;
-}
-
-static char* mc_get_program_errors__(GLuint program) {
-    int32_t success;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (success) return NULL;
-
-    GLint len;
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
-    char* error = malloc(len);
-    glGetProgramInfoLog(program, len, NULL, error);
-
-    return error;
-}
-
-static size_t mc_buffer_iter__(mc_Buffer* buffer, int upload, va_list args) {
-    int data[256] = {0};
-    int pos = 0;
-
-    if (!upload) {
-        uint64_t size = mc_buffer_get_size(buffer);
-        mc_buffer_read(buffer, 0, size > 256 ? 256 : size, data);
+    char* typeStr;
+    switch (type) {
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
+            typeStr = "general";
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
+            typeStr = "validation";
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
+            typeStr = "performance";
+            break;
+        default: typeStr = "unknown"; break;
     }
 
-    while (pos < 256) {
-        mc_ValueType type = va_arg(args, mc_ValueType);
-        if (!type) break;
+    if (severity < VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+        return VK_FALSE;
 
-        int size = MC_TYPE_SIZE(type);
-        int align = MC_TYPE_ALIGN(type);
-        int arrLen = MC_TYPE_ARRAY_LEN(type);
-        void* val = va_arg(args, void*);
-
-        if (arrLen == 0) {
-            pos = MC_ALIGN_POS(pos, align);
-            if (upload) memcpy(&(data[pos]), val, size * sizeof(int));
-            else memcpy(val, &(data[pos]), size * sizeof(int));
-            pos += size;
-        } else {
-            for (int i = 0; i < arrLen; i++) {
-                pos = MC_ALIGN_POS(pos, align);
-                void* element = (int*)val + i * size;
-                if (upload) memcpy(&(data[pos]), element, size * sizeof(int));
-                else memcpy(element, &(data[pos]), size * sizeof(int));
-                pos += size;
-            }
-        }
-    }
-
-    if (pos >= 256) return 0;
-
-    if (upload) {
-        mc_buffer_set_size(buffer, pos * sizeof(int));
-        mc_buffer_write(buffer, 0, pos * sizeof(int), data);
-    }
-
-    return pos * sizeof(int);
+    printf(
+        "VK_MSG (%s, %s, id:%u): %s\n\n",
+        severityStr,
+        typeStr,
+        callbackData->messageIdNumber,
+        callbackData->pMessage
+    );
+    return VK_FALSE;
 }
 
-static void mc_program_run__(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    va_list args
+static uint32_t mc_choose_physical_device_index(
+    uint32_t physicalDeviceCount,
+    VkPhysicalDevice* physicalDevices
 ) {
-    if (program->error) return;
-    glUseProgram(program->program);
+    uint32_t idx = physicalDeviceCount;
 
-    mc_Buffer* buffer;
-    for (int i = 0; (buffer = va_arg(args, mc_Buffer*)); i++)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, buffer->buffer);
+    // find discrete gpu
+    for (uint32_t i = 0; i < physicalDeviceCount; i++) {
+        VkPhysicalDeviceProperties deviceProps;
+        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProps);
+        if (deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            idx = i;
+    }
 
-    glDispatchCompute(workgroupSize.x, workgroupSize.y, workgroupSize.z);
+    if (idx != physicalDeviceCount) return idx;
+
+    // find integrated gpu
+    for (uint32_t i = 0; i < physicalDeviceCount; i++) {
+        VkPhysicalDeviceProperties deviceProps;
+        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProps);
+        if (deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            idx = i;
+    }
+
+    return idx;
 }
 
-char* mc_initialize(mc_debug_cb cb, void* arg) {
-    S.debug_cb = cb;
-    S.debug_cb_arg = arg;
+static uint32_t mc_choose_queue_family_index(
+    uint32_t queueFamilyPropertiesCount,
+    VkQueueFamilyProperties* queueFamilyProperties
+) {
+    uint32_t idx = queueFamilyPropertiesCount;
 
-    if (!gladLoaderLoadEGL(NULL)) return "failed to load egl";
-    S.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (S.disp == EGL_NO_DISPLAY) return "failed to get egl disp";
+    // find dedicated compute queue
+    for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
+        bool g = VK_QUEUE_GRAPHICS_BIT & queueFamilyProperties[i].queueFlags;
+        bool c = VK_QUEUE_COMPUTE_BIT & queueFamilyProperties[i].queueFlags;
+        if (!g && c) idx = i;
+    }
 
-    EGLint major, minor;
-    if (!eglInitialize(S.disp, &major, &minor)) return "failed to init egl";
-    if (major < 1 || (major == 1 && minor < 5)) return "egl version too low";
+    if (idx != queueFamilyPropertiesCount) return idx;
 
-    if (!gladLoaderLoadEGL(S.disp)) return "failed to reload egl";
-    if (!eglBindAPI(EGL_OPENGL_API)) return "failed to bind opengl to egl";
+    // find compute capable queue
+    for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
+        VkQueueFlags c
+            = VK_QUEUE_COMPUTE_BIT & queueFamilyProperties[i].queueFlags;
+        if (c) idx = i;
+    }
 
-    EGLConfig eglCfg;
-    if (!eglChooseConfig(
-            S.disp,
-            (EGLint[]){EGL_NONE},
-            &eglCfg,
-            1,
-            &(EGLint){0}
-        ))
-        return "failed to choose egl config";
+    return idx;
+}
 
-    S.ctx = eglCreateContext(
-        S.disp,
-        eglCfg,
-        EGL_NO_CONTEXT,
-        (EGLint[]){
-            EGL_CONTEXT_MAJOR_VERSION,
-            4,
-            EGL_CONTEXT_MINOR_VERSION,
-            3,
-            EGL_CONTEXT_OPENGL_DEBUG,
-            EGL_TRUE,
-            EGL_NONE,
-        }
+static uint32_t mc_choose_memory_type(
+    VkPhysicalDeviceMemoryProperties memoryProps,
+    uint64_t size
+) {
+    for (uint32_t i = 0; i < memoryProps.memoryTypeCount; i++) {
+        VkMemoryType type = memoryProps.memoryTypes[i];
+        VkMemoryHeap heap = memoryProps.memoryHeaps[type.heapIndex];
+
+        bool v = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & type.propertyFlags;
+        bool c = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT & type.propertyFlags;
+        if (v && c && size < heap.size) return i;
+    }
+
+    return memoryProps.memoryTypeCount;
+}
+
+static void mc_buffer_init(
+    struct mc_Buffer* self,
+    mc_State_t* state,
+    uint64_t size
+) {
+    VkResult res;
+    *self = (struct mc_Buffer){
+        .isInitialized = false,
+        .size = size,
+        .mappedMemory = NULL,
+        .state = state,
+        .memory = NULL,
+        .buffer = NULL,
+    };
+
+    VkPhysicalDeviceMemoryProperties memoryProps;
+    vkGetPhysicalDeviceMemoryProperties(
+        self->state->physicalDevice,
+        &memoryProps
     );
 
-    if (S.ctx == EGL_NO_CONTEXT) return "failed to create egl context";
+    uint32_t memoryTypeIdx = mc_choose_memory_type(memoryProps, self->size);
+    if (memoryTypeIdx == memoryProps.memoryTypeCount) {
+        printf("ERROR: no suitable memory type found\n");
+        return;
+    }
 
-    if (!eglMakeCurrent(S.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, S.ctx))
-        return "failed to make egl context current";
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = NULL,
+        .allocationSize = self->size,
+        .memoryTypeIndex = memoryTypeIdx,
+    };
 
-    if (gladLoaderLoadGL() == 0) return "failed to load gl";
+    res = vkAllocateMemory(
+        self->state->device,
+        &allocInfo,
+        NULL,
+        &self->memory
+    );
 
-    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(mc_gl_debug_cb__, NULL);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkAllocateMemory (%d)\n", res);
+        return;
+    }
 
-    return NULL;
+    vkMapMemory(
+        self->state->device,
+        self->memory,
+        0,
+        self->size,
+        0,
+        &self->mappedMemory
+    );
+
+    VkBufferCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = self->size,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 1,
+        .pQueueFamilyIndices = &self->state->queueFamilyIndex,
+    };
+
+    res = vkCreateBuffer(self->state->device, &createInfo, NULL, &self->buffer);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateBuffer (%d)\n", res);
+        return;
+    }
+
+    res = vkBindBufferMemory(
+        self->state->device,
+        self->buffer,
+        self->memory,
+        0
+    );
+
+    self->isInitialized = true;
 }
 
-void mc_terminate() {
-    if (S.ctx != 0) eglDestroyContext(S.disp, S.ctx);
-    if (S.disp != 0) eglTerminate(S.disp);
+static void mc_buffer_destroy(struct mc_Buffer self) {
+    if (self.buffer) {
+        vkDestroyBuffer(self.state->device, self.buffer, NULL);
+        self.buffer = NULL;
+    }
+
+    if (self.memory) {
+        vkFreeMemory(self.state->device, self.memory, NULL);
+        self.memory = NULL;
+    }
 }
 
-double mc_finish_tasks() {
-    double startTime = mc_get_time();
-    glFinish();
-    return mc_get_time() - startTime;
-}
-
-double mc_get_time() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
-}
-
-mc_Buffer* mc_buffer_create(uint64_t size) {
-    mc_Buffer* buffer = malloc(sizeof *buffer);
-    glGenBuffers(1, &buffer->buffer);
-    mc_buffer_set_size(buffer, size);
-    return buffer;
-}
-
-void mc_buffer_destroy(mc_Buffer* buffer) {
-    if (!buffer) return;
-    if (buffer->buffer) glDeleteBuffers(1, &buffer->buffer);
-    free(buffer);
-}
-
-uint64_t mc_buffer_get_size(mc_Buffer* buffer) {
-    GLint size;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &size);
+static uint64_t mc_buffer_write(
+    struct mc_Buffer self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (offset + size > self.size) return 0;
+    memcpy((char*)self.mappedMemory + offset, data, size);
     return size;
 }
 
-void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_DRAW);
-}
-
-void mc_buffer_write(
-    mc_Buffer* buffer,
+static uint64_t mc_buffer_read(
+    struct mc_Buffer self,
     uint64_t offset,
     uint64_t size,
     void* data
 ) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
+    if (offset + size > self.size) return 0;
+    memcpy(data, (char*)self.mappedMemory + offset, size);
+    return size;
 }
 
-void mc_buffer_read(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
+mc_State_t* mc_state_create(
+
 ) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
-}
+    VkResult res;
+    mc_State_t* self = malloc(sizeof *self);
 
-size_t mc_buffer_pack__(mc_Buffer* buffer, ...) {
-    va_list args;
-    va_start(args, buffer);
-    size_t len = mc_buffer_iter__(buffer, 1, args);
-    va_end(args);
-    return len;
-}
+    *self = (mc_State_t){
+        .isInitialized = false,
+        .instance = NULL,
+        .messenger = NULL,
+        .physicalDevice = NULL,
+        .queueFamilyIndex = 0,
+        .device = NULL,
+    };
 
-size_t mc_buffer_unpack__(mc_Buffer* buffer, ...) {
-    va_list args;
-    va_start(args, buffer);
-    size_t len = mc_buffer_iter__(buffer, 0, args);
-    va_end(args);
-    return len;
-}
+    VkApplicationInfo applicationInfo = {
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pNext = NULL,
+        .pApplicationName = "microcompute",
+        .applicationVersion = 0,
+        .pEngineName = NULL,
+        .engineVersion = 0,
+        .apiVersion = VK_MAKE_VERSION(1, 0, 0),
+    };
 
-mc_Program* mc_program_create(const char* code) {
-    mc_Program* program = malloc(sizeof *program);
-    program->error = NULL;
+    VkInstanceCreateInfo instanceCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pNext = &MC_MESSENGER_CREATE_INFO,
+        .flags = 0,
+        .pApplicationInfo = &applicationInfo,
+        .enabledLayerCount = ENABLE_VALIDATION_LAYERS ? 1 : 0,
+        .ppEnabledLayerNames = (const char*[]){"VK_LAYER_KHRONOS_validation"},
+        .enabledExtensionCount = ENABLE_VALIDATION_LAYERS ? 1 : 0,
+        .ppEnabledExtensionNames = (const char*[]){"VK_EXT_debug_utils"},
+    };
 
-    program->shader = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderSource(program->shader, 1, &code, NULL);
-    glCompileShader(program->shader);
-
-    if ((program->error = mc_get_shader_errors__(program->shader)))
-        return program;
-
-    program->program = glCreateProgram();
-    glAttachShader(program->program, program->shader);
-    glLinkProgram(program->program);
-
-    if ((program->error = mc_get_program_errors__(program->program))) {
-        glDeleteShader(program->shader);
-        return program;
+    res = vkCreateInstance(&instanceCreateInfo, NULL, &self->instance);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateInstance (%d)\n", res);
+        return self;
     }
 
-    return program;
+    self->create_messenger = //
+        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            self->instance,
+            "vkCreateDebugUtilsMessengerEXT"
+        );
+
+    self->destroy_messenger = //
+        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            self->instance,
+            "vkDestroyDebugUtilsMessengerEXT"
+        );
+
+    if (self->create_messenger) {
+        self->create_messenger(
+            self->instance,
+            &MC_MESSENGER_CREATE_INFO,
+            NULL,
+            &self->messenger
+        );
+    }
+
+    uint32_t physicalDeviceCount = 0;
+    res = vkEnumeratePhysicalDevices(
+        self->instance,
+        &physicalDeviceCount,
+        NULL
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkEnumeratePhysicalDevices (%d)\n", res);
+        return self;
+    }
+
+    VkPhysicalDevice* physicalDevices
+        = malloc(sizeof *physicalDevices * physicalDeviceCount);
+
+    res = vkEnumeratePhysicalDevices(
+        self->instance,
+        &physicalDeviceCount,
+        physicalDevices
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkEnumeratePhysicalDevices (%d)\n", res);
+        return self;
+    }
+
+    uint32_t physicalDeviceIndex
+        = mc_choose_physical_device_index(physicalDeviceCount, physicalDevices);
+
+    if (physicalDeviceIndex == physicalDeviceCount) {
+        printf("ERROR: no suitable devices found\n");
+        return self;
+    }
+
+    self->physicalDevice = physicalDevices[physicalDeviceIndex];
+    free(physicalDevices);
+
+    VkPhysicalDeviceProperties deviceProps;
+    vkGetPhysicalDeviceProperties(self->physicalDevice, &deviceProps);
+
+    uint32_t queueFamilyPropertiesCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        self->physicalDevice,
+        &queueFamilyPropertiesCount,
+        NULL
+    );
+
+    VkQueueFamilyProperties* queueFamilyProperties
+        = malloc(sizeof *queueFamilyProperties * queueFamilyPropertiesCount);
+
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        self->physicalDevice,
+        &queueFamilyPropertiesCount,
+        queueFamilyProperties
+    );
+
+    self->queueFamilyIndex = mc_choose_queue_family_index(
+        queueFamilyPropertiesCount,
+        queueFamilyProperties
+    );
+
+    free(queueFamilyProperties);
+
+    if (self->queueFamilyIndex == queueFamilyPropertiesCount) {
+        printf("ERROR: no suitable queue found\n");
+        return self;
+    }
+
+    float queuePriority = 1.0;
+    VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .queueFamilyIndex = self->queueFamilyIndex,
+        .queueCount = 1,
+        .pQueuePriorities = &queuePriority,
+    };
+
+    VkDeviceCreateInfo deviceCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &deviceQueueCreateInfo,
+        .enabledLayerCount = 0,
+        .ppEnabledLayerNames = NULL,
+        .enabledExtensionCount = 0,
+        .ppEnabledExtensionNames = NULL,
+        .pEnabledFeatures = NULL,
+    };
+
+    res = vkCreateDevice(
+        self->physicalDevice,
+        &deviceCreateInfo,
+        0,
+        &self->device
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateDevice (%d)\n", res);
+        return self;
+    }
+
+    self->isInitialized = true;
+    return self;
 }
 
-void mc_program_destroy(mc_Program* program) {
-    if (!program) return;
-    if (program->shader) glDeleteShader(program->shader);
-    if (program->program) glDeleteProgram(program->program);
-    if (program->error) free(program->error);
-    free(program);
+void mc_state_destroy(mc_State_t* self) {
+    if (!self) return;
+
+    if (self->device) {
+        vkDestroyDevice(self->device, NULL);
+        self->device = NULL;
+    }
+
+    if (self->messenger && self->destroy_messenger) {
+        self->destroy_messenger(self->instance, self->messenger, NULL);
+        self->messenger = NULL;
+    }
+
+    if (self->instance) {
+        vkDestroyInstance(self->instance, NULL);
+        self->instance = NULL;
+    }
+
+    free(self);
 }
 
-char* mc_program_check(mc_Program* program) {
-    return program->error;
+mc_Program_t* mc_program_create(
+    mc_State_t* state,
+    uint64_t shaderLength,
+    uint32_t* shader,
+    uint32_t bufferCount,
+    uint64_t* bufferSizes
+) {
+    VkResult res;
+    mc_Program_t* self = malloc(sizeof *self);
+    *self = (mc_Program_t){
+        .isInitialized = false,
+        .state = state,
+        .bufferCount = bufferCount,
+        .buffers = NULL,
+        .shaderModule = NULL,
+        .descriptorSetLayout = NULL,
+        .pipelineLayout = NULL,
+        .pipeline = NULL,
+        .descriptorPool = NULL,
+        .commandPool = NULL,
+    };
+
+    self->buffers = malloc(sizeof *self->buffers * bufferCount);
+
+    for (uint32_t i = 0; i < self->bufferCount; i++) {
+        mc_buffer_init(&self->buffers[i], self->state, bufferSizes[i]);
+        if (!self->buffers[i].isInitialized) {
+            printf("ERROR: failed to initialize buffer (%d)\n", res);
+            return self;
+        }
+    }
+
+    VkShaderModuleCreateInfo shaderModuleCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .codeSize = shaderLength,
+        .pCode = shader,
+    };
+
+    res = vkCreateShaderModule(
+        self->state->device,
+        &shaderModuleCreateInfo,
+        NULL,
+        &self->shaderModule
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateShaderModule (%d)\n", res);
+        return self;
+    }
+
+    VkDescriptorSetLayoutBinding* descriptorSetLayoutBindings
+        = malloc(sizeof *descriptorSetLayoutBindings * bufferCount);
+
+    for (uint32_t i = 0; i < bufferCount; i++) {
+        descriptorSetLayoutBindings[i] = (VkDescriptorSetLayoutBinding){
+            .binding = i,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL,
+        };
+    }
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .bindingCount = bufferCount,
+        .pBindings = descriptorSetLayoutBindings,
+    };
+
+    res = vkCreateDescriptorSetLayout(
+        self->state->device,
+        &descriptorSetLayoutCreateInfo,
+        NULL,
+        &self->descriptorSetLayout
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateDescriptorSetLayout (%d)\n", res);
+        return self;
+    }
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .setLayoutCount = 1,
+        .pSetLayouts = &self->descriptorSetLayout,
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = NULL,
+    };
+
+    res = vkCreatePipelineLayout(
+        self->state->device,
+        &pipelineLayoutCreateInfo,
+        NULL,
+        &self->pipelineLayout
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreatePipelineLayout (%d)\n", res);
+        return self;
+    }
+
+    VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = self->shaderModule,
+        .pName = "main",
+        .pSpecializationInfo = NULL,
+    };
+
+    VkComputePipelineCreateInfo computePipelineCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .stage = pipelineShaderStageCreateInfo,
+        .layout = self->pipelineLayout,
+        .basePipelineHandle = 0,
+        .basePipelineIndex = 0,
+    };
+
+    res = vkCreateComputePipelines(
+        self->state->device,
+        0,
+        1,
+        &computePipelineCreateInfo,
+        NULL,
+        &self->pipeline
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateComputePipelines (%d)\n", res);
+        return self;
+    }
+
+    VkDescriptorPoolSize descriptorPoolSize = {
+        .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = bufferCount,
+    };
+
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .maxSets = 1,
+        .poolSizeCount = 1,
+        .pPoolSizes = &descriptorPoolSize,
+    };
+
+    res = vkCreateDescriptorPool(
+        self->state->device,
+        &descriptorPoolCreateInfo,
+        NULL,
+        &self->descriptorPool
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateDescriptorPool (%d)\n", res);
+        return self;
+    }
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = NULL,
+        .descriptorPool = self->descriptorPool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &self->descriptorSetLayout,
+    };
+
+    VkDescriptorSet descriptorSet;
+    res = vkAllocateDescriptorSets(
+        self->state->device,
+        &descriptorSetAllocateInfo,
+        &descriptorSet
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkAllocateDescriptorSets (%d)\n", res);
+        return self;
+    }
+
+    VkDescriptorBufferInfo* descriptorBufferInfo
+        = malloc(sizeof *descriptorBufferInfo * bufferCount);
+
+    VkWriteDescriptorSet* writeDescriptorSet
+        = malloc(sizeof *writeDescriptorSet * bufferCount);
+
+    for (uint32_t i = 0; i < bufferCount; i++) {
+        descriptorBufferInfo[i] = (VkDescriptorBufferInfo){
+            .buffer = self->buffers[i].buffer,
+            .offset = 0,
+            .range = VK_WHOLE_SIZE,
+        };
+
+        writeDescriptorSet[i] = (VkWriteDescriptorSet){
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = 0,
+            .dstSet = descriptorSet,
+            .dstBinding = i,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pImageInfo = NULL,
+            .pBufferInfo = &descriptorBufferInfo[i],
+            .pTexelBufferView = NULL,
+        };
+    }
+
+    vkUpdateDescriptorSets(
+        self->state->device,
+        bufferCount,
+        writeDescriptorSet,
+        0,
+        NULL
+    );
+
+    VkCommandPoolCreateInfo commandPoolCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .queueFamilyIndex = self->state->queueFamilyIndex,
+    };
+
+    res = vkCreateCommandPool(
+        self->state->device,
+        &commandPoolCreateInfo,
+        NULL,
+        &self->commandPool
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkCreateCommandPool (%d)\n", res);
+        return self;
+    }
+
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = NULL,
+        .commandPool = self->commandPool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+
+    res = vkAllocateCommandBuffers(
+        self->state->device,
+        &commandBufferAllocateInfo,
+        &self->commandBuffer
+    );
+
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkAllocateCommandBuffers (%d)\n", res);
+        return self;
+    }
+
+    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = NULL,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = NULL,
+    };
+
+    res = vkBeginCommandBuffer(self->commandBuffer, &commandBufferBeginInfo);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkBeginCommandBuffer (%d)\n", res);
+        return self;
+    }
+
+    vkCmdBindPipeline(
+        self->commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        self->pipeline
+    );
+
+    vkCmdBindDescriptorSets(
+        self->commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        self->pipelineLayout,
+        0,
+        1,
+        &descriptorSet,
+        0,
+        NULL
+    );
+
+    self->isInitialized = true;
+    return self;
 }
 
-double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...) {
-    va_list args;
-    va_start(args, size);
+void mc_program_destroy(mc_Program_t* self) {
+    if (!self) return;
 
-    double startTime = mc_get_time();
-    mc_program_run__(program, size, args);
-    double time = mc_get_time() - startTime;
+    if (self->buffers) {
+        for (uint32_t i = 0; i < self->bufferCount; i++)
+            mc_buffer_destroy(self->buffers[i]);
+        free(self->buffers);
 
-    va_end(args);
-    return time;
+        self->bufferCount = 0;
+        self->buffers = NULL;
+    }
+
+    if (self->shaderModule) {
+        vkDestroyShaderModule(self->state->device, self->shaderModule, NULL);
+        self->shaderModule = NULL;
+    }
+
+    if (self->descriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(
+            self->state->device,
+            self->descriptorSetLayout,
+            NULL
+        );
+        self->descriptorSetLayout = NULL;
+    }
+
+    if (self->pipelineLayout) {
+        vkDestroyPipelineLayout(
+            self->state->device,
+            self->pipelineLayout,
+            NULL
+        );
+        self->pipelineLayout = NULL;
+    }
+
+    if (self->pipeline) {
+        vkDestroyPipeline(self->state->device, self->pipeline, NULL);
+        self->pipeline = NULL;
+    }
+
+    if (self->descriptorPool) {
+        vkDestroyDescriptorPool(
+            self->state->device,
+            self->descriptorPool,
+            NULL
+        );
+        self->descriptorPool = NULL;
+    }
+
+    if (self->commandPool) {
+        vkDestroyCommandPool(self->state->device, self->commandPool, NULL);
+        self->commandPool = NULL;
+    }
+
+    free(self);
 }
 
-double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...) {
-    va_list args;
-    va_start(args, size);
-
-    double startTime = mc_get_time();
-    mc_program_run__(program, size, args);
-    mc_finish_tasks();
-    double time = mc_get_time() - startTime;
-
-    va_end(args);
-    return time;
+uint32_t mc_program_get_buffer_count(mc_Program_t* self) {
+    return self->bufferCount;
 }
 
-#undef MC_TYPE_SIZE
-#undef MC_TYPE_ALIGN
-#undef MC_TYPE_ARRAY_LEN
-#undef MC_ALIGN_POS
+uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n) {
+    if (n >= self->bufferCount) return 0;
+    return self->buffers[n].size;
+}
+
+uint64_t mc_program_nth_buffer_write(
+    mc_Program_t* self,
+    uint32_t n,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (n >= self->bufferCount) return 0;
+    return mc_buffer_write(self->buffers[n], offset, size, data);
+}
+
+uint64_t mc_program_nth_buffer_read(
+    mc_Program_t* self,
+    uint32_t n,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (n >= self->bufferCount) return 0;
+    return mc_buffer_read(self->buffers[n], offset, size, data);
+}
+
+void mc_program_dispatch(
+    mc_Program_t* self,
+    uint32_t x,
+    uint32_t y,
+    uint32_t z
+) {
+    VkResult res;
+
+    vkCmdDispatch(self->commandBuffer, x, y, z);
+    res = vkEndCommandBuffer(self->commandBuffer);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkEndCommandBuffer (%d)\n", res);
+        return;
+    }
+
+    VkQueue queue;
+    vkGetDeviceQueue(
+        self->state->device,
+        self->state->queueFamilyIndex,
+        0,
+        &queue
+    );
+
+    VkSubmitInfo submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = NULL,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = NULL,
+        .pWaitDstStageMask = NULL,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &self->commandBuffer,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores = NULL,
+    };
+
+    res = vkQueueSubmit(queue, 1, &submitInfo, 0);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkQueueSubmit (%d)\n", res);
+        return;
+    }
+
+    res = vkQueueWaitIdle(queue);
+    if (res != VK_SUCCESS) {
+        printf("ERROR: vkQueueWaitIdle (%d)\n", res);
+        return;
+    }
+}
 
 #endif // MICROCOMPUTE_IMPLEMENTATION
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD
