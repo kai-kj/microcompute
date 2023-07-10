@@ -278,13 +278,15 @@ struct mc_State {
     mc_debug_cb* debug_cb;
 
     VkInstance instance;
-    VkDebugUtilsMessengerEXT messenger;
     VkPhysicalDevice physicalDevice;
     uint32_t queueFamilyIndex;
     VkDevice device;
 
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    VkDebugUtilsMessengerEXT messenger;
     PFN_vkCreateDebugUtilsMessengerEXT create_messenger;
     PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger;
+#endif // MC_ENABLE_VALIDATION_LAYER
 };
 
 struct mc_Buffer {
@@ -325,6 +327,7 @@ static void mc_state_emit_debug_msg(
     self->debug_cb(level, source, message, self->debugArg);
 }
 
+#ifdef MC_ENABLE_VALIDATION_LAYER
 static VkBool32 mc_vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
@@ -348,17 +351,19 @@ static VkBool32 mc_vk_debug_callback(
                 message->pMessage
             );
             return VK_FALSE;
-        default: return VK_FALSE;
+        default: return VK_FALSE; // dont bother with info or verbose
     }
 }
+#endif // MC_ENABLE_VALIDATION_LAYER
 
 static uint32_t mc_choose_physical_device_index(
     uint32_t physicalDeviceCount,
     VkPhysicalDevice* physicalDevices
 ) {
+    // so its easy to tell if no device was found
     uint32_t idx = physicalDeviceCount;
 
-    // find discrete gpu
+    // find discrete gpu, best case
     for (uint32_t i = 0; i < physicalDeviceCount; i++) {
         VkPhysicalDeviceProperties deviceProps;
         vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProps);
@@ -376,28 +381,30 @@ static uint32_t mc_choose_physical_device_index(
             idx = i;
     }
 
-    return idx;
+    if (idx != physicalDeviceCount) return idx;
+
+    return 0; // last resort, return any device
 }
 
 static uint32_t mc_choose_queue_family_index(
-    uint32_t queueFamilyPropertiesCount,
-    VkQueueFamilyProperties* queueFamilyProperties
+    uint32_t queueFamilyPropsCount,
+    VkQueueFamilyProperties* queueFamilyProps
 ) {
-    uint32_t idx = queueFamilyPropertiesCount;
+    // so its easy to tell if no queue was found
+    uint32_t idx = queueFamilyPropsCount;
 
-    // find dedicated compute queue
-    for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
-        bool g = VK_QUEUE_GRAPHICS_BIT & queueFamilyProperties[i].queueFlags;
-        bool c = VK_QUEUE_COMPUTE_BIT & queueFamilyProperties[i].queueFlags;
+    // find dedicated compute queue, best case
+    for (uint32_t i = 0; i < queueFamilyPropsCount; i++) {
+        bool g = VK_QUEUE_GRAPHICS_BIT & queueFamilyProps[i].queueFlags;
+        bool c = VK_QUEUE_COMPUTE_BIT & queueFamilyProps[i].queueFlags;
         if (!g && c) idx = i;
     }
 
-    if (idx != queueFamilyPropertiesCount) return idx;
+    if (idx != queueFamilyPropsCount) return idx;
 
     // find compute capable queue
-    for (uint32_t i = 0; i < queueFamilyPropertiesCount; i++) {
-        VkQueueFlags c
-            = VK_QUEUE_COMPUTE_BIT & queueFamilyProperties[i].queueFlags;
+    for (uint32_t i = 0; i < queueFamilyPropsCount; i++) {
+        VkQueueFlags c = VK_QUEUE_COMPUTE_BIT & queueFamilyProps[i].queueFlags;
         if (c) idx = i;
     }
 
@@ -414,9 +421,12 @@ static uint32_t mc_choose_memory_type(
 
         bool v = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & type.propertyFlags;
         bool c = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT & type.propertyFlags;
+
+        // just return the first memory type that works
         if (v && c && size < heap.size) return i;
     }
 
+    // so its easy to tell that the function failed
     return memoryProps.memoryTypeCount;
 }
 
@@ -464,6 +474,7 @@ static void mc_buffer_init(
         &memoryRequirements
     );
 
+    // check the minimum memory requirement
     if (memoryRequirements.size > self->size)
         self->size = memoryRequirements.size;
 
@@ -508,6 +519,8 @@ static void mc_buffer_init(
         return;
     }
 
+    // reading / writing to self->memory has the same effect as reading /
+    // writing to the buffer
     vkMapMemory(
         self->state->device,
         self->memory,
@@ -542,6 +555,7 @@ static void mc_buffer_finalize(struct mc_Buffer self) {
         "destroying mc_State.buffer[n]"
     );
 
+    // check before freeing
     if (self.buffer) {
         vkDestroyBuffer(self.state->device, self.buffer, NULL);
         self.buffer = NULL;
@@ -579,6 +593,7 @@ static uint64_t mc_buffer_write(
         return 0;
     }
 
+    // since the buffer has been mapped, this is all thats needed
     memcpy((char*)self.mappedMemory + offset, data, size);
     return size;
 }
@@ -609,6 +624,7 @@ static uint64_t mc_buffer_read(
         return 0;
     }
 
+    // since the buffer has been mapped, this is all thats needed
     memcpy(data, (char*)self.mappedMemory + offset, size);
     return size;
 }
@@ -619,7 +635,7 @@ const char* mc_debug_level_to_str(mc_DebugLevel level) {
         case MC_DEBUG_LEVEL_LOW: return "MC_DEBUG_LEVEL_LOW";
         case MC_DEBUG_LEVEL_MEDIUM: return "MC_DEBUG_LEVEL_MEDIUM";
         case MC_DEBUG_LEVEL_HIGH: return "MC_DEBUG_LEVEL_HIGH";
-        default: return "MC_DEBUG_LEVEL_UNKNOWN";
+        default: return "MC_DEBUG_LEVEL_UNKNOWN"; // just incase
     }
 }
 
@@ -632,12 +648,29 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         .debug_cb = debug_cb,
         .debugArg = debugArg,
         .instance = NULL,
-        .messenger = NULL,
         .physicalDevice = NULL,
         .queueFamilyIndex = 0,
         .device = NULL,
+
+#ifdef MC_ENABLE_VALIDATION_LAYER
+        .messenger = NULL,
+        .create_messenger = NULL,
+        .destroy_messenger = NULL,
+#endif // MC_ENABLE_VALIDATION_LAYER
     };
 
+    VkApplicationInfo applicationInfo = {
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pNext = NULL,
+        .pApplicationName = "microcompute",
+        .applicationVersion = 0,
+        .pEngineName = NULL,
+        .engineVersion = 0,
+        .apiVersion = VK_MAKE_VERSION(1, 0, 0),
+    };
+
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    // enable all the validation layer stuff
     VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
@@ -651,19 +684,9 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         .pUserData = self,
     };
 
-    VkApplicationInfo applicationInfo = {
-        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pNext = NULL,
-        .pApplicationName = "microcompute",
-        .applicationVersion = 0,
-        .pEngineName = NULL,
-        .engineVersion = 0,
-        .apiVersion = VK_MAKE_VERSION(1, 0, 0),
-    };
-
     VkInstanceCreateInfo instanceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = &messengerCreateInfo,
+        .pNext = &messengerCreateInfo, // for validation during vkCreateInstance
         .flags = 0,
         .pApplicationInfo = &applicationInfo,
         .enabledLayerCount = 1,
@@ -671,6 +694,18 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         .enabledExtensionCount = 1,
         .ppEnabledExtensionNames = (const char*[]){"VK_EXT_debug_utils"},
     };
+#else
+    VkInstanceCreateInfo instanceCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .pApplicationInfo = &applicationInfo,
+        .enabledLayerCount = 0,
+        .ppEnabledLayerNames = NULL,
+        .enabledExtensionCount = 0,
+        .ppEnabledExtensionNames = NULL,
+    };
+#endif // MC_ENABLE_VALIDATION_LAYER
 
     res = vkCreateInstance(&instanceCreateInfo, NULL, &self->instance);
     if (res != VK_SUCCESS) {
@@ -683,6 +718,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         return self;
     }
 
+#ifdef MC_ENABLE_VALIDATION_LAYER
     self->create_messenger = //
         (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             self->instance,
@@ -695,6 +731,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
             "vkDestroyDebugUtilsMessengerEXT"
         );
 
+    // vkGetInstanceProcAddr() can fail, so just to be sure
     if (self->create_messenger) {
         self->create_messenger(
             self->instance,
@@ -703,6 +740,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
             &self->messenger
         );
     }
+#endif // MC_ENABLE_VALIDATION_LAYER
 
     uint32_t physicalDeviceCount = 0;
     res = vkEnumeratePhysicalDevices(
@@ -853,10 +891,13 @@ void mc_state_destroy(mc_State_t* self) {
         self->device = NULL;
     }
 
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    // self->destroy_messenger might be NULL, so just to be sure
     if (self->messenger && self->destroy_messenger) {
         self->destroy_messenger(self->instance, self->messenger, NULL);
         self->messenger = NULL;
     }
+#endif // MC_ENABLE_VALIDATION_LAYER
 
     if (self->instance) {
         vkDestroyInstance(self->instance, NULL);
@@ -891,6 +932,16 @@ mc_Program_t* mc_program_create(
         .descriptorPool = NULL,
         .commandPool = NULL,
     };
+
+    if (!state->isInitialized) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "mc_State_t not initialized"
+        );
+        return self;
+    }
 
     self->buffers = malloc(sizeof *self->buffers * bufferCount);
 
@@ -932,6 +983,7 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
+    // TODO: this probably needs to be freed
     VkDescriptorSetLayoutBinding* descriptorSetLayoutBindings
         = malloc(sizeof *descriptorSetLayoutBindings * bufferCount);
 
@@ -1003,7 +1055,7 @@ mc_Program_t* mc_program_create(
         .flags = 0,
         .stage = VK_SHADER_STAGE_COMPUTE_BIT,
         .module = self->shaderModule,
-        .pName = "main",
+        .pName = "main", // TODO: make this configurable
         .pSpecializationInfo = NULL,
     };
 
@@ -1091,6 +1143,7 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
+    // TODO: these to buffers should be freed at some point
     VkDescriptorBufferInfo* descriptorBufferInfo
         = malloc(sizeof *descriptorBufferInfo * bufferCount);
 
@@ -1252,10 +1305,30 @@ bool mc_program_is_initialized(mc_Program_t* self) {
 }
 
 uint32_t mc_program_get_buffer_count(mc_Program_t* self) {
+    if (!self->isInitialized) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "mc_Program_t not initialized"
+        );
+        return 0;
+    }
+
     return self->bufferCount;
 }
 
 uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n) {
+    if (!self->isInitialized) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "mc_Program_t not initialized"
+        );
+        return 0;
+    }
+
     if (n >= self->bufferCount) {
         mc_state_emit_debug_msg(
             self->state,
@@ -1275,6 +1348,16 @@ uint64_t mc_program_nth_buffer_write(
     uint64_t size,
     void* data
 ) {
+    if (!self->isInitialized) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "mc_Program_t not initialized"
+        );
+        return 0;
+    }
+
     if (n >= self->bufferCount) {
         mc_state_emit_debug_msg(
             self->state,
@@ -1294,6 +1377,16 @@ uint64_t mc_program_nth_buffer_read(
     uint64_t size,
     void* data
 ) {
+    if (!self->isInitialized) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "mc_Program_t not initialized"
+        );
+        return 0;
+    }
+
     if (n >= self->bufferCount) {
         mc_state_emit_debug_msg(
             self->state,
@@ -1307,7 +1400,17 @@ uint64_t mc_program_nth_buffer_read(
 }
 
 double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
-    VkResult res;
+    if (!self->isInitialized) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "mc_Program_t not initialized"
+        );
+        return -1.0;
+    }
+
+    // an easy mistake to make
     if (size.x * size.y * size.z == 0) {
         mc_state_emit_debug_msg(
             self->state,
@@ -1318,6 +1421,10 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
         return -1.0;
     }
 
+    VkResult res;
+
+    // all the following steps apparently have to be repeated every time the
+    // program is run, but they take no time compared to vkQueueWaitIdle()
     VkCommandBufferBeginInfo commandBufferBeginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = NULL,
