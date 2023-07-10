@@ -1,10 +1,24 @@
 #ifndef MICROCOMPUTE_H_INCLUDE_GUARD
 #define MICROCOMPUTE_H_INCLUDE_GUARD
 
-#define MICROCOMPUTE_IMPLEMENTATION // TODO: remove
+/** text
+ * # `microcompute.h`
+ *
+ * This library contains utilities that can be used to easily run compute
+ * SPIR-V shaders using vulkan. The library is built to be used with GLSL
+ * shaders, although it should also work with other shader types.
+ */
 
+#include <stdbool.h>
 #include <stdint.h>
 
+/** text
+ * ## Types
+ */
+
+/** code
+ * The severity of a debug message.
+ */
 typedef enum mc_DebugLevel {
     MC_DEBUG_LEVEL_INFO,
     MC_DEBUG_LEVEL_LOW,
@@ -13,6 +27,14 @@ typedef enum mc_DebugLevel {
     MC_DEBUG_LEVEL_UNKNOWN,
 } mc_DebugLevel;
 
+/** code
+ * The debug callback type passed to `mc_set_debug_cb()`.
+ *
+ * - `level`: A `mc_DebugLevel` indicating the severity of the message
+ * - `source`: The message source (NULL terminated)
+ * - `msg`: The message contents (NULL terminated)
+ * - `arg`: The value passed to `debugArg` in `mc_state_create()`
+ */
 typedef void(mc_debug_cb)(
     mc_DebugLevel level,
     const char* source,
@@ -20,30 +42,158 @@ typedef void(mc_debug_cb)(
     void* arg
 );
 
+/** code
+ * Basic scalar data types that can be used in GLSL.
+ */
+typedef float mc_float_t;
+typedef int32_t mc_int_t;
+typedef uint32_t mc_uint_t;
+
+/** code
+ * The basic vector types that can be used in GLSL.
+ */
+typedef struct mc_vec2 {
+    mc_float_t x, y;
+} mc_vec2_t;
+
+typedef struct mc_vec3 {
+    mc_float_t x, y, z;
+} mc_vec3_t;
+
+typedef struct mc_vec4 {
+    mc_float_t x, y, z, w;
+} mc_vec4_t;
+
+typedef struct mc_ivec2 {
+    mc_int_t x, y;
+} mc_ivec2_t;
+
+typedef struct mc_ivec3 {
+    mc_int_t x, y, z;
+} mc_ivec3_t;
+
+typedef struct mc_ivec4 {
+    mc_int_t x, y, z, w;
+} mc_ivec4_t;
+
+typedef struct mc_uvec2 {
+    mc_uint_t x, y;
+} mc_uvec2_t;
+
+typedef struct mc_uvec3 {
+    mc_uint_t x, y, z;
+} mc_uvec3_t;
+
+typedef struct mc_uvec4 {
+    mc_uint_t x, y, z, w;
+} mc_uvec4_t;
+
+/** code
+ * The microcompute state type.
+ */
 typedef struct mc_State mc_State_t;
 
+/** code
+ * The program type.
+ */
 typedef struct mc_Program mc_Program_t;
 
+/** text
+ * ## Functions
+ */
+
+/** code
+ * Convert a `mc_DebugLevel` enum to a human readable string.
+ *
+ * - `level`: A `mc_DebugLevel` value
+ * - returns: A human readable string (`NULL` terminated)
+ */
 const char* mc_debug_level_to_str(mc_DebugLevel level);
 
+/** code
+ * Create a `mc_State_t` object.
+ *
+ * - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
+ * - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
+ * - returns: A reference to a `mc_State_t` object
+ */
 mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg);
 
+/** code
+ * Destroy a `mc_State_t` object.
+ *
+ * - `self`: A reference to a `mc_State_t` object
+ */
 void mc_state_destroy(mc_State_t* self);
 
+/** code
+ * Checks whether a `mc_State_t` object has been successfully initialized.
+ *
+ * - `self`: A reference to a `mc_State_t` object
+ * - returns: `true` if successful, `false` otherwise
+ */
+bool mc_state_is_initialized(mc_State_t* self);
+
+/** code
+ * Create a `mc_Program_t` object.
+ *
+ * - `state`: A reference to a `mc_State_t` object
+ * - `shaderSize`: The size of `shader`, in bytes
+ * - `shader`: SPIR-V code
+ * - `bufferCount`: The number of buffers to create
+ * - `bufferSizes`: The sizes of the buffers to create
+ * - returns: A reference to a `mc_Program_t` object
+ */
 mc_Program_t* mc_program_create(
     mc_State_t* state,
-    uint64_t shaderLength,
+    uint64_t shaderSize,
     uint32_t* shader,
     uint32_t bufferCount,
     uint64_t* bufferSizes
 );
 
+/** code
+ * Destroy a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ */
 void mc_program_destroy(mc_Program_t* self);
 
+/** code
+ * Checks whether a `mc_Program_t` object has been successfully initialized.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - returns: `true` if successful, `false` otherwise
+ */
+bool mc_program_is_initialized(mc_Program_t* self);
+
+/** code
+ * Get the number of buffers in a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - returns: The number of buffers
+ */
 uint32_t mc_program_get_buffer_count(mc_Program_t* self);
 
+/** code
+ * Get the size of the `n`th buffer in a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - `n`: The buffer of interest
+ * - returns: The size of the buffer
+ */
 uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n);
 
+/** code
+ * Write data to the `n`th buffer in a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - `n`: The buffer of interest
+ * - `offset`: The offset from witch to start writing the data, in bytes
+ * - `size`: The size of the data to write, in bytes
+ * - `data`: The data to write
+ * - returns: The number of bytes written
+ */
 uint64_t mc_program_nth_buffer_write(
     mc_Program_t* self,
     uint32_t n,
@@ -52,6 +202,16 @@ uint64_t mc_program_nth_buffer_write(
     void* data
 );
 
+/** code
+ * Read data from the `n`th buffer in a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - `n`: The buffer of interest
+ * - `offset`: The offset from witch to start reading the data, in bytes
+ * - `size`: The size of the data to read, in bytes
+ * - `data`: The data to read to
+ * - returns: The number of bytes read
+ */
 uint64_t mc_program_nth_buffer_read(
     mc_Program_t* self,
     uint32_t n,
@@ -60,12 +220,22 @@ uint64_t mc_program_nth_buffer_read(
     void* data
 );
 
-void mc_program_dispatch(
-    mc_Program_t* self,
-    uint32_t x,
-    uint32_t y,
-    uint32_t z
-);
+/** code
+ * Run a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - `size`: The number of work groups to dispatch in each dimension
+ * - returns: The time taken waiting for the compute operation tio finish, in
+ *            seconds
+ */
+double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size);
+
+/** code
+ * Get the current time.
+ *
+ * - returns: The current time, in seconds
+ */
+double mc_get_time();
 
 /** text
  * ## Licence
@@ -96,12 +266,10 @@ void mc_program_dispatch(
 
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
-#include <stdbool.h>
 #include <stdlib.h> // TODO: custom allocators
 #include <string.h> // TODO: custom allocators
+#include <sys/time.h>
 #include <vulkan/vulkan.h>
-
-#define ENABLE_VALIDATION_LAYERS true // TODO: undef
 
 struct mc_State {
     bool isInitialized;
@@ -283,7 +451,7 @@ static void mc_buffer_init(
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_Buffer",
+            "mc_State.buffer[n]",
             "vkCreateBuffer() failed"
         );
         return;
@@ -310,7 +478,7 @@ static void mc_buffer_init(
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_Buffer",
+            "mc_State.buffer[n]",
             "no suitable memory type found"
         );
         return;
@@ -334,7 +502,7 @@ static void mc_buffer_init(
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_Buffer",
+            "mc_State.buffer[n]",
             "vkAllocateMemory() failed"
         );
         return;
@@ -359,8 +527,8 @@ static void mc_buffer_init(
     mc_state_emit_debug_msg(
         self->state,
         MC_DEBUG_LEVEL_INFO,
-        "mc_Buffer",
-        "mc_Buffer successfully initialized"
+        "mc_State.buffer[n]",
+        "mc_State.buffer[n] successfully initialized"
     );
 
     self->isInitialized = true;
@@ -370,8 +538,8 @@ static void mc_buffer_finalize(struct mc_Buffer self) {
     mc_state_emit_debug_msg(
         self.state,
         MC_DEBUG_LEVEL_INFO,
-        "mc_Buffer",
-        "destroying mc_Buffer"
+        "mc_State.buffer[n]",
+        "destroying mc_State.buffer[n]"
     );
 
     if (self.buffer) {
@@ -395,18 +563,18 @@ static uint64_t mc_buffer_write(
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer",
-            "mc_Buffer not initialized"
+            "mc_State.buffer[n]",
+            "mc_State.buffer[n] not initialized"
         );
         return 0;
     }
 
-    if (!self.isInitialized) {
+    if (offset + size > self.size) {
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer",
-            "offset + size > mc_Buffer.size"
+            "mc_State.buffer[n]",
+            "offset + size > mc_State.buffer[n].size"
         );
         return 0;
     }
@@ -425,18 +593,18 @@ static uint64_t mc_buffer_read(
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer",
-            "mc_Buffer not initialized"
+            "mc_State.buffer[n]",
+            "mc_State.buffer[n] not initialized"
         );
         return 0;
     }
 
-    if (!self.isInitialized) {
+    if (offset + size > self.size) {
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer",
-            "offset + size > mc_Buffer.size"
+            "mc_State.buffer[n]",
+            "offset + size > mc_State.buffer[n].size"
         );
         return 0;
     }
@@ -498,9 +666,9 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         .pNext = &messengerCreateInfo,
         .flags = 0,
         .pApplicationInfo = &applicationInfo,
-        .enabledLayerCount = ENABLE_VALIDATION_LAYERS ? 1 : 0,
+        .enabledLayerCount = 1,
         .ppEnabledLayerNames = (const char*[]){"VK_LAYER_KHRONOS_validation"},
-        .enabledExtensionCount = ENABLE_VALIDATION_LAYERS ? 1 : 0,
+        .enabledExtensionCount = 1,
         .ppEnabledExtensionNames = (const char*[]){"VK_EXT_debug_utils"},
     };
 
@@ -698,9 +866,13 @@ void mc_state_destroy(mc_State_t* self) {
     free(self);
 }
 
+bool mc_state_is_initialized(mc_State_t* self) {
+    return self->isInitialized;
+}
+
 mc_Program_t* mc_program_create(
     mc_State_t* state,
-    uint64_t shaderLength,
+    uint64_t shaderSize,
     uint32_t* shader,
     uint32_t bufferCount,
     uint64_t* bufferSizes
@@ -739,7 +911,7 @@ mc_Program_t* mc_program_create(
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = NULL,
         .flags = 0,
-        .codeSize = shaderLength,
+        .codeSize = shaderSize,
         .pCode = shader,
     };
 
@@ -1002,41 +1174,6 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = NULL,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-        .pInheritanceInfo = NULL,
-    };
-
-    res = vkBeginCommandBuffer(self->commandBuffer, &commandBufferBeginInfo);
-    if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkBeginCommandBuffer() failed"
-        );
-        return self;
-    }
-
-    vkCmdBindPipeline(
-        self->commandBuffer,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        self->pipeline
-    );
-
-    vkCmdBindDescriptorSets(
-        self->commandBuffer,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        self->pipelineLayout,
-        0,
-        1,
-        &self->descriptorSet,
-        0,
-        NULL
-    );
-
     mc_state_emit_debug_msg(
         self->state,
         MC_DEBUG_LEVEL_INFO,
@@ -1110,6 +1247,10 @@ void mc_program_destroy(mc_Program_t* self) {
     free(self);
 }
 
+bool mc_program_is_initialized(mc_Program_t* self) {
+    return self->isInitialized;
+}
+
 uint32_t mc_program_get_buffer_count(mc_Program_t* self) {
     return self->bufferCount;
 }
@@ -1165,21 +1306,16 @@ uint64_t mc_program_nth_buffer_read(
     return mc_buffer_read(self->buffers[n], offset, size, data);
 }
 
-void mc_program_dispatch(
-    mc_Program_t* self,
-    uint32_t x,
-    uint32_t y,
-    uint32_t z
-) {
+double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
     VkResult res;
-    if (x * y * z == 0) {
+    if (size.x * size.y * size.z == 0) {
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_MEDIUM,
             "mc_Program_t",
             "at least one dimension is 0"
         );
-        return;
+        return -1.0;
     }
 
     VkCommandBufferBeginInfo commandBufferBeginInfo = {
@@ -1197,7 +1333,7 @@ void mc_program_dispatch(
             "mc_Program_t",
             "vkBeginCommandBuffer() failed"
         );
-        return;
+        return -1.0;
     }
 
     vkCmdBindPipeline(
@@ -1217,7 +1353,7 @@ void mc_program_dispatch(
         NULL
     );
 
-    vkCmdDispatch(self->commandBuffer, x, y, z);
+    vkCmdDispatch(self->commandBuffer, size.x, size.y, size.z);
     res = vkEndCommandBuffer(self->commandBuffer);
     if (res != VK_SUCCESS) {
         mc_state_emit_debug_msg(
@@ -1226,7 +1362,7 @@ void mc_program_dispatch(
             "mc_Program_t",
             "vkEndCommandBuffer() failed"
         );
-        return;
+        return -1.0;
     }
 
     VkQueue queue;
@@ -1257,9 +1393,10 @@ void mc_program_dispatch(
             "mc_Program_t",
             "vkQueueSubmit() failed"
         );
-        return;
+        return -1.0;
     }
 
+    double startTime = mc_get_time();
     res = vkQueueWaitIdle(queue);
     if (res != VK_SUCCESS) {
         mc_state_emit_debug_msg(
@@ -1268,8 +1405,16 @@ void mc_program_dispatch(
             "mc_Program_t",
             "vkQueueWaitIdle() failed"
         );
-        return;
+        return -1.0;
     }
+
+    return mc_get_time() - startTime;
+}
+
+double mc_get_time() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
 
 #endif // MICROCOMPUTE_IMPLEMENTATION

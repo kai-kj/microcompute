@@ -70,7 +70,7 @@ int main(void) {
         );
     }
 
-    mc_program_dispatch(program, BUFFER_LEN, 1, 1);
+    mc_program_dispatch(program, (mc_uvec3_t){BUFFER_LEN, 1, 1});
 
     float data[BUFFER_LEN];
     mc_program_nth_buffer_read(program, 1, 0, sizeof(float) * BUFFER_LEN, data);
