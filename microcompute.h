@@ -1,12 +1,32 @@
 #ifndef MICROCOMPUTE_H_INCLUDE_GUARD
 #define MICROCOMPUTE_H_INCLUDE_GUARD
 
+#define MICROCOMPUTE_IMPLEMENTATION // TODO: remove
+
 #include <stdint.h>
 
+typedef enum mc_DebugLevel {
+    MC_DEBUG_LEVEL_INFO,
+    MC_DEBUG_LEVEL_LOW,
+    MC_DEBUG_LEVEL_MEDIUM,
+    MC_DEBUG_LEVEL_HIGH,
+    MC_DEBUG_LEVEL_UNKNOWN,
+} mc_DebugLevel;
+
+typedef void(mc_debug_cb)(
+    mc_DebugLevel level,
+    const char* source,
+    const char* msg,
+    void* arg
+);
+
 typedef struct mc_State mc_State_t;
+
 typedef struct mc_Program mc_Program_t;
 
-mc_State_t* mc_state_create();
+const char* mc_debug_level_to_str(mc_DebugLevel level);
+
+mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg);
 
 void mc_state_destroy(mc_State_t* self);
 
@@ -77,28 +97,17 @@ void mc_program_dispatch(
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
 #include <stdbool.h>
-#include <stdio.h>  // TODO: remove
 #include <stdlib.h> // TODO: custom allocators
 #include <string.h> // TODO: custom allocators
 #include <vulkan/vulkan.h>
 
 #define ENABLE_VALIDATION_LAYERS true // TODO: undef
 
-#define MC_MESSENGER_CREATE_INFO                                               \
-    (VkDebugUtilsMessengerCreateInfoEXT) {                                     \
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,      \
-        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT     \
-                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT        \
-                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT     \
-                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,      \
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT             \
-                     | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT          \
-                     | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,        \
-        .pfnUserCallback = mc_debug_callback, .pUserData = NULL,               \
-    }
-
 struct mc_State {
     bool isInitialized;
+
+    void* debugArg;
+    mc_debug_cb* debug_cb;
 
     VkInstance instance;
     VkDebugUtilsMessengerEXT messenger;
@@ -116,8 +125,9 @@ struct mc_Buffer {
 
     uint64_t size;
     void* mappedMemory;
-    VkDeviceMemory memory;
+
     VkBuffer buffer;
+    VkDeviceMemory memory;
 };
 
 struct mc_Program {
@@ -133,57 +143,45 @@ struct mc_Program {
     VkPipeline pipeline;
     VkDescriptorPool descriptorPool;
     VkCommandPool commandPool;
+    VkDescriptorSet descriptorSet;
     VkCommandBuffer commandBuffer;
 };
 
-static VkBool32 mc_debug_callback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-    VkDebugUtilsMessageTypeFlagsEXT type,
-    const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
-    __attribute__((unused)) void* userData
+static void mc_state_emit_debug_msg(
+    mc_State_t* self,
+    mc_DebugLevel level,
+    const char* source,
+    const char* message
 ) {
-    char* severityStr;
+    if (!self->debug_cb) return;
+    self->debug_cb(level, source, message, self->debugArg);
+}
+
+static VkBool32 mc_vk_debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
+    const VkDebugUtilsMessengerCallbackDataEXT* message,
+    void* userData
+) {
     switch (severity) {
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-            severityStr = "verbose";
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-            severityStr = "info";
-            break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-            severityStr = "warning";
-            break;
+            mc_state_emit_debug_msg(
+                (mc_State_t*)userData,
+                MC_DEBUG_LEVEL_MEDIUM,
+                "Vulkan",
+                message->pMessage
+            );
+            return VK_FALSE;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-            severityStr = "error";
-            break;
-        default: severityStr = "unknown"; break;
+            mc_state_emit_debug_msg(
+                (mc_State_t*)userData,
+                MC_DEBUG_LEVEL_HIGH,
+                "Vulkan",
+                message->pMessage
+            );
+            return VK_FALSE;
+        default: return VK_FALSE;
     }
-
-    char* typeStr;
-    switch (type) {
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
-            typeStr = "general";
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
-            typeStr = "validation";
-            break;
-        case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
-            typeStr = "performance";
-            break;
-        default: typeStr = "unknown"; break;
-    }
-
-    if (severity < VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-        return VK_FALSE;
-
-    printf(
-        "VK_MSG (%s, %s, id:%u): %s\n\n",
-        severityStr,
-        typeStr,
-        callbackData->messageIdNumber,
-        callbackData->pMessage
-    );
-    return VK_FALSE;
 }
 
 static uint32_t mc_choose_physical_device_index(
@@ -265,9 +263,41 @@ static void mc_buffer_init(
         .size = size,
         .mappedMemory = NULL,
         .state = state,
-        .memory = NULL,
         .buffer = NULL,
+        .memory = NULL,
     };
+
+    VkBufferCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = self->size,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 1,
+        .pQueueFamilyIndices = &self->state->queueFamilyIndex,
+    };
+
+    res = vkCreateBuffer(self->state->device, &createInfo, NULL, &self->buffer);
+    if (res != VK_SUCCESS) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Buffer",
+            "vkCreateBuffer() failed"
+        );
+        return;
+    }
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(
+        self->state->device,
+        self->buffer,
+        &memoryRequirements
+    );
+
+    if (memoryRequirements.size > self->size)
+        self->size = memoryRequirements.size;
 
     VkPhysicalDeviceMemoryProperties memoryProps;
     vkGetPhysicalDeviceMemoryProperties(
@@ -277,7 +307,12 @@ static void mc_buffer_init(
 
     uint32_t memoryTypeIdx = mc_choose_memory_type(memoryProps, self->size);
     if (memoryTypeIdx == memoryProps.memoryTypeCount) {
-        printf("ERROR: no suitable memory type found\n");
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Buffer",
+            "no suitable memory type found"
+        );
         return;
     }
 
@@ -296,7 +331,12 @@ static void mc_buffer_init(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkAllocateMemory (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Buffer",
+            "vkAllocateMemory() failed"
+        );
         return;
     }
 
@@ -309,23 +349,6 @@ static void mc_buffer_init(
         &self->mappedMemory
     );
 
-    VkBufferCreateInfo createInfo = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .size = self->size,
-        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &self->state->queueFamilyIndex,
-    };
-
-    res = vkCreateBuffer(self->state->device, &createInfo, NULL, &self->buffer);
-    if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateBuffer (%d)\n", res);
-        return;
-    }
-
     res = vkBindBufferMemory(
         self->state->device,
         self->buffer,
@@ -333,10 +356,24 @@ static void mc_buffer_init(
         0
     );
 
+    mc_state_emit_debug_msg(
+        self->state,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_Buffer",
+        "mc_Buffer successfully initialized"
+    );
+
     self->isInitialized = true;
 }
 
-static void mc_buffer_destroy(struct mc_Buffer self) {
+static void mc_buffer_finalize(struct mc_Buffer self) {
+    mc_state_emit_debug_msg(
+        self.state,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_Buffer",
+        "destroying mc_Buffer"
+    );
+
     if (self.buffer) {
         vkDestroyBuffer(self.state->device, self.buffer, NULL);
         self.buffer = NULL;
@@ -354,7 +391,26 @@ static uint64_t mc_buffer_write(
     uint64_t size,
     void* data
 ) {
-    if (offset + size > self.size) return 0;
+    if (!self.isInitialized) {
+        mc_state_emit_debug_msg(
+            self.state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer",
+            "mc_Buffer not initialized"
+        );
+        return 0;
+    }
+
+    if (!self.isInitialized) {
+        mc_state_emit_debug_msg(
+            self.state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer",
+            "offset + size > mc_Buffer.size"
+        );
+        return 0;
+    }
+
     memcpy((char*)self.mappedMemory + offset, data, size);
     return size;
 }
@@ -365,24 +421,66 @@ static uint64_t mc_buffer_read(
     uint64_t size,
     void* data
 ) {
-    if (offset + size > self.size) return 0;
+    if (!self.isInitialized) {
+        mc_state_emit_debug_msg(
+            self.state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer",
+            "mc_Buffer not initialized"
+        );
+        return 0;
+    }
+
+    if (!self.isInitialized) {
+        mc_state_emit_debug_msg(
+            self.state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer",
+            "offset + size > mc_Buffer.size"
+        );
+        return 0;
+    }
+
     memcpy(data, (char*)self.mappedMemory + offset, size);
     return size;
 }
 
-mc_State_t* mc_state_create(
+const char* mc_debug_level_to_str(mc_DebugLevel level) {
+    switch (level) {
+        case MC_DEBUG_LEVEL_INFO: return "MC_DEBUG_LEVEL_INFO";
+        case MC_DEBUG_LEVEL_LOW: return "MC_DEBUG_LEVEL_LOW";
+        case MC_DEBUG_LEVEL_MEDIUM: return "MC_DEBUG_LEVEL_MEDIUM";
+        case MC_DEBUG_LEVEL_HIGH: return "MC_DEBUG_LEVEL_HIGH";
+        default: return "MC_DEBUG_LEVEL_UNKNOWN";
+    }
+}
 
-) {
+mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
     VkResult res;
     mc_State_t* self = malloc(sizeof *self);
 
     *self = (mc_State_t){
         .isInitialized = false,
+        .debug_cb = debug_cb,
+        .debugArg = debugArg,
         .instance = NULL,
         .messenger = NULL,
         .physicalDevice = NULL,
         .queueFamilyIndex = 0,
         .device = NULL,
+    };
+
+    VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+                     | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                     | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = mc_vk_debug_callback,
+        .pUserData = self,
     };
 
     VkApplicationInfo applicationInfo = {
@@ -397,7 +495,7 @@ mc_State_t* mc_state_create(
 
     VkInstanceCreateInfo instanceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = &MC_MESSENGER_CREATE_INFO,
+        .pNext = &messengerCreateInfo,
         .flags = 0,
         .pApplicationInfo = &applicationInfo,
         .enabledLayerCount = ENABLE_VALIDATION_LAYERS ? 1 : 0,
@@ -408,7 +506,12 @@ mc_State_t* mc_state_create(
 
     res = vkCreateInstance(&instanceCreateInfo, NULL, &self->instance);
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateInstance (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "vkCreateInstance() failed"
+        );
         return self;
     }
 
@@ -427,7 +530,7 @@ mc_State_t* mc_state_create(
     if (self->create_messenger) {
         self->create_messenger(
             self->instance,
-            &MC_MESSENGER_CREATE_INFO,
+            &messengerCreateInfo,
             NULL,
             &self->messenger
         );
@@ -441,7 +544,12 @@ mc_State_t* mc_state_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkEnumeratePhysicalDevices (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "vkEnumeratePhysicalDevices() failed"
+        );
         return self;
     }
 
@@ -455,7 +563,12 @@ mc_State_t* mc_state_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkEnumeratePhysicalDevices (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "vkEnumeratePhysicalDevices() failed"
+        );
         return self;
     }
 
@@ -463,15 +576,17 @@ mc_State_t* mc_state_create(
         = mc_choose_physical_device_index(physicalDeviceCount, physicalDevices);
 
     if (physicalDeviceIndex == physicalDeviceCount) {
-        printf("ERROR: no suitable devices found\n");
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "no suitable devices found"
+        );
         return self;
     }
 
     self->physicalDevice = physicalDevices[physicalDeviceIndex];
     free(physicalDevices);
-
-    VkPhysicalDeviceProperties deviceProps;
-    vkGetPhysicalDeviceProperties(self->physicalDevice, &deviceProps);
 
     uint32_t queueFamilyPropertiesCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
@@ -497,7 +612,12 @@ mc_State_t* mc_state_create(
     free(queueFamilyProperties);
 
     if (self->queueFamilyIndex == queueFamilyPropertiesCount) {
-        printf("ERROR: no suitable queue found\n");
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "no suitable queue found"
+        );
         return self;
     }
 
@@ -532,16 +652,33 @@ mc_State_t* mc_state_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateDevice (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "vkCreateDevice() failed"
+        );
         return self;
     }
+
+    mc_state_emit_debug_msg(
+        self,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_State_t",
+        "mc_State_t successfully created"
+    );
 
     self->isInitialized = true;
     return self;
 }
 
 void mc_state_destroy(mc_State_t* self) {
-    if (!self) return;
+    mc_state_emit_debug_msg(
+        self,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_State_t",
+        "destroying mc_State_t"
+    );
 
     if (self->device) {
         vkDestroyDevice(self->device, NULL);
@@ -588,7 +725,12 @@ mc_Program_t* mc_program_create(
     for (uint32_t i = 0; i < self->bufferCount; i++) {
         mc_buffer_init(&self->buffers[i], self->state, bufferSizes[i]);
         if (!self->buffers[i].isInitialized) {
-            printf("ERROR: failed to initialize buffer (%d)\n", res);
+            mc_state_emit_debug_msg(
+                self->state,
+                MC_DEBUG_LEVEL_HIGH,
+                "mc_Program",
+                "failed to initialize buffer"
+            );
             return self;
         }
     }
@@ -609,7 +751,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateShaderModule (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkCreateShaderModule() failed"
+        );
         return self;
     }
 
@@ -642,7 +789,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateDescriptorSetLayout (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkCreateDescriptorSetLayout() failed"
+        );
         return self;
     }
 
@@ -664,7 +816,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreatePipelineLayout (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkCreatePipelineLayout() failed"
+        );
         return self;
     }
 
@@ -698,7 +855,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateComputePipelines (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkCreateComputePipelines() failed"
+        );
         return self;
     }
 
@@ -724,7 +886,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateDescriptorPool (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkCreateDescriptorPool() failed"
+        );
         return self;
     }
 
@@ -736,15 +903,19 @@ mc_Program_t* mc_program_create(
         .pSetLayouts = &self->descriptorSetLayout,
     };
 
-    VkDescriptorSet descriptorSet;
     res = vkAllocateDescriptorSets(
         self->state->device,
         &descriptorSetAllocateInfo,
-        &descriptorSet
+        &self->descriptorSet
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkAllocateDescriptorSets (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkAllocateDescriptorSets() failed"
+        );
         return self;
     }
 
@@ -764,7 +935,7 @@ mc_Program_t* mc_program_create(
         writeDescriptorSet[i] = (VkWriteDescriptorSet){
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .pNext = 0,
-            .dstSet = descriptorSet,
+            .dstSet = self->descriptorSet,
             .dstBinding = i,
             .dstArrayElement = 0,
             .descriptorCount = 1,
@@ -786,7 +957,7 @@ mc_Program_t* mc_program_create(
     VkCommandPoolCreateInfo commandPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = NULL,
-        .flags = 0,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = self->state->queueFamilyIndex,
     };
 
@@ -798,7 +969,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkCreateCommandPool (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkCreateCommandPool() failed"
+        );
         return self;
     }
 
@@ -817,7 +993,12 @@ mc_Program_t* mc_program_create(
     );
 
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkAllocateCommandBuffers (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkAllocateCommandBuffers() failed"
+        );
         return self;
     }
 
@@ -830,7 +1011,12 @@ mc_Program_t* mc_program_create(
 
     res = vkBeginCommandBuffer(self->commandBuffer, &commandBufferBeginInfo);
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkBeginCommandBuffer (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkBeginCommandBuffer() failed"
+        );
         return self;
     }
 
@@ -846,9 +1032,16 @@ mc_Program_t* mc_program_create(
         self->pipelineLayout,
         0,
         1,
-        &descriptorSet,
+        &self->descriptorSet,
         0,
         NULL
+    );
+
+    mc_state_emit_debug_msg(
+        self->state,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_Program_t",
+        "mc_Program_t successfully created"
     );
 
     self->isInitialized = true;
@@ -856,11 +1049,16 @@ mc_Program_t* mc_program_create(
 }
 
 void mc_program_destroy(mc_Program_t* self) {
-    if (!self) return;
+    mc_state_emit_debug_msg(
+        self->state,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_Program_t",
+        "destroying mc_Program_t"
+    );
 
     if (self->buffers) {
         for (uint32_t i = 0; i < self->bufferCount; i++)
-            mc_buffer_destroy(self->buffers[i]);
+            mc_buffer_finalize(self->buffers[i]);
         free(self->buffers);
 
         self->bufferCount = 0;
@@ -917,7 +1115,15 @@ uint32_t mc_program_get_buffer_count(mc_Program_t* self) {
 }
 
 uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n) {
-    if (n >= self->bufferCount) return 0;
+    if (n >= self->bufferCount) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "n >= mc_Program_t.bufferCount"
+        );
+        return 0;
+    }
     return self->buffers[n].size;
 }
 
@@ -928,7 +1134,15 @@ uint64_t mc_program_nth_buffer_write(
     uint64_t size,
     void* data
 ) {
-    if (n >= self->bufferCount) return 0;
+    if (n >= self->bufferCount) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "n >= mc_Program_t.bufferCount"
+        );
+        return 0;
+    }
     return mc_buffer_write(self->buffers[n], offset, size, data);
 }
 
@@ -939,7 +1153,15 @@ uint64_t mc_program_nth_buffer_read(
     uint64_t size,
     void* data
 ) {
-    if (n >= self->bufferCount) return 0;
+    if (n >= self->bufferCount) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "n >= mc_Program_t.bufferCount"
+        );
+        return 0;
+    }
     return mc_buffer_read(self->buffers[n], offset, size, data);
 }
 
@@ -950,11 +1172,60 @@ void mc_program_dispatch(
     uint32_t z
 ) {
     VkResult res;
+    if (x * y * z == 0) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Program_t",
+            "at least one dimension is 0"
+        );
+        return;
+    }
+
+    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = NULL,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = NULL,
+    };
+
+    res = vkBeginCommandBuffer(self->commandBuffer, &commandBufferBeginInfo);
+    if (res != VK_SUCCESS) {
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkBeginCommandBuffer() failed"
+        );
+        return;
+    }
+
+    vkCmdBindPipeline(
+        self->commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        self->pipeline
+    );
+
+    vkCmdBindDescriptorSets(
+        self->commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        self->pipelineLayout,
+        0,
+        1,
+        &self->descriptorSet,
+        0,
+        NULL
+    );
 
     vkCmdDispatch(self->commandBuffer, x, y, z);
     res = vkEndCommandBuffer(self->commandBuffer);
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkEndCommandBuffer (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkEndCommandBuffer() failed"
+        );
         return;
     }
 
@@ -980,13 +1251,23 @@ void mc_program_dispatch(
 
     res = vkQueueSubmit(queue, 1, &submitInfo, 0);
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkQueueSubmit (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkQueueSubmit() failed"
+        );
         return;
     }
 
     res = vkQueueWaitIdle(queue);
     if (res != VK_SUCCESS) {
-        printf("ERROR: vkQueueWaitIdle (%d)\n", res);
+        mc_state_emit_debug_msg(
+            self->state,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Program_t",
+            "vkQueueWaitIdle() failed"
+        );
         return;
     }
 }

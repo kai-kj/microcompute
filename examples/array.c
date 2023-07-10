@@ -5,9 +5,9 @@
 #include "microcompute.h"
 
 #define SHADER_FILE "array.spv"
-#define BUFFER_LEN 20
+#define BUFFER_LEN 5
 
-void read_file(const char* path, size_t* length, char* contents) {
+static void read_file(const char* path, size_t* length, char* contents) {
     FILE* fp = fopen(path, "rb");
 
     if (!fp) {
@@ -25,8 +25,18 @@ void read_file(const char* path, size_t* length, char* contents) {
     fclose(fp);
 }
 
+static void debug_cb(
+    mc_DebugLevel level,
+    const char* source,
+    const char* msg,
+    void* arg
+) {
+    (void)!arg;
+    printf("[%s from %s]: %s\n", mc_debug_level_to_str(level), source, msg);
+}
+
 int main(void) {
-    mc_State_t* state = mc_state_create();
+    mc_State_t* state = mc_state_create(debug_cb, NULL);
 
     size_t shaderLen;
     read_file(SHADER_FILE, &shaderLen, NULL);
