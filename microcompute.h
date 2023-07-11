@@ -1088,7 +1088,6 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
-    // TODO: this probably needs to be freed
     VkDescriptorSetLayoutBinding* descriptorSetLayoutBindings
         = self->state->alloc_fn(
             sizeof *descriptorSetLayoutBindings * bufferCount
@@ -1118,6 +1117,8 @@ mc_Program_t* mc_program_create(
         &self->state->allocationCallbacks,
         &self->descriptorSetLayout
     );
+
+    self->state->free_fn(descriptorSetLayoutBindings);
 
     if (res != VK_SUCCESS) {
         mc_state_emit_debug_msg(
@@ -1250,7 +1251,6 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
-    // TODO: these to buffers should be freed at some point
     VkDescriptorBufferInfo* descriptorBufferInfo
         = self->state->alloc_fn(sizeof *descriptorBufferInfo * bufferCount);
 
@@ -1285,6 +1285,9 @@ mc_Program_t* mc_program_create(
         0,
         NULL
     );
+
+    self->state->free_fn(descriptorBufferInfo);
+    self->state->free_fn(writeDescriptorSet);
 
     VkCommandPoolCreateInfo commandPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
