@@ -8,17 +8,6 @@ shaders, although it should also work with other shader types.
 ## Types
 
 ```c
-typedef void*(mc_alloc_fn)(size_t size);
-typedef void(mc_free_fn)(void* ptr);
-typedef void*(mc_realloc_fn)(void* ptr, size_t size);
-```
-
-Custom allocators. The functions have the same signatures as `malloc()`,
-`free()`, and `realloc()`, respectively.
-
-----
-
-```c
 typedef enum mc_DebugLevel {
     MC_DEBUG_LEVEL_INFO,
     MC_DEBUG_LEVEL_LOW,
@@ -46,7 +35,7 @@ The debug callback type passed to `mc_set_debug_cb()`.
 - `level`: A `mc_DebugLevel` indicating the severity of the message
 - `source`: The message source (NULL terminated)
 - `msg`: The message contents (NULL terminated)
-- `arg`: The value passed to `debugArg` in `mc_state_create()`
+- `arg`: The value passed to `debugArg` in `mc_instance_create()`
 
 ----
 
@@ -103,18 +92,13 @@ The basic vector types that can be used in GLSL.
 ----
 
 ```c
-typedef struct mc_State mc_State_t;
-```
-
-The microcompute state type.
-
-----
-
-```c
+typedef struct mc_Instance mc_Instance_t;
+typedef struct mc_Device mc_Device_t;
+typedef struct mc_Buffer mc_Buffer_t;
 typedef struct mc_Program mc_Program_t;
 ```
 
-The program type.
+Core microcompute types.
 
 ----
 
@@ -132,64 +116,191 @@ Convert a `mc_DebugLevel` enum to a human readable string.
 ----
 
 ```c
-mc_State_t* mc_state_create(
-    mc_alloc_fn* alloc_fn,
-    mc_free_fn* free_fn,
-    mc_realloc_fn* realloc_fn,
-    mc_debug_cb* debug_cb,
-    void* debugArg
-);
+mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
 ```
 
-Create a `mc_State_t` object.
+Create a `mc_Instance_t` object.
 
-- `alloc_fn`: A function to use to allocate memory, e.g. `malloc()`
-- `free_fn`: A function to use to free memory, e.g. `free()`
-- `realloc_fn`: A function to use to reallocate memory, e.g. `realloc()`
 - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
 - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
-- returns: A reference to a `mc_State_t` object
+- returns: A reference to a `mc_Instance_t` object
 
 ----
 
 ```c
-void mc_state_destroy(mc_State_t* self);
+void mc_instance_destroy(mc_Instance_t* self);
 ```
 
-Destroy a `mc_State_t` object.
+Destroy a `mc_Instance_t` object.
 
-- `self`: A reference to a `mc_State_t` object
+- `self`: A reference to a `mc_Instance_t` object
 
 ----
 
 ```c
-bool mc_state_is_initialized(mc_State_t* self);
+bool mc_instance_is_initialized(mc_Instance_t* self);
 ```
 
-Checks whether a `mc_State_t` object has been successfully initialized.
+Checks whether a `mc_Instance_t` object has been successfully initialized.
 
-- `self`: A reference to a `mc_State_t` object
+- `self`: A reference to a `mc_Instance_t` object
 - returns: `true` if successful, `false` otherwise
 
 ----
 
 ```c
+uint32_t mc_instance_get_device_count(mc_Instance_t* self);
+```
+
+Get the number of available `mc_Device_t` objects.
+
+- `self`: A reference to a `mc_Instance_t` object
+- returns: The number of devices
+
+----
+
+```c
+mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
+```
+
+Get a list of of available `mc_Device_t` objects.
+
+- `self`: A reference to a `mc_Instance_t` object
+- returns: A list of devices
+
+----
+
+```c
+bool mc_device_is_discrete_gpu(mc_Device_t* self);
+```
+
+Check if a `mc_Device_t` object is a discrete GPU.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: `true` if it is, `false` otherwise
+
+----
+
+```c
+bool mc_device_is_integrated_gpu(mc_Device_t* self);
+```
+
+Check if a `mc_Device_t` object is a integrated GPU.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: `true` if it is, `false` otherwise
+
+----
+
+```c
+mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size);
+```
+
+Create a `mc_Buffer_t` object.
+
+- `device`: A reference to a `mc_Device_t` object
+- `size`: The size of the buffer
+- returns: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+mc_Buffer_t* mc_buffer_from(mc_Device_t* device, uint64_t size, void* data);
+```
+
+Create a `mc_Buffer_t` object and initializes with some data.
+
+- `device`: A reference to a `mc_Device_t` object
+- `size`: The size of the buffer
+- `data`: A reference to the data the initialize the buffer with
+- returns: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+void mc_buffer_destroy(mc_Buffer_t* self);
+```
+
+Destroy a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+bool mc_buffer_is_initialized(mc_Buffer_t* self);
+```
+
+Checks whether a `mc_Buffer_t` object been successfully initialized.
+
+- `self`: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+uint64_t mc_buffer_get_size(mc_Buffer_t* self);
+```
+
+Get the size of a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- returns: The size, in bytes
+
+----
+
+```c
+uint64_t mc_buffer_write(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
+```
+
+Write data to a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- `offset`: The offset from witch to start writing the data, in bytes
+- `size`: The size of the data to write, in bytes
+- `data`: The data to write
+- returns: The number of bytes written
+
+----
+
+```c
+uint64_t mc_buffer_read(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
+```
+
+Read data from a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- `offset`: The offset from witch to start reading the data, in bytes
+- `size`: The size of the data to read, in bytes
+- `data`: Where to read the data to
+- returns: The number of bytes read
+
+----
+
+```c
 mc_Program_t* mc_program_create(
-    mc_State_t* state,
-    uint64_t shaderSize,
-    uint32_t* shader,
-    uint32_t bufferCount,
-    uint64_t* bufferSizes
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint,
+    uint32_t bufferCount
 );
 ```
 
 Create a `mc_Program_t` object.
 
-- `state`: A reference to a `mc_State_t` object
-- `shaderSize`: The size of `shader`, in bytes
-- `shader`: SPIR-V code
-- `bufferCount`: The number of buffers to create
-- `bufferSizes`: The sizes of the buffers to create
+- `device`: A reference to a `mc_Device_t` object
+- `fileName`: The path to the shader code
+- `entryPoint`: The entry point name, generally `"main"`
+- `bufferCount`: The number of buffers to bind
 - returns: A reference to a `mc_Program_t` object
 
 ----
@@ -216,80 +327,17 @@ Checks whether a `mc_Program_t` object has been successfully initialized.
 ----
 
 ```c
-uint32_t mc_program_get_buffer_count(mc_Program_t* self);
-```
-
-Get the number of buffers in a `mc_Program_t` object.
-
-- `self`: A reference to a `mc_Program_t` object
-- returns: The number of buffers
-
-----
-
-```c
-uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n);
-```
-
-Get the size of the `n`th buffer in a `mc_Program_t` object.
-
-- `self`: A reference to a `mc_Program_t` object
-- `n`: The buffer of interest
-- returns: The size of the buffer
-
-----
-
-```c
-uint64_t mc_program_nth_buffer_write(
-    mc_Program_t* self,
-    uint32_t n,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-);
-```
-
-Write data to the `n`th buffer in a `mc_Program_t` object.
-
-- `self`: A reference to a `mc_Program_t` object
-- `n`: The buffer of interest
-- `offset`: The offset from witch to start writing the data, in bytes
-- `size`: The size of the data to write, in bytes
-- `data`: The data to write
-- returns: The number of bytes written
-
-----
-
-```c
-uint64_t mc_program_nth_buffer_read(
-    mc_Program_t* self,
-    uint32_t n,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-);
-```
-
-Read data from the `n`th buffer in a `mc_Program_t` object.
-
-- `self`: A reference to a `mc_Program_t` object
-- `n`: The buffer of interest
-- `offset`: The offset from witch to start reading the data, in bytes
-- `size`: The size of the data to read, in bytes
-- `data`: The data to read to
-- returns: The number of bytes read
-
-----
-
-```c
-double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size);
+double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...);
 ```
 
 Run a `mc_Program_t` object.
 
 - `self`: A reference to a `mc_Program_t` object
 - `size`: The number of work groups to dispatch in each dimension
+- `...`: A list of buffers to bind to the program, must be of the same length
+         as the `bufferCount` value passed to `mc_program_create()`
 - returns: The time taken waiting for the compute operation tio finish, in
-           seconds
+           seconds, -1.0 on fail
 
 ----
 

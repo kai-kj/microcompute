@@ -4,27 +4,6 @@
 #define MICROCOMPUTE_IMPLEMENTATION
 #include "microcompute.h"
 
-#define SHADER_FILE "array.spv"
-#define BUFFER_LEN 5
-
-static void read_file(const char* path, size_t* length, char* contents) {
-    FILE* fp = fopen(path, "rb");
-
-    if (!fp) {
-        if (length) *length = 0;
-        return;
-    }
-
-    fseek(fp, 0, SEEK_END);
-    size_t length_internal = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    if (contents) (void)!fread(contents, 1, length_internal, fp);
-
-    if (length) *length = length_internal;
-    fclose(fp);
-}
-
 static void debug_cb(
     mc_DebugLevel level,
     const char* source,
@@ -36,50 +15,32 @@ static void debug_cb(
 }
 
 int main(void) {
-    mc_State_t* state = mc_state_create(malloc, free, realloc, debug_cb, NULL);
+    mc_Instance_t* instance = mc_instance_create(debug_cb, NULL);
+    mc_Device_t* device = mc_instance_get_devices(instance)[0];
 
-    size_t shaderLen;
-    read_file(SHADER_FILE, &shaderLen, NULL);
+    float arr1[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    mc_Buffer_t* buff1 = mc_buffer_from(device, sizeof arr1, arr1);
 
-    char shader[shaderLen];
-    read_file(SHADER_FILE, NULL, shader);
+    float arr2[] = {10.0, 100.0, 1000.0, 10000.0, 100000.0};
+    mc_Buffer_t* buff2 = mc_buffer_from(device, sizeof arr2, arr2);
 
-    mc_Program_t* program = mc_program_create(
-        state,
-        shaderLen,
-        (uint32_t*)shader,
-        2,
-        (uint64_t[]){sizeof(float) * BUFFER_LEN, sizeof(float) * BUFFER_LEN}
-    );
+    mc_Program_t* program = mc_program_create(device, "array.spv", "main", 2);
 
-    for (uint32_t i = 0; i < mc_program_get_buffer_count(program); i++) {
-        float data[BUFFER_LEN];
-        printf("in[%d] ", i);
-        for (uint32_t j = 0; j < BUFFER_LEN; j++) {
-            data[j] = j + i * mc_program_get_buffer_count(program);
-            printf("%f, ", data[j]);
-        }
-        printf("\n");
+    mc_program_run(program, (mc_uvec3_t){5, 1, 1}, buff1, buff2);
 
-        mc_program_nth_buffer_write(
-            program,
-            i,
-            0,
-            sizeof(float) * BUFFER_LEN,
-            data
-        );
-    }
+    mc_buffer_read(buff1, 0, sizeof arr1, arr1);
+    mc_buffer_read(buff2, 0, sizeof arr2, arr2);
 
-    mc_program_dispatch(program, (mc_uvec3_t){BUFFER_LEN, 1, 1});
-
-    float data[BUFFER_LEN];
-    mc_program_nth_buffer_read(program, 1, 0, sizeof(float) * BUFFER_LEN, data);
-
-    printf("out   ");
-    for (uint32_t i = 0; i < BUFFER_LEN; i++) printf("%f, ", data[i]);
+    printf("arr1: ");
+    for (uint32_t i = 0; i < 5; i++) printf("%f, ", arr1[i]);
     printf("\n");
 
-    mc_program_destroy(program);
+    printf("arr2: ");
+    for (uint32_t i = 0; i < 5; i++) printf("%f, ", arr2[i]);
+    printf("\n");
 
-    mc_state_destroy(state);
+    mc_buffer_destroy(buff1);
+    mc_buffer_destroy(buff2);
+    mc_program_destroy(program);
+    mc_instance_destroy(instance);
 }

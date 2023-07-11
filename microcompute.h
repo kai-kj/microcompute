@@ -11,18 +11,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 /** text
  * ## Types
  */
-
-/** code
- * Custom allocators. The functions have the same signatures as `malloc()`,
- * `free()`, and `realloc()`, respectively.
- */
-typedef void*(mc_alloc_fn)(size_t size);
-typedef void(mc_free_fn)(void* ptr);
-typedef void*(mc_realloc_fn)(void* ptr, size_t size);
 
 /** code
  * The severity of a debug message.
@@ -41,7 +34,7 @@ typedef enum mc_DebugLevel {
  * - `level`: A `mc_DebugLevel` indicating the severity of the message
  * - `source`: The message source (NULL terminated)
  * - `msg`: The message contents (NULL terminated)
- * - `arg`: The value passed to `debugArg` in `mc_state_create()`
+ * - `arg`: The value passed to `debugArg` in `mc_instance_create()`
  */
 typedef void(mc_debug_cb)(
     mc_DebugLevel level,
@@ -97,13 +90,11 @@ typedef struct mc_uvec4 {
 } mc_uvec4_t;
 
 /** code
- * The microcompute state type.
+ * Core microcompute types.
  */
-typedef struct mc_State mc_State_t;
-
-/** code
- * The program type.
- */
+typedef struct mc_Instance mc_Instance_t;
+typedef struct mc_Device mc_Device_t;
+typedef struct mc_Buffer mc_Buffer_t;
 typedef struct mc_Program mc_Program_t;
 
 /** text
@@ -119,54 +110,148 @@ typedef struct mc_Program mc_Program_t;
 const char* mc_debug_level_to_str(mc_DebugLevel level);
 
 /** code
- * Create a `mc_State_t` object.
+ * Create a `mc_Instance_t` object.
  *
- * - `alloc_fn`: A function to use to allocate memory, e.g. `malloc()`
- * - `free_fn`: A function to use to free memory, e.g. `free()`
- * - `realloc_fn`: A function to use to reallocate memory, e.g. `realloc()`
  * - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
  * - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
- * - returns: A reference to a `mc_State_t` object
+ * - returns: A reference to a `mc_Instance_t` object
  */
-mc_State_t* mc_state_create(
-    mc_alloc_fn* alloc_fn,
-    mc_free_fn* free_fn,
-    mc_realloc_fn* realloc_fn,
-    mc_debug_cb* debug_cb,
-    void* debugArg
+mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
+
+/** code
+ * Destroy a `mc_Instance_t` object.
+ *
+ * - `self`: A reference to a `mc_Instance_t` object
+ */
+void mc_instance_destroy(mc_Instance_t* self);
+
+/** code
+ * Checks whether a `mc_Instance_t` object has been successfully initialized.
+ *
+ * - `self`: A reference to a `mc_Instance_t` object
+ * - returns: `true` if successful, `false` otherwise
+ */
+bool mc_instance_is_initialized(mc_Instance_t* self);
+
+/** code
+ * Get the number of available `mc_Device_t` objects.
+ *
+ * - `self`: A reference to a `mc_Instance_t` object
+ * - returns: The number of devices
+ */
+uint32_t mc_instance_get_device_count(mc_Instance_t* self);
+
+/** code
+ * Get a list of of available `mc_Device_t` objects.
+ *
+ * - `self`: A reference to a `mc_Instance_t` object
+ * - returns: A list of devices
+ */
+mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
+
+/** code
+ * Check if a `mc_Device_t` object is a discrete GPU.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: `true` if it is, `false` otherwise
+ */
+bool mc_device_is_discrete_gpu(mc_Device_t* self);
+
+/** code
+ * Check if a `mc_Device_t` object is a integrated GPU.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: `true` if it is, `false` otherwise
+ */
+bool mc_device_is_integrated_gpu(mc_Device_t* self);
+
+/** code
+ * Create a `mc_Buffer_t` object.
+ *
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `size`: The size of the buffer
+ * - returns: A reference to a `mc_Buffer_t` object
+ */
+mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size);
+
+/** code
+ * Create a `mc_Buffer_t` object and initializes with some data.
+ *
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `size`: The size of the buffer
+ * - `data`: A reference to the data the initialize the buffer with
+ * - returns: A reference to a `mc_Buffer_t` object
+ */
+mc_Buffer_t* mc_buffer_from(mc_Device_t* device, uint64_t size, void* data);
+
+/** code
+ * Destroy a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ */
+void mc_buffer_destroy(mc_Buffer_t* self);
+
+/** code
+ * Checks whether a `mc_Buffer_t` object been successfully initialized.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ */
+bool mc_buffer_is_initialized(mc_Buffer_t* self);
+
+/** code
+ * Get the size of a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - returns: The size, in bytes
+ */
+uint64_t mc_buffer_get_size(mc_Buffer_t* self);
+
+/** code
+ * Write data to a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - `offset`: The offset from witch to start writing the data, in bytes
+ * - `size`: The size of the data to write, in bytes
+ * - `data`: The data to write
+ * - returns: The number of bytes written
+ */
+uint64_t mc_buffer_write(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
 );
 
 /** code
- * Destroy a `mc_State_t` object.
+ * Read data from a `mc_Buffer_t` object.
  *
- * - `self`: A reference to a `mc_State_t` object
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - `offset`: The offset from witch to start reading the data, in bytes
+ * - `size`: The size of the data to read, in bytes
+ * - `data`: Where to read the data to
+ * - returns: The number of bytes read
  */
-void mc_state_destroy(mc_State_t* self);
-
-/** code
- * Checks whether a `mc_State_t` object has been successfully initialized.
- *
- * - `self`: A reference to a `mc_State_t` object
- * - returns: `true` if successful, `false` otherwise
- */
-bool mc_state_is_initialized(mc_State_t* self);
+uint64_t mc_buffer_read(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
 
 /** code
  * Create a `mc_Program_t` object.
  *
- * - `state`: A reference to a `mc_State_t` object
- * - `shaderSize`: The size of `shader`, in bytes
- * - `shader`: SPIR-V code
- * - `bufferCount`: The number of buffers to create
- * - `bufferSizes`: The sizes of the buffers to create
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `fileName`: The path to the shader code
+ * - `entryPoint`: The entry point name, generally `"main"`
+ * - `bufferCount`: The number of buffers to bind
  * - returns: A reference to a `mc_Program_t` object
  */
 mc_Program_t* mc_program_create(
-    mc_State_t* state,
-    uint64_t shaderSize,
-    uint32_t* shader,
-    uint32_t bufferCount,
-    uint64_t* bufferSizes
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint,
+    uint32_t bufferCount
 );
 
 /** code
@@ -185,67 +270,16 @@ void mc_program_destroy(mc_Program_t* self);
 bool mc_program_is_initialized(mc_Program_t* self);
 
 /** code
- * Get the number of buffers in a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
- * - returns: The number of buffers
- */
-uint32_t mc_program_get_buffer_count(mc_Program_t* self);
-
-/** code
- * Get the size of the `n`th buffer in a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
- * - `n`: The buffer of interest
- * - returns: The size of the buffer
- */
-uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n);
-
-/** code
- * Write data to the `n`th buffer in a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
- * - `n`: The buffer of interest
- * - `offset`: The offset from witch to start writing the data, in bytes
- * - `size`: The size of the data to write, in bytes
- * - `data`: The data to write
- * - returns: The number of bytes written
- */
-uint64_t mc_program_nth_buffer_write(
-    mc_Program_t* self,
-    uint32_t n,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-);
-
-/** code
- * Read data from the `n`th buffer in a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
- * - `n`: The buffer of interest
- * - `offset`: The offset from witch to start reading the data, in bytes
- * - `size`: The size of the data to read, in bytes
- * - `data`: The data to read to
- * - returns: The number of bytes read
- */
-uint64_t mc_program_nth_buffer_read(
-    mc_Program_t* self,
-    uint32_t n,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-);
-
-/** code
  * Run a `mc_Program_t` object.
  *
  * - `self`: A reference to a `mc_Program_t` object
  * - `size`: The number of work groups to dispatch in each dimension
+ * - `...`: A list of buffers to bind to the program, must be of the same length
+ *          as the `bufferCount` value passed to `mc_program_create()`
  * - returns: The time taken waiting for the compute operation tio finish, in
- *            seconds
+ *            seconds, -1.0 on fail
  */
-double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size);
+double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...);
 
 /** code
  * Get the current time.
@@ -283,25 +317,35 @@ double mc_get_time();
 
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
+#include <stdarg.h>
 #include <string.h>
 #include <sys/time.h>
 #include <vulkan/vulkan.h>
 
-struct mc_State {
-    bool isInitialized;
+#define MC_EMIT_MESSAGE(self, level, source, message)                          \
+    do {                                                                       \
+        if ((self)->debug_cb)                                                  \
+            (self)->debug_cb((level), (source), (message), (self)->debugArg);  \
+    } while (0)
 
-    mc_alloc_fn* alloc_fn;
-    mc_free_fn* free_fn;
-    mc_realloc_fn* realloc_fn;
-    VkAllocationCallbacks allocationCallbacks;
+struct mc_Device {
+    void* debugArg;
+    mc_debug_cb* debug_cb;
+
+    VkPhysicalDevice physicalDevice;
+    uint32_t queueFamilyIndex;
+    VkDevice device;
+};
+
+struct mc_Instance {
+    bool isInitialized;
 
     void* debugArg;
     mc_debug_cb* debug_cb;
 
     VkInstance instance;
-    VkPhysicalDevice physicalDevice;
-    uint32_t queueFamilyIndex;
-    VkDevice device;
+    uint32_t deviceCount;
+    mc_Device_t** devices;
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
     VkDebugUtilsMessengerEXT messenger;
@@ -312,7 +356,7 @@ struct mc_State {
 
 struct mc_Buffer {
     bool isInitialized;
-    mc_State_t* state;
+    mc_Device_t* device;
 
     uint64_t size;
     void* mappedMemory;
@@ -323,30 +367,24 @@ struct mc_Buffer {
 
 struct mc_Program {
     bool isInitialized;
-    mc_State_t* state;
-
-    uint32_t bufferCount;
-    struct mc_Buffer* buffers;
+    mc_Device_t* device;
 
     VkShaderModule shaderModule;
     VkDescriptorSetLayout descriptorSetLayout;
+
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
-    VkDescriptorPool descriptorPool;
-    VkCommandPool commandPool;
-    VkDescriptorSet descriptorSet;
-    VkCommandBuffer commandBuffer;
-};
 
-static void mc_state_emit_debug_msg(
-    mc_State_t* self,
-    mc_DebugLevel level,
-    const char* source,
-    const char* message
-) {
-    if (!self->debug_cb) return;
-    self->debug_cb(level, source, message, self->debugArg);
-}
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSet;
+
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+
+    uint32_t bufferCount;
+    VkDescriptorBufferInfo* descriptorBufferInfo;
+    VkWriteDescriptorSet* writeDescriptorSet;
+};
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
 static VkBool32 mc_vk_debug_callback(
@@ -357,16 +395,16 @@ static VkBool32 mc_vk_debug_callback(
 ) {
     switch (severity) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-            mc_state_emit_debug_msg(
-                (mc_State_t*)userData,
+            MC_EMIT_MESSAGE(
+                (mc_Instance_t*)userData,
                 MC_DEBUG_LEVEL_MEDIUM,
                 "Vulkan",
                 message->pMessage
             );
             return VK_FALSE;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-            mc_state_emit_debug_msg(
-                (mc_State_t*)userData,
+            MC_EMIT_MESSAGE(
+                (mc_Instance_t*)userData,
                 MC_DEBUG_LEVEL_HIGH,
                 "Vulkan",
                 message->pMessage
@@ -376,62 +414,6 @@ static VkBool32 mc_vk_debug_callback(
     }
 }
 #endif // MC_ENABLE_VALIDATION_LAYER
-
-static void* mc_vk_alloc(
-    void* userData,
-    size_t size,
-    __attribute__((unused)) size_t align,
-    __attribute__((unused)) VkSystemAllocationScope scope
-) {
-    mc_State_t* state = (mc_State_t*)userData;
-    return state->alloc_fn(size);
-}
-
-static void* mc_vk_realloc(
-    void* userData,
-    void* ptr,
-    size_t size,
-    __attribute__((unused)) size_t align,
-    __attribute__((unused)) VkSystemAllocationScope scope
-) {
-    mc_State_t* state = (mc_State_t*)userData;
-    return state->realloc_fn(ptr, size);
-}
-
-static void mc_vk_free(void* userData, void* ptr) {
-    mc_State_t* state = (mc_State_t*)userData;
-    state->free_fn(ptr);
-}
-
-static uint32_t mc_choose_physical_device_index(
-    uint32_t physicalDeviceCount,
-    VkPhysicalDevice* physicalDevices
-) {
-    // so its easy to tell if no device was found
-    uint32_t idx = physicalDeviceCount;
-
-    // find discrete gpu, best case
-    for (uint32_t i = 0; i < physicalDeviceCount; i++) {
-        VkPhysicalDeviceProperties deviceProps;
-        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProps);
-        if (deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-            idx = i;
-    }
-
-    if (idx != physicalDeviceCount) return idx;
-
-    // find integrated gpu
-    for (uint32_t i = 0; i < physicalDeviceCount; i++) {
-        VkPhysicalDeviceProperties deviceProps;
-        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProps);
-        if (deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
-            idx = i;
-    }
-
-    if (idx != physicalDeviceCount) return idx;
-
-    return 0; // last resort, return any device
-}
 
 static uint32_t mc_choose_queue_family_index(
     uint32_t queueFamilyPropsCount,
@@ -477,217 +459,15 @@ static uint32_t mc_choose_memory_type(
     return memoryProps.memoryTypeCount;
 }
 
-static void mc_buffer_init(
-    struct mc_Buffer* self,
-    mc_State_t* state,
-    uint64_t size
-) {
-    VkResult res;
-    *self = (struct mc_Buffer){
-        .isInitialized = false,
-        .size = size,
-        .mappedMemory = NULL,
-        .state = state,
-        .buffer = NULL,
-        .memory = NULL,
-    };
-
-    VkBufferCreateInfo createInfo = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .size = self->size,
-        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &self->state->queueFamilyIndex,
-    };
-
-    res = vkCreateBuffer(
-        self->state->device,
-        &createInfo,
-        &self->state->allocationCallbacks,
-        &self->buffer
-    );
-
-    if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_State.buffer*",
-            "vkCreateBuffer() failed"
-        );
-        return;
-    }
-
-    VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(
-        self->state->device,
-        self->buffer,
-        &memoryRequirements
-    );
-
-    // check the minimum memory requirement
-    if (memoryRequirements.size > self->size)
-        self->size = memoryRequirements.size;
-
-    VkPhysicalDeviceMemoryProperties memoryProps;
-    vkGetPhysicalDeviceMemoryProperties(
-        self->state->physicalDevice,
-        &memoryProps
-    );
-
-    uint32_t memoryTypeIdx = mc_choose_memory_type(memoryProps, self->size);
-    if (memoryTypeIdx == memoryProps.memoryTypeCount) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_State.buffer*",
-            "no suitable memory type found"
-        );
-        return;
-    }
-
-    VkMemoryAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext = NULL,
-        .allocationSize = self->size,
-        .memoryTypeIndex = memoryTypeIdx,
-    };
-
-    res = vkAllocateMemory(
-        self->state->device,
-        &allocInfo,
-        &self->state->allocationCallbacks,
-        &self->memory
-    );
-
-    if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_State.buffer*",
-            "vkAllocateMemory() failed"
-        );
-        return;
-    }
-
-    // reading / writing to self->memory has the same effect as reading /
-    // writing to the buffer
-    vkMapMemory(
-        self->state->device,
-        self->memory,
-        0,
-        self->size,
-        0,
-        &self->mappedMemory
-    );
-
-    res = vkBindBufferMemory(
-        self->state->device,
-        self->buffer,
-        self->memory,
-        0
-    );
-
-    mc_state_emit_debug_msg(
-        self->state,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_State.buffer*",
-        "mc_State.buffer* successfully initialized"
-    );
-
-    self->isInitialized = true;
-}
-
-static void mc_buffer_finalize(struct mc_Buffer self) {
-    mc_state_emit_debug_msg(
-        self.state,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_State.buffer*",
-        "destroying mc_State.buffer*"
-    );
-
-    // check before freeing
-    if (self.buffer) {
-        vkDestroyBuffer(
-            self.state->device,
-            self.buffer,
-            &self.state->allocationCallbacks
-        );
-        self.buffer = NULL;
-    }
-
-    if (self.memory) {
-        vkFreeMemory(
-            self.state->device,
-            self.memory,
-            &self.state->allocationCallbacks
-        );
-        self.memory = NULL;
-    }
-}
-
-static uint64_t mc_buffer_write(
-    struct mc_Buffer self,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-) {
-    if (!self.isInitialized) {
-        mc_state_emit_debug_msg(
-            self.state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer*",
-            "mc_State.buffer* not initialized"
-        );
-        return 0;
-    }
-
-    if (offset + size > self.size) {
-        mc_state_emit_debug_msg(
-            self.state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer*",
-            "offset + size > mc_State.buffer*.size"
-        );
-        return 0;
-    }
-
-    // since the buffer has been mapped, this is all thats needed
-    memcpy((char*)self.mappedMemory + offset, data, size);
-    return size;
-}
-
-static uint64_t mc_buffer_read(
-    struct mc_Buffer self,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-) {
-    if (!self.isInitialized) {
-        mc_state_emit_debug_msg(
-            self.state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer*",
-            "mc_State.buffer* not initialized"
-        );
-        return 0;
-    }
-
-    if (offset + size > self.size) {
-        mc_state_emit_debug_msg(
-            self.state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer*",
-            "offset + size > mc_State.buffer*.size"
-        );
-        return 0;
-    }
-
-    // since the buffer has been mapped, this is all thats needed
-    memcpy(data, (char*)self.mappedMemory + offset, size);
-    return size;
+static size_t mc_read_file(const char* path, char* contents) {
+    FILE* fp = fopen(path, "rb");
+    if (!fp) return 0;
+    fseek(fp, 0, SEEK_END);
+    size_t length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (contents) (void)!fread(contents, 1, length, fp);
+    fclose(fp);
+    return length;
 }
 
 const char* mc_debug_level_to_str(mc_DebugLevel level) {
@@ -700,55 +480,25 @@ const char* mc_debug_level_to_str(mc_DebugLevel level) {
     }
 }
 
-mc_State_t* mc_state_create(
-    mc_alloc_fn* alloc_fn,
-    mc_free_fn* free_fn,
-    mc_realloc_fn* realloc_fn,
-    mc_debug_cb* debug_cb,
-    void* debugArg
-) {
+mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     VkResult res;
-    mc_State_t* self = alloc_fn(sizeof *self);
+    mc_Instance_t* self = malloc(sizeof *self);
 
-    *self = (mc_State_t){
+    *self = (mc_Instance_t){
         .isInitialized = false,
 
-        .alloc_fn = alloc_fn,
-        .free_fn = free_fn,
-        .realloc_fn = realloc_fn,
-
-        .debug_cb = debug_cb,
         .debugArg = debugArg,
+        .debug_cb = debug_cb,
 
         .instance = NULL,
-        .physicalDevice = NULL,
-        .queueFamilyIndex = 0,
-        .device = NULL,
+        .deviceCount = 0,
+        .devices = NULL,
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
         .messenger = NULL,
         .create_messenger = NULL,
         .destroy_messenger = NULL,
 #endif // MC_ENABLE_VALIDATION_LAYER
-    };
-
-    if (!(self->alloc_fn && self->free_fn && self->realloc_fn)) {
-        mc_state_emit_debug_msg(
-            self,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
-            "alloc_fn, free_fn, or realloc_fn was NULL"
-        );
-        return self;
-    }
-
-    self->allocationCallbacks = (VkAllocationCallbacks){
-        .pUserData = self,
-        .pfnAllocation = mc_vk_alloc,
-        .pfnReallocation = mc_vk_realloc,
-        .pfnFree = mc_vk_free,
-        .pfnInternalAllocation = NULL,
-        .pfnInternalFree = NULL,
     };
 
     VkApplicationInfo applicationInfo = {
@@ -775,10 +525,10 @@ mc_State_t* mc_state_create(
         .pUserData = self,
     };
 
-    mc_state_emit_debug_msg(
+    MC_EMIT_MESSAGE(
         self,
         MC_DEBUG_LEVEL_INFO,
-        "mc_State_t",
+        "mc_Instance_t",
         "MC_ENABLE_VALIDATION_LAYER enabled"
     );
 #endif // MC_ENABLE_VALIDATION_LAYER
@@ -802,17 +552,13 @@ mc_State_t* mc_state_create(
 #endif // MC_ENABLE_VALIDATION_LAYER
     };
 
-    res = vkCreateInstance(
-        &instanceCreateInfo,
-        &self->allocationCallbacks,
-        &self->instance
-    );
+    res = vkCreateInstance(&instanceCreateInfo, NULL, &self->instance);
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
+        MC_EMIT_MESSAGE(
             self,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
+            "mc_Instance_t",
             "vkCreateInstance() failed"
         );
         return self;
@@ -836,7 +582,7 @@ mc_State_t* mc_state_create(
         self->create_messenger(
             self->instance,
             &messengerCreateInfo,
-            &self->allocationCallbacks,
+            NULL,
             &self->messenger
         );
     }
@@ -850,17 +596,17 @@ mc_State_t* mc_state_create(
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
+        MC_EMIT_MESSAGE(
             self,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
+            "mc_Instance_t",
             "vkEnumeratePhysicalDevices() failed"
         );
         return self;
     }
 
     VkPhysicalDevice* physicalDevices
-        = self->alloc_fn(sizeof *physicalDevices * physicalDeviceCount);
+        = malloc(sizeof *physicalDevices * physicalDeviceCount);
 
     res = vkEnumeratePhysicalDevices(
         self->instance,
@@ -869,218 +615,450 @@ mc_State_t* mc_state_create(
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
+        MC_EMIT_MESSAGE(
             self,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
+            "mc_Instance_t",
             "vkEnumeratePhysicalDevices() failed"
         );
         return self;
     }
 
-    uint32_t physicalDeviceIndex
-        = mc_choose_physical_device_index(physicalDeviceCount, physicalDevices);
+    self->devices = malloc(sizeof *self->devices * physicalDeviceCount);
 
-    if (physicalDeviceIndex == physicalDeviceCount) {
-        mc_state_emit_debug_msg(
-            self,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
-            "no suitable devices found"
+    uint32_t physicalDeviceIndex = 0, deviceIndex = 0;
+    while (physicalDeviceIndex < physicalDeviceCount) {
+        VkPhysicalDevice physicalDevice = physicalDevices[physicalDeviceIndex];
+
+        uint32_t queueFamilyPropertiesCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            physicalDevice,
+            &queueFamilyPropertiesCount,
+            NULL
         );
-        return self;
+
+        VkQueueFamilyProperties* queueFamilyProperties = malloc(
+            sizeof *queueFamilyProperties * queueFamilyPropertiesCount
+        );
+
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            physicalDevice,
+            &queueFamilyPropertiesCount,
+            queueFamilyProperties
+        );
+
+        uint32_t queueFamilyIndex = mc_choose_queue_family_index(
+            queueFamilyPropertiesCount,
+            queueFamilyProperties
+        );
+
+        free(queueFamilyProperties);
+
+        if (queueFamilyIndex == queueFamilyPropertiesCount) {
+            physicalDeviceIndex++;
+            continue;
+        }
+
+        float queuePriority = 1.0;
+        VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .pNext = NULL,
+            .flags = 0,
+            .queueFamilyIndex = queueFamilyIndex,
+            .queueCount = 1,
+            .pQueuePriorities = &queuePriority,
+        };
+
+        VkDeviceCreateInfo deviceCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .pNext = NULL,
+            .flags = 0,
+            .queueCreateInfoCount = 1,
+            .pQueueCreateInfos = &deviceQueueCreateInfo,
+            .enabledLayerCount = 0,
+            .ppEnabledLayerNames = NULL,
+            .enabledExtensionCount = 0,
+            .ppEnabledExtensionNames = NULL,
+            .pEnabledFeatures = NULL,
+        };
+
+        VkDevice device;
+        res = vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device);
+
+        if (res != VK_SUCCESS) {
+            physicalDeviceIndex++;
+            continue;
+        }
+
+        self->devices[deviceIndex] = malloc(sizeof *self->devices[deviceIndex]);
+        *self->devices[deviceIndex] = (mc_Device_t){
+            .debugArg = debugArg,
+            .debug_cb = debug_cb,
+            .physicalDevice = physicalDevice,
+            .queueFamilyIndex = queueFamilyIndex,
+            .device = device,
+        };
+
+        physicalDeviceIndex++;
+        deviceIndex++;
     }
 
-    self->physicalDevice = physicalDevices[physicalDeviceIndex];
-    self->free_fn(physicalDevices);
+    free(physicalDevices);
 
-    uint32_t queueFamilyPropertiesCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(
-        self->physicalDevice,
-        &queueFamilyPropertiesCount,
-        NULL
+    self->deviceCount = deviceIndex;
+    self->isInitialized = true;
+    return self;
+}
+
+void mc_instance_destroy(mc_Instance_t* self) {
+    MC_EMIT_MESSAGE(
+        self,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_Instance_t",
+        "destroying mc_Instance_t"
     );
 
-    VkQueueFamilyProperties* queueFamilyProperties = self->alloc_fn(
-        sizeof *queueFamilyProperties * queueFamilyPropertiesCount
-    );
+    for (uint32_t i = 0; i < self->deviceCount; i++)
+        vkDestroyDevice(self->devices[i]->device, NULL);
 
-    vkGetPhysicalDeviceQueueFamilyProperties(
-        self->physicalDevice,
-        &queueFamilyPropertiesCount,
-        queueFamilyProperties
-    );
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    // self->destroy_messenger might be NULL, so just to be sure
+    if (self->messenger && self->destroy_messenger) {
+        self->destroy_messenger(self->instance, self->messenger, NULL);
+        self->messenger = NULL;
+    }
+#endif // MC_ENABLE_VALIDATION_LAYER
 
-    self->queueFamilyIndex = mc_choose_queue_family_index(
-        queueFamilyPropertiesCount,
-        queueFamilyProperties
-    );
-
-    self->free_fn(queueFamilyProperties);
-
-    if (self->queueFamilyIndex == queueFamilyPropertiesCount) {
-        mc_state_emit_debug_msg(
-            self,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
-            "no suitable queue found"
-        );
-        return self;
+    if (self->instance) {
+        vkDestroyInstance(self->instance, NULL);
+        self->instance = NULL;
     }
 
-    float queuePriority = 1.0;
-    VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .queueFamilyIndex = self->queueFamilyIndex,
-        .queueCount = 1,
-        .pQueuePriorities = &queuePriority,
+    free(self);
+}
+
+bool mc_instance_is_initialized(mc_Instance_t* self) {
+    return self->isInitialized;
+}
+
+uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
+    if (!self->isInitialized) {
+        MC_EMIT_MESSAGE(
+            self,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Instance_t",
+            "mc_Instance_t not initialized"
+        );
+        return 0;
+    }
+    return self->deviceCount;
+}
+
+mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
+    if (!self->isInitialized) {
+        MC_EMIT_MESSAGE(
+            self,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Instance_t",
+            "mc_Instance_t not initialized"
+        );
+        return NULL;
+    }
+    return self->devices;
+}
+
+bool mc_device_is_discrete_gpu(mc_Device_t* device) {
+    VkPhysicalDeviceProperties deviceProps;
+    vkGetPhysicalDeviceProperties(device->physicalDevice, &deviceProps);
+    return deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+}
+
+bool mc_device_is_integrated_gpu(mc_Device_t* device) {
+    VkPhysicalDeviceProperties deviceProps;
+    vkGetPhysicalDeviceProperties(device->physicalDevice, &deviceProps);
+    return deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+}
+
+mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
+    VkResult res;
+    mc_Buffer_t* self = malloc(sizeof *self);
+
+    *self = (mc_Buffer_t){
+        .isInitialized = false,
+        .size = size,
+        .mappedMemory = NULL,
+        .device = device,
+        .buffer = NULL,
+        .memory = NULL,
     };
 
-    VkDeviceCreateInfo deviceCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    VkBufferCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .pNext = NULL,
         .flags = 0,
-        .queueCreateInfoCount = 1,
-        .pQueueCreateInfos = &deviceQueueCreateInfo,
-        .enabledLayerCount = 0,
-        .ppEnabledLayerNames = NULL,
-        .enabledExtensionCount = 0,
-        .ppEnabledExtensionNames = NULL,
-        .pEnabledFeatures = NULL,
+        .size = self->size,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 1,
+        .pQueueFamilyIndices = &self->device->queueFamilyIndex,
     };
 
-    res = vkCreateDevice(
-        self->physicalDevice,
-        &deviceCreateInfo,
-        &self->allocationCallbacks,
-        &self->device
+    res = vkCreateBuffer(
+        self->device->device,
+        &createInfo,
+        NULL,
+        &self->buffer
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State_t",
-            "vkCreateDevice() failed"
+            "mc_Buffer_t",
+            "vkCreateBuffer() failed"
         );
         return self;
     }
 
-    mc_state_emit_debug_msg(
-        self,
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(
+        self->device->device,
+        self->buffer,
+        &memoryRequirements
+    );
+
+    // check the minimum memory requirement
+    if (memoryRequirements.size > self->size)
+        self->size = memoryRequirements.size;
+
+    VkPhysicalDeviceMemoryProperties memoryProps;
+    vkGetPhysicalDeviceMemoryProperties(
+        self->device->physicalDevice,
+        &memoryProps
+    );
+
+    uint32_t memoryTypeIdx = mc_choose_memory_type(memoryProps, self->size);
+    if (memoryTypeIdx == memoryProps.memoryTypeCount) {
+        MC_EMIT_MESSAGE(
+            self->device,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Buffer_t",
+            "no suitable memory type found"
+        );
+        return self;
+    }
+
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = NULL,
+        .allocationSize = self->size,
+        .memoryTypeIndex = memoryTypeIdx,
+    };
+
+    res = vkAllocateMemory(
+        self->device->device,
+        &allocInfo,
+        NULL,
+        &self->memory
+    );
+
+    if (res != VK_SUCCESS) {
+        MC_EMIT_MESSAGE(
+            self->device,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_Buffer_t",
+            "vkAllocateMemory() failed"
+        );
+        return self;
+    }
+
+    // reading / writing to self->memory has the same effect as reading /
+    // writing to the buffer
+    vkMapMemory(
+        self->device->device,
+        self->memory,
+        0,
+        self->size,
+        0,
+        &self->mappedMemory
+    );
+
+    res = vkBindBufferMemory(
+        self->device->device,
+        self->buffer,
+        self->memory,
+        0
+    );
+
+    MC_EMIT_MESSAGE(
+        self->device,
         MC_DEBUG_LEVEL_INFO,
-        "mc_State_t",
-        "mc_State_t successfully created"
+        "mc_Buffer_t",
+        "mc_Buffer_t successfully initialized"
     );
 
     self->isInitialized = true;
     return self;
 }
 
-void mc_state_destroy(mc_State_t* self) {
-    mc_state_emit_debug_msg(
-        self,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_State_t",
-        "destroying mc_State_t"
-    );
+mc_Buffer_t* mc_buffer_from(mc_Device_t* device, uint64_t size, void* data) {
+    mc_Buffer_t* self = mc_buffer_create(device, size);
+    if (!self->isInitialized) return self;
 
-    if (self->device) {
-        vkDestroyDevice(self->device, &self->allocationCallbacks);
-        self->device = NULL;
-    }
-
-#ifdef MC_ENABLE_VALIDATION_LAYER
-    // self->destroy_messenger might be NULL, so just to be sure
-    if (self->messenger && self->destroy_messenger) {
-        self->destroy_messenger(
-            self->instance,
-            self->messenger,
-            &self->allocationCallbacks
-        );
-        self->messenger = NULL;
-    }
-#endif // MC_ENABLE_VALIDATION_LAYER
-
-    if (self->instance) {
-        vkDestroyInstance(self->instance, &self->allocationCallbacks);
-        self->instance = NULL;
-    }
-
-    self->free_fn(self);
+    mc_buffer_write(self, 0, size, data);
+    return self;
 }
 
-bool mc_state_is_initialized(mc_State_t* self) {
+void mc_buffer_destroy(mc_Buffer_t* self) {
+    MC_EMIT_MESSAGE(
+        self->device,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_Buffer_t",
+        "destroying mc_Buffer_t"
+    );
+
+    if (self->memory) {
+        vkFreeMemory(self->device->device, self->memory, NULL);
+        self->memory = NULL;
+    }
+
+    if (self->buffer) {
+        vkDestroyBuffer(self->device->device, self->buffer, NULL);
+        self->buffer = NULL;
+    }
+
+    free(self);
+}
+
+bool mc_buffer_is_initialized(mc_Buffer_t* self) {
     return self->isInitialized;
 }
 
+uint64_t mc_buffer_get_size(mc_Buffer_t* self) {
+    return self->size;
+}
+
+uint64_t mc_buffer_write(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (!self->isInitialized) {
+        MC_EMIT_MESSAGE(
+            self->device,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer_t",
+            "mc_Buffer_t not initialized"
+        );
+        return 0;
+    }
+
+    if (offset + size > self->size) {
+        MC_EMIT_MESSAGE(
+            self->device,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer_t",
+            "offset + size > mc_Buffer_t.size"
+        );
+        return 0;
+    }
+
+    // since the buffer has been mapped, this is all thats needed
+    memcpy((char*)self->mappedMemory + offset, data, size);
+    return size;
+}
+
+uint64_t mc_buffer_read(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (!self->isInitialized) {
+        MC_EMIT_MESSAGE(
+            self->device,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer_t",
+            "mc_Buffer_t not initialized"
+        );
+        return 0;
+    }
+
+    if (offset + size > self->size) {
+        MC_EMIT_MESSAGE(
+            self->device,
+            MC_DEBUG_LEVEL_MEDIUM,
+            "mc_Buffer_t",
+            "offset + size > mc_Buffer_t.size"
+        );
+        return 0;
+    }
+
+    // since the buffer has been mapped, this is all thats needed
+    memcpy(data, (char*)self->mappedMemory + offset, size);
+    return size;
+}
+
 mc_Program_t* mc_program_create(
-    mc_State_t* state,
-    uint64_t shaderSize,
-    uint32_t* shader,
-    uint32_t bufferCount,
-    uint64_t* bufferSizes
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint,
+    uint32_t bufferCount
 ) {
     VkResult res;
-    mc_Program_t* self = state->alloc_fn(sizeof *self);
+    mc_Program_t* self = malloc(sizeof *self);
     *self = (mc_Program_t){
         .isInitialized = false,
-        .state = state,
-        .bufferCount = bufferCount,
-        .buffers = NULL,
+        .device = device,
         .shaderModule = NULL,
         .descriptorSetLayout = NULL,
         .pipelineLayout = NULL,
         .pipeline = NULL,
         .descriptorPool = NULL,
+        .descriptorSet = NULL,
         .commandPool = NULL,
+        .commandBuffer = NULL,
+        .bufferCount = bufferCount,
+        .descriptorBufferInfo = NULL,
+        .writeDescriptorSet = NULL,
     };
 
-    if (!state->isInitialized) {
-        mc_state_emit_debug_msg(
-            self->state,
+    size_t shaderSize = mc_read_file(fileName, NULL);
+
+    if (shaderSize == 0) {
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_MEDIUM,
             "mc_Program_t",
-            "mc_State_t not initialized"
+            "failed to open file `fileName`"
         );
         return self;
     }
 
-    self->buffers = self->state->alloc_fn(sizeof *self->buffers * bufferCount);
-
-    for (uint32_t i = 0; i < self->bufferCount; i++) {
-        mc_buffer_init(&self->buffers[i], self->state, bufferSizes[i]);
-        if (!self->buffers[i].isInitialized) {
-            mc_state_emit_debug_msg(
-                self->state,
-                MC_DEBUG_LEVEL_HIGH,
-                "mc_Program",
-                "failed to initialize buffer"
-            );
-            return self;
-        }
-    }
+    char* shaderCode = malloc(shaderSize);
+    mc_read_file(fileName, shaderCode);
 
     VkShaderModuleCreateInfo shaderModuleCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = NULL,
         .flags = 0,
         .codeSize = shaderSize,
-        .pCode = shader,
+        .pCode = (const uint32_t*)shaderCode,
     };
 
     res = vkCreateShaderModule(
-        self->state->device,
+        self->device->device,
         &shaderModuleCreateInfo,
-        &self->state->allocationCallbacks,
+        NULL,
         &self->shaderModule
     );
 
+    free(shaderCode);
+
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkCreateShaderModule() failed"
@@ -1089,11 +1067,9 @@ mc_Program_t* mc_program_create(
     }
 
     VkDescriptorSetLayoutBinding* descriptorSetLayoutBindings
-        = self->state->alloc_fn(
-            sizeof *descriptorSetLayoutBindings * bufferCount
-        );
+        = malloc(sizeof *descriptorSetLayoutBindings * self->bufferCount);
 
-    for (uint32_t i = 0; i < bufferCount; i++) {
+    for (uint32_t i = 0; i < self->bufferCount; i++) {
         descriptorSetLayoutBindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = i,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -1107,22 +1083,22 @@ mc_Program_t* mc_program_create(
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .flags = 0,
-        .bindingCount = bufferCount,
+        .bindingCount = self->bufferCount,
         .pBindings = descriptorSetLayoutBindings,
     };
 
     res = vkCreateDescriptorSetLayout(
-        self->state->device,
+        self->device->device,
         &descriptorSetLayoutCreateInfo,
-        &self->state->allocationCallbacks,
+        NULL,
         &self->descriptorSetLayout
     );
 
-    self->state->free_fn(descriptorSetLayoutBindings);
+    free(descriptorSetLayoutBindings);
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkCreateDescriptorSetLayout() failed"
@@ -1141,15 +1117,15 @@ mc_Program_t* mc_program_create(
     };
 
     res = vkCreatePipelineLayout(
-        self->state->device,
+        self->device->device,
         &pipelineLayoutCreateInfo,
-        &self->state->allocationCallbacks,
+        NULL,
         &self->pipelineLayout
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkCreatePipelineLayout() failed"
@@ -1163,7 +1139,7 @@ mc_Program_t* mc_program_create(
         .flags = 0,
         .stage = VK_SHADER_STAGE_COMPUTE_BIT,
         .module = self->shaderModule,
-        .pName = "main", // TODO: make this configurable
+        .pName = entryPoint,
         .pSpecializationInfo = NULL,
     };
 
@@ -1178,17 +1154,17 @@ mc_Program_t* mc_program_create(
     };
 
     res = vkCreateComputePipelines(
-        self->state->device,
+        self->device->device,
         0,
         1,
         &computePipelineCreateInfo,
-        &self->state->allocationCallbacks,
+        NULL,
         &self->pipeline
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkCreateComputePipelines() failed"
@@ -1198,28 +1174,28 @@ mc_Program_t* mc_program_create(
 
     VkDescriptorPoolSize descriptorPoolSize = {
         .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        .descriptorCount = bufferCount,
+        .descriptorCount = self->bufferCount,
     };
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .pNext = NULL,
-        .flags = 0,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 1,
         .poolSizeCount = 1,
         .pPoolSizes = &descriptorPoolSize,
     };
 
     res = vkCreateDescriptorPool(
-        self->state->device,
+        self->device->device,
         &descriptorPoolCreateInfo,
-        &self->state->allocationCallbacks,
+        NULL,
         &self->descriptorPool
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkCreateDescriptorPool() failed"
@@ -1236,14 +1212,14 @@ mc_Program_t* mc_program_create(
     };
 
     res = vkAllocateDescriptorSets(
-        self->state->device,
+        self->device->device,
         &descriptorSetAllocateInfo,
         &self->descriptorSet
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkAllocateDescriptorSets() failed"
@@ -1251,61 +1227,23 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
-    VkDescriptorBufferInfo* descriptorBufferInfo
-        = self->state->alloc_fn(sizeof *descriptorBufferInfo * bufferCount);
-
-    VkWriteDescriptorSet* writeDescriptorSet
-        = self->state->alloc_fn(sizeof *writeDescriptorSet * bufferCount);
-
-    for (uint32_t i = 0; i < bufferCount; i++) {
-        descriptorBufferInfo[i] = (VkDescriptorBufferInfo){
-            .buffer = self->buffers[i].buffer,
-            .offset = 0,
-            .range = VK_WHOLE_SIZE,
-        };
-
-        writeDescriptorSet[i] = (VkWriteDescriptorSet){
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .pNext = 0,
-            .dstSet = self->descriptorSet,
-            .dstBinding = i,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .pImageInfo = NULL,
-            .pBufferInfo = &descriptorBufferInfo[i],
-            .pTexelBufferView = NULL,
-        };
-    }
-
-    vkUpdateDescriptorSets(
-        self->state->device,
-        bufferCount,
-        writeDescriptorSet,
-        0,
-        NULL
-    );
-
-    self->state->free_fn(descriptorBufferInfo);
-    self->state->free_fn(writeDescriptorSet);
-
     VkCommandPoolCreateInfo commandPoolCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = NULL,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = self->state->queueFamilyIndex,
+        .queueFamilyIndex = self->device->queueFamilyIndex,
     };
 
     res = vkCreateCommandPool(
-        self->state->device,
+        self->device->device,
         &commandPoolCreateInfo,
-        &self->state->allocationCallbacks,
+        NULL,
         &self->commandPool
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkCreateCommandPool() failed"
@@ -1322,14 +1260,14 @@ mc_Program_t* mc_program_create(
     };
 
     res = vkAllocateCommandBuffers(
-        self->state->device,
+        self->device->device,
         &commandBufferAllocateInfo,
         &self->commandBuffer
     );
 
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkAllocateCommandBuffers() failed"
@@ -1337,194 +1275,106 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
-    mc_state_emit_debug_msg(
-        self->state,
+    MC_EMIT_MESSAGE(
+        self->device,
         MC_DEBUG_LEVEL_INFO,
         "mc_Program_t",
         "mc_Program_t successfully created"
     );
+
+    self->descriptorBufferInfo
+        = malloc(sizeof *self->descriptorBufferInfo * self->bufferCount);
+
+    self->writeDescriptorSet
+        = malloc(sizeof *self->writeDescriptorSet * self->bufferCount);
 
     self->isInitialized = true;
     return self;
 }
 
 void mc_program_destroy(mc_Program_t* self) {
-    mc_state_emit_debug_msg(
-        self->state,
+    MC_EMIT_MESSAGE(
+        self->device,
         MC_DEBUG_LEVEL_INFO,
         "mc_Program_t",
         "destroying mc_Program_t"
     );
 
-    if (self->buffers) {
-        for (uint32_t i = 0; i < self->bufferCount; i++)
-            mc_buffer_finalize(self->buffers[i]);
-        self->state->free_fn(self->buffers);
-
-        self->bufferCount = 0;
-        self->buffers = NULL;
+    if (self->commandBuffer) {
+        vkFreeCommandBuffers(
+            self->device->device,
+            self->commandPool,
+            1,
+            &self->commandBuffer
+        );
+        self->commandBuffer = NULL;
     }
 
-    if (self->shaderModule) {
-        vkDestroyShaderModule(
-            self->state->device,
-            self->shaderModule,
-            &self->state->allocationCallbacks
-        );
-        self->shaderModule = NULL;
+    if (self->commandPool) {
+        vkDestroyCommandPool(self->device->device, self->commandPool, NULL);
+        self->commandPool = NULL;
     }
 
-    if (self->descriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(
-            self->state->device,
-            self->descriptorSetLayout,
-            &self->state->allocationCallbacks
+    if (self->descriptorSet) {
+        vkFreeDescriptorSets(
+            self->device->device,
+            self->descriptorPool,
+            1,
+            &self->descriptorSet
         );
-        self->descriptorSetLayout = NULL;
-    }
-
-    if (self->pipelineLayout) {
-        vkDestroyPipelineLayout(
-            self->state->device,
-            self->pipelineLayout,
-            &self->state->allocationCallbacks
-        );
-        self->pipelineLayout = NULL;
-    }
-
-    if (self->pipeline) {
-        vkDestroyPipeline(
-            self->state->device,
-            self->pipeline,
-            &self->state->allocationCallbacks
-        );
-        self->pipeline = NULL;
+        self->descriptorSet = NULL;
     }
 
     if (self->descriptorPool) {
         vkDestroyDescriptorPool(
-            self->state->device,
+            self->device->device,
             self->descriptorPool,
-            &self->state->allocationCallbacks
+            NULL
         );
         self->descriptorPool = NULL;
     }
 
-    if (self->commandPool) {
-        vkDestroyCommandPool(
-            self->state->device,
-            self->commandPool,
-            &self->state->allocationCallbacks
-        );
-        self->commandPool = NULL;
+    if (self->pipeline) {
+        vkDestroyPipeline(self->device->device, self->pipeline, NULL);
+        self->pipeline = NULL;
     }
 
-    self->state->free_fn(self);
+    if (self->pipelineLayout) {
+        vkDestroyPipelineLayout(
+            self->device->device,
+            self->pipelineLayout,
+            NULL
+        );
+        self->pipelineLayout = NULL;
+    }
+
+    if (self->descriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(
+            self->device->device,
+            self->descriptorSetLayout,
+            NULL
+        );
+        self->descriptorSetLayout = NULL;
+    }
+
+    if (self->shaderModule) {
+        vkDestroyShaderModule(self->device->device, self->shaderModule, NULL);
+        self->shaderModule = NULL;
+    }
+
+    free(self);
 }
 
 bool mc_program_is_initialized(mc_Program_t* self) {
     return self->isInitialized;
 }
 
-uint32_t mc_program_get_buffer_count(mc_Program_t* self) {
+double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...) {
+    VkResult res;
+
     if (!self->isInitialized) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "mc_Program_t not initialized"
-        );
-        return 0;
-    }
-
-    return self->bufferCount;
-}
-
-uint64_t mc_program_nth_buffer_get_size(mc_Program_t* self, uint32_t n) {
-    if (!self->isInitialized) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "mc_Program_t not initialized"
-        );
-        return 0;
-    }
-
-    if (n >= self->bufferCount) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "n >= mc_Program_t.bufferCount"
-        );
-        return 0;
-    }
-    return self->buffers[n].size;
-}
-
-uint64_t mc_program_nth_buffer_write(
-    mc_Program_t* self,
-    uint32_t n,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-) {
-    if (!self->isInitialized) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "mc_Program_t not initialized"
-        );
-        return 0;
-    }
-
-    if (n >= self->bufferCount) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "n >= mc_Program_t.bufferCount"
-        );
-        return 0;
-    }
-    return mc_buffer_write(self->buffers[n], offset, size, data);
-}
-
-uint64_t mc_program_nth_buffer_read(
-    mc_Program_t* self,
-    uint32_t n,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-) {
-    if (!self->isInitialized) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "mc_Program_t not initialized"
-        );
-        return 0;
-    }
-
-    if (n >= self->bufferCount) {
-        mc_state_emit_debug_msg(
-            self->state,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "n >= mc_Program_t.bufferCount"
-        );
-        return 0;
-    }
-    return mc_buffer_read(self->buffers[n], offset, size, data);
-}
-
-double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
-    if (!self->isInitialized) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_MEDIUM,
             "mc_Program_t",
             "mc_Program_t not initialized"
@@ -1533,9 +1383,9 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
     }
 
     // an easy mistake to make
-    if (size.x * size.y * size.z == 0) {
-        mc_state_emit_debug_msg(
-            self->state,
+    if (dims.x * dims.y * dims.z == 0) {
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_MEDIUM,
             "mc_Program_t",
             "at least one dimension is 0"
@@ -1543,10 +1393,52 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
         return -1.0;
     }
 
-    VkResult res;
+    va_list args;
+    va_start(args, dims);
 
-    // all the following steps apparently have to be repeated every time the
-    // program is run, but they take no time compared to vkQueueWaitIdle()
+    for (uint32_t i = 0; i < self->bufferCount; i++) {
+        mc_Buffer_t* buffer = va_arg(args, void*);
+
+        if (!buffer->isInitialized) {
+            MC_EMIT_MESSAGE(
+                self->device,
+                MC_DEBUG_LEVEL_MEDIUM,
+                "mc_Program_t",
+                "at least one buffer has not been initialized"
+            );
+            return -1.0;
+        }
+
+        self->descriptorBufferInfo[i] = (VkDescriptorBufferInfo){
+            .buffer = buffer->buffer,
+            .offset = 0,
+            .range = VK_WHOLE_SIZE,
+        };
+
+        self->writeDescriptorSet[i] = (VkWriteDescriptorSet){
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = 0,
+            .dstSet = self->descriptorSet,
+            .dstBinding = i,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pImageInfo = NULL,
+            .pBufferInfo = &self->descriptorBufferInfo[i],
+            .pTexelBufferView = NULL,
+        };
+    }
+
+    va_end(args);
+
+    vkUpdateDescriptorSets(
+        self->device->device,
+        self->bufferCount,
+        self->writeDescriptorSet,
+        0,
+        NULL
+    );
+
     VkCommandBufferBeginInfo commandBufferBeginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = NULL,
@@ -1556,8 +1448,8 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
 
     res = vkBeginCommandBuffer(self->commandBuffer, &commandBufferBeginInfo);
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkBeginCommandBuffer() failed"
@@ -1582,11 +1474,11 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
         NULL
     );
 
-    vkCmdDispatch(self->commandBuffer, size.x, size.y, size.z);
+    vkCmdDispatch(self->commandBuffer, dims.x, dims.y, dims.z);
     res = vkEndCommandBuffer(self->commandBuffer);
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkEndCommandBuffer() failed"
@@ -1596,8 +1488,8 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
 
     VkQueue queue;
     vkGetDeviceQueue(
-        self->state->device,
-        self->state->queueFamilyIndex,
+        self->device->device,
+        self->device->queueFamilyIndex,
         0,
         &queue
     );
@@ -1616,8 +1508,8 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
 
     res = vkQueueSubmit(queue, 1, &submitInfo, 0);
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkQueueSubmit() failed"
@@ -1628,8 +1520,8 @@ double mc_program_dispatch(mc_Program_t* self, mc_uvec3_t size) {
     double startTime = mc_get_time();
     res = vkQueueWaitIdle(queue);
     if (res != VK_SUCCESS) {
-        mc_state_emit_debug_msg(
-            self->state,
+        MC_EMIT_MESSAGE(
+            self->device,
             MC_DEBUG_LEVEL_HIGH,
             "mc_Program_t",
             "vkQueueWaitIdle() failed"
