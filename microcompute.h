@@ -17,6 +17,14 @@
  */
 
 /** code
+ * Custom allocators. The functions have the same signatures as `malloc()`,
+ * `free()`, and `realloc()`, respectively.
+ */
+typedef void*(mc_alloc_fn)(size_t size);
+typedef void(mc_free_fn)(void* ptr);
+typedef void*(mc_realloc_fn)(void* ptr, size_t size);
+
+/** code
  * The severity of a debug message.
  */
 typedef enum mc_DebugLevel {
@@ -113,11 +121,20 @@ const char* mc_debug_level_to_str(mc_DebugLevel level);
 /** code
  * Create a `mc_State_t` object.
  *
+ * - `alloc_fn`: A function to use to allocate memory, e.g. `malloc()`
+ * - `free_fn`: A function to use to free memory, e.g. `free()`
+ * - `realloc_fn`: A function to use to reallocate memory, e.g. `realloc()`
  * - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
  * - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
  * - returns: A reference to a `mc_State_t` object
  */
-mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg);
+mc_State_t* mc_state_create(
+    mc_alloc_fn* alloc_fn,
+    mc_free_fn* free_fn,
+    mc_realloc_fn* realloc_fn,
+    mc_debug_cb* debug_cb,
+    void* debugArg
+);
 
 /** code
  * Destroy a `mc_State_t` object.
@@ -266,13 +283,17 @@ double mc_get_time();
 
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
-#include <stdlib.h> // TODO: custom allocators
-#include <string.h> // TODO: custom allocators
+#include <string.h>
 #include <sys/time.h>
 #include <vulkan/vulkan.h>
 
 struct mc_State {
     bool isInitialized;
+
+    mc_alloc_fn* alloc_fn;
+    mc_free_fn* free_fn;
+    mc_realloc_fn* realloc_fn;
+    VkAllocationCallbacks allocationCallbacks;
 
     void* debugArg;
     mc_debug_cb* debug_cb;
@@ -355,6 +376,32 @@ static VkBool32 mc_vk_debug_callback(
     }
 }
 #endif // MC_ENABLE_VALIDATION_LAYER
+
+static void* mc_vk_alloc(
+    void* userData,
+    size_t size,
+    __attribute__((unused)) size_t align,
+    __attribute__((unused)) VkSystemAllocationScope scope
+) {
+    mc_State_t* state = (mc_State_t*)userData;
+    return state->alloc_fn(size);
+}
+
+static void* mc_vk_realloc(
+    void* userData,
+    void* ptr,
+    size_t size,
+    __attribute__((unused)) size_t align,
+    __attribute__((unused)) VkSystemAllocationScope scope
+) {
+    mc_State_t* state = (mc_State_t*)userData;
+    return state->realloc_fn(ptr, size);
+}
+
+static void mc_vk_free(void* userData, void* ptr) {
+    mc_State_t* state = (mc_State_t*)userData;
+    state->free_fn(ptr);
+}
 
 static uint32_t mc_choose_physical_device_index(
     uint32_t physicalDeviceCount,
@@ -456,12 +503,18 @@ static void mc_buffer_init(
         .pQueueFamilyIndices = &self->state->queueFamilyIndex,
     };
 
-    res = vkCreateBuffer(self->state->device, &createInfo, NULL, &self->buffer);
+    res = vkCreateBuffer(
+        self->state->device,
+        &createInfo,
+        &self->state->allocationCallbacks,
+        &self->buffer
+    );
+
     if (res != VK_SUCCESS) {
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State.buffer[n]",
+            "mc_State.buffer*",
             "vkCreateBuffer() failed"
         );
         return;
@@ -489,7 +542,7 @@ static void mc_buffer_init(
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State.buffer[n]",
+            "mc_State.buffer*",
             "no suitable memory type found"
         );
         return;
@@ -505,7 +558,7 @@ static void mc_buffer_init(
     res = vkAllocateMemory(
         self->state->device,
         &allocInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->memory
     );
 
@@ -513,7 +566,7 @@ static void mc_buffer_init(
         mc_state_emit_debug_msg(
             self->state,
             MC_DEBUG_LEVEL_HIGH,
-            "mc_State.buffer[n]",
+            "mc_State.buffer*",
             "vkAllocateMemory() failed"
         );
         return;
@@ -540,8 +593,8 @@ static void mc_buffer_init(
     mc_state_emit_debug_msg(
         self->state,
         MC_DEBUG_LEVEL_INFO,
-        "mc_State.buffer[n]",
-        "mc_State.buffer[n] successfully initialized"
+        "mc_State.buffer*",
+        "mc_State.buffer* successfully initialized"
     );
 
     self->isInitialized = true;
@@ -551,18 +604,26 @@ static void mc_buffer_finalize(struct mc_Buffer self) {
     mc_state_emit_debug_msg(
         self.state,
         MC_DEBUG_LEVEL_INFO,
-        "mc_State.buffer[n]",
-        "destroying mc_State.buffer[n]"
+        "mc_State.buffer*",
+        "destroying mc_State.buffer*"
     );
 
     // check before freeing
     if (self.buffer) {
-        vkDestroyBuffer(self.state->device, self.buffer, NULL);
+        vkDestroyBuffer(
+            self.state->device,
+            self.buffer,
+            &self.state->allocationCallbacks
+        );
         self.buffer = NULL;
     }
 
     if (self.memory) {
-        vkFreeMemory(self.state->device, self.memory, NULL);
+        vkFreeMemory(
+            self.state->device,
+            self.memory,
+            &self.state->allocationCallbacks
+        );
         self.memory = NULL;
     }
 }
@@ -577,8 +638,8 @@ static uint64_t mc_buffer_write(
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer[n]",
-            "mc_State.buffer[n] not initialized"
+            "mc_State.buffer*",
+            "mc_State.buffer* not initialized"
         );
         return 0;
     }
@@ -587,8 +648,8 @@ static uint64_t mc_buffer_write(
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer[n]",
-            "offset + size > mc_State.buffer[n].size"
+            "mc_State.buffer*",
+            "offset + size > mc_State.buffer*.size"
         );
         return 0;
     }
@@ -608,8 +669,8 @@ static uint64_t mc_buffer_read(
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer[n]",
-            "mc_State.buffer[n] not initialized"
+            "mc_State.buffer*",
+            "mc_State.buffer* not initialized"
         );
         return 0;
     }
@@ -618,8 +679,8 @@ static uint64_t mc_buffer_read(
         mc_state_emit_debug_msg(
             self.state,
             MC_DEBUG_LEVEL_MEDIUM,
-            "mc_State.buffer[n]",
-            "offset + size > mc_State.buffer[n].size"
+            "mc_State.buffer*",
+            "offset + size > mc_State.buffer*.size"
         );
         return 0;
     }
@@ -639,14 +700,26 @@ const char* mc_debug_level_to_str(mc_DebugLevel level) {
     }
 }
 
-mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
+mc_State_t* mc_state_create(
+    mc_alloc_fn* alloc_fn,
+    mc_free_fn* free_fn,
+    mc_realloc_fn* realloc_fn,
+    mc_debug_cb* debug_cb,
+    void* debugArg
+) {
     VkResult res;
-    mc_State_t* self = malloc(sizeof *self);
+    mc_State_t* self = alloc_fn(sizeof *self);
 
     *self = (mc_State_t){
         .isInitialized = false,
+
+        .alloc_fn = alloc_fn,
+        .free_fn = free_fn,
+        .realloc_fn = realloc_fn,
+
         .debug_cb = debug_cb,
         .debugArg = debugArg,
+
         .instance = NULL,
         .physicalDevice = NULL,
         .queueFamilyIndex = 0,
@@ -657,6 +730,25 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         .create_messenger = NULL,
         .destroy_messenger = NULL,
 #endif // MC_ENABLE_VALIDATION_LAYER
+    };
+
+    if (!(self->alloc_fn && self->free_fn && self->realloc_fn)) {
+        mc_state_emit_debug_msg(
+            self,
+            MC_DEBUG_LEVEL_HIGH,
+            "mc_State_t",
+            "alloc_fn, free_fn, or realloc_fn was NULL"
+        );
+        return self;
+    }
+
+    self->allocationCallbacks = (VkAllocationCallbacks){
+        .pUserData = self,
+        .pfnAllocation = mc_vk_alloc,
+        .pfnReallocation = mc_vk_realloc,
+        .pfnFree = mc_vk_free,
+        .pfnInternalAllocation = NULL,
+        .pfnInternalFree = NULL,
     };
 
     VkApplicationInfo applicationInfo = {
@@ -670,7 +762,6 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
     };
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-    // enable all the validation layer stuff
     VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
@@ -684,30 +775,39 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         .pUserData = self,
     };
 
+    mc_state_emit_debug_msg(
+        self,
+        MC_DEBUG_LEVEL_INFO,
+        "mc_State_t",
+        "MC_ENABLE_VALIDATION_LAYER enabled"
+    );
+#endif // MC_ENABLE_VALIDATION_LAYER
+
     VkInstanceCreateInfo instanceCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = &messengerCreateInfo, // for validation during vkCreateInstance
         .flags = 0,
         .pApplicationInfo = &applicationInfo,
+#ifdef MC_ENABLE_VALIDATION_LAYER
+        .pNext = &messengerCreateInfo, // for validation during vkCreateInstance
         .enabledLayerCount = 1,
         .ppEnabledLayerNames = (const char*[]){"VK_LAYER_KHRONOS_validation"},
         .enabledExtensionCount = 1,
         .ppEnabledExtensionNames = (const char*[]){"VK_EXT_debug_utils"},
-    };
 #else
-    VkInstanceCreateInfo instanceCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = NULL,
-        .flags = 0,
-        .pApplicationInfo = &applicationInfo,
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = NULL,
         .enabledExtensionCount = 0,
         .ppEnabledExtensionNames = NULL,
-    };
 #endif // MC_ENABLE_VALIDATION_LAYER
+    };
 
-    res = vkCreateInstance(&instanceCreateInfo, NULL, &self->instance);
+    res = vkCreateInstance(
+        &instanceCreateInfo,
+        &self->allocationCallbacks,
+        &self->instance
+    );
+
     if (res != VK_SUCCESS) {
         mc_state_emit_debug_msg(
             self,
@@ -736,7 +836,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         self->create_messenger(
             self->instance,
             &messengerCreateInfo,
-            NULL,
+            &self->allocationCallbacks,
             &self->messenger
         );
     }
@@ -760,7 +860,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
     }
 
     VkPhysicalDevice* physicalDevices
-        = malloc(sizeof *physicalDevices * physicalDeviceCount);
+        = self->alloc_fn(sizeof *physicalDevices * physicalDeviceCount);
 
     res = vkEnumeratePhysicalDevices(
         self->instance,
@@ -792,7 +892,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
     }
 
     self->physicalDevice = physicalDevices[physicalDeviceIndex];
-    free(physicalDevices);
+    self->free_fn(physicalDevices);
 
     uint32_t queueFamilyPropertiesCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
@@ -801,8 +901,9 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         NULL
     );
 
-    VkQueueFamilyProperties* queueFamilyProperties
-        = malloc(sizeof *queueFamilyProperties * queueFamilyPropertiesCount);
+    VkQueueFamilyProperties* queueFamilyProperties = self->alloc_fn(
+        sizeof *queueFamilyProperties * queueFamilyPropertiesCount
+    );
 
     vkGetPhysicalDeviceQueueFamilyProperties(
         self->physicalDevice,
@@ -815,7 +916,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
         queueFamilyProperties
     );
 
-    free(queueFamilyProperties);
+    self->free_fn(queueFamilyProperties);
 
     if (self->queueFamilyIndex == queueFamilyPropertiesCount) {
         mc_state_emit_debug_msg(
@@ -853,7 +954,7 @@ mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg) {
     res = vkCreateDevice(
         self->physicalDevice,
         &deviceCreateInfo,
-        0,
+        &self->allocationCallbacks,
         &self->device
     );
 
@@ -887,24 +988,28 @@ void mc_state_destroy(mc_State_t* self) {
     );
 
     if (self->device) {
-        vkDestroyDevice(self->device, NULL);
+        vkDestroyDevice(self->device, &self->allocationCallbacks);
         self->device = NULL;
     }
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
     // self->destroy_messenger might be NULL, so just to be sure
     if (self->messenger && self->destroy_messenger) {
-        self->destroy_messenger(self->instance, self->messenger, NULL);
+        self->destroy_messenger(
+            self->instance,
+            self->messenger,
+            &self->allocationCallbacks
+        );
         self->messenger = NULL;
     }
 #endif // MC_ENABLE_VALIDATION_LAYER
 
     if (self->instance) {
-        vkDestroyInstance(self->instance, NULL);
+        vkDestroyInstance(self->instance, &self->allocationCallbacks);
         self->instance = NULL;
     }
 
-    free(self);
+    self->free_fn(self);
 }
 
 bool mc_state_is_initialized(mc_State_t* self) {
@@ -919,7 +1024,7 @@ mc_Program_t* mc_program_create(
     uint64_t* bufferSizes
 ) {
     VkResult res;
-    mc_Program_t* self = malloc(sizeof *self);
+    mc_Program_t* self = state->alloc_fn(sizeof *self);
     *self = (mc_Program_t){
         .isInitialized = false,
         .state = state,
@@ -943,7 +1048,7 @@ mc_Program_t* mc_program_create(
         return self;
     }
 
-    self->buffers = malloc(sizeof *self->buffers * bufferCount);
+    self->buffers = self->state->alloc_fn(sizeof *self->buffers * bufferCount);
 
     for (uint32_t i = 0; i < self->bufferCount; i++) {
         mc_buffer_init(&self->buffers[i], self->state, bufferSizes[i]);
@@ -969,7 +1074,7 @@ mc_Program_t* mc_program_create(
     res = vkCreateShaderModule(
         self->state->device,
         &shaderModuleCreateInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->shaderModule
     );
 
@@ -985,7 +1090,9 @@ mc_Program_t* mc_program_create(
 
     // TODO: this probably needs to be freed
     VkDescriptorSetLayoutBinding* descriptorSetLayoutBindings
-        = malloc(sizeof *descriptorSetLayoutBindings * bufferCount);
+        = self->state->alloc_fn(
+            sizeof *descriptorSetLayoutBindings * bufferCount
+        );
 
     for (uint32_t i = 0; i < bufferCount; i++) {
         descriptorSetLayoutBindings[i] = (VkDescriptorSetLayoutBinding){
@@ -1008,7 +1115,7 @@ mc_Program_t* mc_program_create(
     res = vkCreateDescriptorSetLayout(
         self->state->device,
         &descriptorSetLayoutCreateInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->descriptorSetLayout
     );
 
@@ -1035,7 +1142,7 @@ mc_Program_t* mc_program_create(
     res = vkCreatePipelineLayout(
         self->state->device,
         &pipelineLayoutCreateInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->pipelineLayout
     );
 
@@ -1074,7 +1181,7 @@ mc_Program_t* mc_program_create(
         0,
         1,
         &computePipelineCreateInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->pipeline
     );
 
@@ -1105,7 +1212,7 @@ mc_Program_t* mc_program_create(
     res = vkCreateDescriptorPool(
         self->state->device,
         &descriptorPoolCreateInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->descriptorPool
     );
 
@@ -1145,10 +1252,10 @@ mc_Program_t* mc_program_create(
 
     // TODO: these to buffers should be freed at some point
     VkDescriptorBufferInfo* descriptorBufferInfo
-        = malloc(sizeof *descriptorBufferInfo * bufferCount);
+        = self->state->alloc_fn(sizeof *descriptorBufferInfo * bufferCount);
 
     VkWriteDescriptorSet* writeDescriptorSet
-        = malloc(sizeof *writeDescriptorSet * bufferCount);
+        = self->state->alloc_fn(sizeof *writeDescriptorSet * bufferCount);
 
     for (uint32_t i = 0; i < bufferCount; i++) {
         descriptorBufferInfo[i] = (VkDescriptorBufferInfo){
@@ -1189,7 +1296,7 @@ mc_Program_t* mc_program_create(
     res = vkCreateCommandPool(
         self->state->device,
         &commandPoolCreateInfo,
-        NULL,
+        &self->state->allocationCallbacks,
         &self->commandPool
     );
 
@@ -1249,14 +1356,18 @@ void mc_program_destroy(mc_Program_t* self) {
     if (self->buffers) {
         for (uint32_t i = 0; i < self->bufferCount; i++)
             mc_buffer_finalize(self->buffers[i]);
-        free(self->buffers);
+        self->state->free_fn(self->buffers);
 
         self->bufferCount = 0;
         self->buffers = NULL;
     }
 
     if (self->shaderModule) {
-        vkDestroyShaderModule(self->state->device, self->shaderModule, NULL);
+        vkDestroyShaderModule(
+            self->state->device,
+            self->shaderModule,
+            &self->state->allocationCallbacks
+        );
         self->shaderModule = NULL;
     }
 
@@ -1264,7 +1375,7 @@ void mc_program_destroy(mc_Program_t* self) {
         vkDestroyDescriptorSetLayout(
             self->state->device,
             self->descriptorSetLayout,
-            NULL
+            &self->state->allocationCallbacks
         );
         self->descriptorSetLayout = NULL;
     }
@@ -1273,13 +1384,17 @@ void mc_program_destroy(mc_Program_t* self) {
         vkDestroyPipelineLayout(
             self->state->device,
             self->pipelineLayout,
-            NULL
+            &self->state->allocationCallbacks
         );
         self->pipelineLayout = NULL;
     }
 
     if (self->pipeline) {
-        vkDestroyPipeline(self->state->device, self->pipeline, NULL);
+        vkDestroyPipeline(
+            self->state->device,
+            self->pipeline,
+            &self->state->allocationCallbacks
+        );
         self->pipeline = NULL;
     }
 
@@ -1287,17 +1402,21 @@ void mc_program_destroy(mc_Program_t* self) {
         vkDestroyDescriptorPool(
             self->state->device,
             self->descriptorPool,
-            NULL
+            &self->state->allocationCallbacks
         );
         self->descriptorPool = NULL;
     }
 
     if (self->commandPool) {
-        vkDestroyCommandPool(self->state->device, self->commandPool, NULL);
+        vkDestroyCommandPool(
+            self->state->device,
+            self->commandPool,
+            &self->state->allocationCallbacks
+        );
         self->commandPool = NULL;
     }
 
-    free(self);
+    self->state->free_fn(self);
 }
 
 bool mc_program_is_initialized(mc_Program_t* self) {

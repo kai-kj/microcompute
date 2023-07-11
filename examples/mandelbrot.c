@@ -14,14 +14,14 @@ struct ShaderData {
     mc_int_t maxIter;
 };
 
-static void debug_cb(mc_DebugLevel level, char* source, char* msg, void* arg) {
+static void debug_cb(
+    mc_DebugLevel level,
+    const char* source,
+    const char* msg,
+    void* arg
+) {
     (void)!arg;
-    printf(
-        "[%state from %state]: %state\n",
-        mc_debug_level_to_str(level),
-        source,
-        msg
-    );
+    printf("[%s from %s]: %s\n", mc_debug_level_to_str(level), source, msg);
 }
 
 static size_t read_file(const char* path, char* contents) {
@@ -43,7 +43,7 @@ int main(void) {
         .maxIter = 500,
     };
 
-    mc_State_t* state = mc_state_create((mc_debug_cb*)debug_cb, NULL);
+    mc_State_t* state = mc_state_create(malloc, free, realloc, debug_cb, NULL);
 
     size_t shaderLen = read_file(SHADER_FILE, NULL);
     char shader[shaderLen];

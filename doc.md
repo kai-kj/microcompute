@@ -8,6 +8,17 @@ shaders, although it should also work with other shader types.
 ## Types
 
 ```c
+typedef void*(mc_alloc_fn)(size_t size);
+typedef void(mc_free_fn)(void* ptr);
+typedef void*(mc_realloc_fn)(void* ptr, size_t size);
+```
+
+Custom allocators. The functions have the same signatures as `malloc()`,
+`free()`, and `realloc()`, respectively.
+
+----
+
+```c
 typedef enum mc_DebugLevel {
     MC_DEBUG_LEVEL_INFO,
     MC_DEBUG_LEVEL_LOW,
@@ -121,11 +132,20 @@ Convert a `mc_DebugLevel` enum to a human readable string.
 ----
 
 ```c
-mc_State_t* mc_state_create(mc_debug_cb* debug_cb, void* debugArg);
+mc_State_t* mc_state_create(
+    mc_alloc_fn* alloc_fn,
+    mc_free_fn* free_fn,
+    mc_realloc_fn* realloc_fn,
+    mc_debug_cb* debug_cb,
+    void* debugArg
+);
 ```
 
 Create a `mc_State_t` object.
 
+- `alloc_fn`: A function to use to allocate memory, e.g. `malloc()`
+- `free_fn`: A function to use to free memory, e.g. `free()`
+- `realloc_fn`: A function to use to reallocate memory, e.g. `realloc()`
 - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
 - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
 - returns: A reference to a `mc_State_t` object

@@ -36,7 +36,7 @@ static void debug_cb(
 }
 
 int main(void) {
-    mc_State_t* state = mc_state_create(debug_cb, NULL);
+    mc_State_t* state = mc_state_create(malloc, free, realloc, debug_cb, NULL);
 
     size_t shaderLen;
     read_file(SHADER_FILE, &shaderLen, NULL);
