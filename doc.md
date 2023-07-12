@@ -14,7 +14,7 @@ typedef enum mc_DebugLevel {
     MC_DEBUG_LEVEL_MEDIUM,
     MC_DEBUG_LEVEL_HIGH,
     MC_DEBUG_LEVEL_UNKNOWN,
-} mc_DebugLevel;
+} mc_DebugLevel_t;
 ```
 
 The severity of a debug message.
@@ -23,7 +23,7 @@ The severity of a debug message.
 
 ```c
 typedef void(mc_debug_cb)(
-    mc_DebugLevel level,
+    mc_DebugLevel_t level,
     const char* source,
     const char* msg,
     void* arg
@@ -105,12 +105,12 @@ Core microcompute types.
 ## Functions
 
 ```c
-const char* mc_debug_level_to_str(mc_DebugLevel level);
+const char* mc_debug_level_to_str(mc_DebugLevel_t level);
 ```
 
-Convert a `mc_DebugLevel` enum to a human readable string.
+Convert a `mc_DebugLevel_t` enum to a human readable string.
 
-- `level`: A `mc_DebugLevel` value
+- `level`: A `mc_DebugLevel_t` value
 - returns: A human readable string (`NULL` terminated)
 
 ----

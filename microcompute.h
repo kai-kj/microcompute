@@ -26,7 +26,7 @@ typedef enum mc_DebugLevel {
     MC_DEBUG_LEVEL_MEDIUM,
     MC_DEBUG_LEVEL_HIGH,
     MC_DEBUG_LEVEL_UNKNOWN,
-} mc_DebugLevel;
+} mc_DebugLevel_t;
 
 /** code
  * The debug callback type passed to `mc_set_debug_cb()`.
@@ -37,7 +37,7 @@ typedef enum mc_DebugLevel {
  * - `arg`: The value passed to `debugArg` in `mc_instance_create()`
  */
 typedef void(mc_debug_cb)(
-    mc_DebugLevel level,
+    mc_DebugLevel_t level,
     const char* source,
     const char* msg,
     void* arg
@@ -102,12 +102,12 @@ typedef struct mc_Program mc_Program_t;
  */
 
 /** code
- * Convert a `mc_DebugLevel` enum to a human readable string.
+ * Convert a `mc_DebugLevel_t` enum to a human readable string.
  *
- * - `level`: A `mc_DebugLevel` value
+ * - `level`: A `mc_DebugLevel_t` value
  * - returns: A human readable string (`NULL` terminated)
  */
-const char* mc_debug_level_to_str(mc_DebugLevel level);
+const char* mc_debug_level_to_str(mc_DebugLevel_t level);
 
 /** code
  * Create a `mc_Instance_t` object.
@@ -322,45 +322,50 @@ double mc_get_time();
 #include <sys/time.h>
 #include <vulkan/vulkan.h>
 
-#define MC_EMIT_MESSAGE(self, level, source, message)                          \
+#define MC_MESSAGE_(self, level, message)                                      \
     do {                                                                       \
         if ((self)->debug_cb)                                                  \
-            (self)->debug_cb((level), (source), (message), (self)->debugArg);  \
+            (self)->debug_cb((level), "mc", (message), (self)->debugArg);      \
     } while (0)
+
+#define MC_MESSAGE_INFO(self, msg)                                             \
+    MC_MESSAGE_((self), MC_DEBUG_LEVEL_INFO, (msg));
+
+#define MC_MESSAGE_LOW(self, msg)                                              \
+    MC_MESSAGE_((self), MC_DEBUG_LEVEL_LOW, (msg));
+
+#define MC_MESSAGE_MEDIUM(self, msg)                                           \
+    MC_MESSAGE_((self), MC_DEBUG_LEVEL_MEDIUM, (msg));
+
+#define MC_MESSAGE_HIGH(self, msg)                                             \
+    MC_MESSAGE_((self), MC_DEBUG_LEVEL_HIGH, (msg));
 
 struct mc_Device {
     void* debugArg;
     mc_debug_cb* debug_cb;
-
-    VkPhysicalDevice physicalDevice;
-    uint32_t queueFamilyIndex;
+    VkPhysicalDevice physDev;
+    uint32_t queueFamilyIdx;
     VkDevice device;
 };
 
 struct mc_Instance {
     bool isInitialized;
-
     void* debugArg;
     mc_debug_cb* debug_cb;
-
     VkInstance instance;
     uint32_t deviceCount;
     mc_Device_t** devices;
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-    VkDebugUtilsMessengerEXT messenger;
-    PFN_vkCreateDebugUtilsMessengerEXT create_messenger;
-    PFN_vkDestroyDebugUtilsMessengerEXT destroy_messenger;
+    VkDebugUtilsMessengerEXT msg;
 #endif // MC_ENABLE_VALIDATION_LAYER
 };
 
 struct mc_Buffer {
     bool isInitialized;
     mc_Device_t* device;
-
     uint64_t size;
     void* mappedMemory;
-
     VkBuffer buffer;
     VkDeviceMemory memory;
 };
@@ -368,22 +373,17 @@ struct mc_Buffer {
 struct mc_Program {
     bool isInitialized;
     mc_Device_t* device;
-
     VkShaderModule shaderModule;
-    VkDescriptorSetLayout descriptorSetLayout;
-
+    VkDescriptorSetLayout descSetLayout;
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
-
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSet descriptorSet;
-
-    VkCommandPool commandPool;
-    VkCommandBuffer commandBuffer;
-
+    VkDescriptorPool descPool;
+    VkDescriptorSet descSet;
+    VkCommandPool cmdPool;
+    VkCommandBuffer cmdBuff;
     uint32_t bufferCount;
-    VkDescriptorBufferInfo* descriptorBufferInfo;
-    VkWriteDescriptorSet* writeDescriptorSet;
+    VkDescriptorBufferInfo* descBuffInfo;
+    VkWriteDescriptorSet* wrtDescSet;
 };
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
@@ -393,47 +393,43 @@ static VkBool32 mc_vk_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* message,
     void* userData
 ) {
+    mc_Instance_t* instance = (mc_Instance_t*)userData;
+    enum mc_DebugLevel level;
     switch (severity) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-            MC_EMIT_MESSAGE(
-                (mc_Instance_t*)userData,
-                MC_DEBUG_LEVEL_MEDIUM,
-                "Vulkan",
-                message->pMessage
-            );
-            return VK_FALSE;
+            level = MC_DEBUG_LEVEL_MEDIUM;
+            break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-            MC_EMIT_MESSAGE(
-                (mc_Instance_t*)userData,
-                MC_DEBUG_LEVEL_HIGH,
-                "Vulkan",
-                message->pMessage
-            );
-            return VK_FALSE;
+            level = MC_DEBUG_LEVEL_HIGH;
+            break;
         default: return VK_FALSE; // dont bother with info or verbose
     }
+
+    if (instance->debug_cb)
+        instance->debug_cb(level, "vk", message->pMessage, instance->debugArg);
+
+    return VK_FALSE;
 }
 #endif // MC_ENABLE_VALIDATION_LAYER
 
 static uint32_t mc_choose_queue_family_index(
-    uint32_t queueFamilyPropsCount,
-    VkQueueFamilyProperties* queueFamilyProps
+    uint32_t queuePropsCount,
+    VkQueueFamilyProperties* queueProps
 ) {
-    // so its easy to tell if no queue was found
-    uint32_t idx = queueFamilyPropsCount;
+    uint32_t idx = queuePropsCount; // so its easy to tell if no queue was found
 
     // find dedicated compute queue, best case
-    for (uint32_t i = 0; i < queueFamilyPropsCount; i++) {
-        bool g = VK_QUEUE_GRAPHICS_BIT & queueFamilyProps[i].queueFlags;
-        bool c = VK_QUEUE_COMPUTE_BIT & queueFamilyProps[i].queueFlags;
+    for (uint32_t i = 0; i < queuePropsCount; i++) {
+        bool g = VK_QUEUE_GRAPHICS_BIT & queueProps[i].queueFlags;
+        bool c = VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags;
         if (!g && c) idx = i;
     }
 
-    if (idx != queueFamilyPropsCount) return idx;
+    if (idx != queuePropsCount) return idx;
 
     // find compute capable queue
-    for (uint32_t i = 0; i < queueFamilyPropsCount; i++) {
-        VkQueueFlags c = VK_QUEUE_COMPUTE_BIT & queueFamilyProps[i].queueFlags;
+    for (uint32_t i = 0; i < queuePropsCount; i++) {
+        VkQueueFlags c = VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags;
         if (c) idx = i;
     }
 
@@ -447,12 +443,9 @@ static uint32_t mc_choose_memory_type(
     for (uint32_t i = 0; i < memoryProps.memoryTypeCount; i++) {
         VkMemoryType type = memoryProps.memoryTypes[i];
         VkMemoryHeap heap = memoryProps.memoryHeaps[type.heapIndex];
-
         bool v = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & type.propertyFlags;
         bool c = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT & type.propertyFlags;
-
-        // just return the first memory type that works
-        if (v && c && size < heap.size) return i;
+        if (v && c && size < heap.size) return i; // just first valid memory
     }
 
     // so its easy to tell that the function failed
@@ -470,7 +463,7 @@ static size_t mc_read_file(const char* path, char* contents) {
     return length;
 }
 
-const char* mc_debug_level_to_str(mc_DebugLevel level) {
+const char* mc_debug_level_to_str(mc_DebugLevel_t level) {
     switch (level) {
         case MC_DEBUG_LEVEL_INFO: return "MC_DEBUG_LEVEL_INFO";
         case MC_DEBUG_LEVEL_LOW: return "MC_DEBUG_LEVEL_LOW";
@@ -483,249 +476,168 @@ const char* mc_debug_level_to_str(mc_DebugLevel level) {
 mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     VkResult res;
     mc_Instance_t* self = malloc(sizeof *self);
+    *self = (mc_Instance_t){0};
 
-    *self = (mc_Instance_t){
-        .isInitialized = false,
-
-        .debugArg = debugArg,
-        .debug_cb = debug_cb,
-
-        .instance = NULL,
-        .deviceCount = 0,
-        .devices = NULL,
+    VkApplicationInfo appInfo = {0};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "microcompute";
+    appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-        .messenger = NULL,
-        .create_messenger = NULL,
-        .destroy_messenger = NULL,
-#endif // MC_ENABLE_VALIDATION_LAYER
+    MC_MESSAGE_INFO(self, "enabling vulkan validation layer");
+
+    VkDebugUtilsMessengerCreateInfoEXT msgInfo = {0};
+    msgInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    msgInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    msgInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+                        | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                        | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    msgInfo.pfnUserCallback = mc_vk_debug_callback;
+    msgInfo.pUserData = self;
+
+    VkInstanceCreateInfo instanceInfo = {0};
+    instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instanceInfo.pApplicationInfo = &appInfo;
+    instanceInfo.pNext = &msgInfo;
+    instanceInfo.enabledLayerCount = 1;
+    instanceInfo.ppEnabledLayerNames = (const char*[]){
+        "VK_LAYER_KHRONOS_validation",
     };
-
-    VkApplicationInfo applicationInfo = {
-        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pNext = NULL,
-        .pApplicationName = "microcompute",
-        .applicationVersion = 0,
-        .pEngineName = NULL,
-        .engineVersion = 0,
-        .apiVersion = VK_MAKE_VERSION(1, 0, 0),
+    instanceInfo.enabledExtensionCount = 1;
+    instanceInfo.ppEnabledExtensionNames = (const char*[]){
+        "VK_EXT_debug_utils",
     };
-
-#ifdef MC_ENABLE_VALIDATION_LAYER
-    VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
-                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
-                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-                         | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
-                     | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
-                     | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback = mc_vk_debug_callback,
-        .pUserData = self,
-    };
-
-    MC_EMIT_MESSAGE(
-        self,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_Instance_t",
-        "MC_ENABLE_VALIDATION_LAYER enabled"
-    );
-#endif // MC_ENABLE_VALIDATION_LAYER
-
-    VkInstanceCreateInfo instanceCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .flags = 0,
-        .pApplicationInfo = &applicationInfo,
-#ifdef MC_ENABLE_VALIDATION_LAYER
-        .pNext = &messengerCreateInfo, // for validation during vkCreateInstance
-        .enabledLayerCount = 1,
-        .ppEnabledLayerNames = (const char*[]){"VK_LAYER_KHRONOS_validation"},
-        .enabledExtensionCount = 1,
-        .ppEnabledExtensionNames = (const char*[]){"VK_EXT_debug_utils"},
 #else
-        .pNext = NULL,
-        .enabledLayerCount = 0,
-        .ppEnabledLayerNames = NULL,
-        .enabledExtensionCount = 0,
-        .ppEnabledExtensionNames = NULL,
+    VkInstanceCreateInfo instanceInfo = {0};
+    instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instanceInfo.pApplicationInfo = &appInfo;
 #endif // MC_ENABLE_VALIDATION_LAYER
-    };
 
-    res = vkCreateInstance(&instanceCreateInfo, NULL, &self->instance);
+    res = vkCreateInstance(&instanceInfo, NULL, &self->instance);
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Instance_t",
-            "vkCreateInstance() failed"
-        );
+        MC_MESSAGE_HIGH(self, "failed to create vulkan instance");
         return self;
     }
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-    self->create_messenger = //
-        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+    PFN_vkCreateDebugUtilsMessengerEXT msg_create
+        = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             self->instance,
             "vkCreateDebugUtilsMessengerEXT"
         );
 
-    self->destroy_messenger = //
-        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            self->instance,
-            "vkDestroyDebugUtilsMessengerEXT"
-        );
-
     // vkGetInstanceProcAddr() can fail, so just to be sure
-    if (self->create_messenger) {
-        self->create_messenger(
-            self->instance,
-            &messengerCreateInfo,
-            NULL,
-            &self->messenger
-        );
-    }
+    if (msg_create) msg_create(self->instance, &msgInfo, NULL, &self->msg);
 #endif // MC_ENABLE_VALIDATION_LAYER
 
-    uint32_t physicalDeviceCount = 0;
-    res = vkEnumeratePhysicalDevices(
-        self->instance,
-        &physicalDeviceCount,
-        NULL
-    );
+    uint32_t physDevCount = 0;
+    res = vkEnumeratePhysicalDevices(self->instance, &physDevCount, NULL);
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Instance_t",
-            "vkEnumeratePhysicalDevices() failed"
-        );
+        MC_MESSAGE_HIGH(self, "failed to get vulkan devices");
         return self;
     }
 
-    VkPhysicalDevice* physicalDevices
-        = malloc(sizeof *physicalDevices * physicalDeviceCount);
-
-    res = vkEnumeratePhysicalDevices(
-        self->instance,
-        &physicalDeviceCount,
-        physicalDevices
-    );
+    VkPhysicalDevice* physDevs = malloc(sizeof *physDevs * physDevCount);
+    res = vkEnumeratePhysicalDevices(self->instance, &physDevCount, physDevs);
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Instance_t",
-            "vkEnumeratePhysicalDevices() failed"
-        );
+        MC_MESSAGE_HIGH(self, "failed to get vulkan devices");
         return self;
     }
 
-    self->devices = malloc(sizeof *self->devices * physicalDeviceCount);
+    self->devices = malloc(sizeof *self->devices * physDevCount);
 
-    uint32_t physicalDeviceIndex = 0, deviceIndex = 0;
-    while (physicalDeviceIndex < physicalDeviceCount) {
-        VkPhysicalDevice physicalDevice = physicalDevices[physicalDeviceIndex];
+    uint32_t physDevIdx = 0, devIdx = 0;
+    while (physDevIdx < physDevCount) {
+        VkPhysicalDevice physDev = physDevs[physDevIdx];
 
-        uint32_t queueFamilyPropertiesCount = 0;
+        uint32_t queuePropsCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(
-            physicalDevice,
-            &queueFamilyPropertiesCount,
+            physDev,
+            &queuePropsCount,
             NULL
         );
 
-        VkQueueFamilyProperties* queueFamilyProperties = malloc(
-            sizeof *queueFamilyProperties * queueFamilyPropertiesCount
-        );
+        VkQueueFamilyProperties* queueProps
+            = malloc(sizeof *queueProps * queuePropsCount);
 
         vkGetPhysicalDeviceQueueFamilyProperties(
-            physicalDevice,
-            &queueFamilyPropertiesCount,
-            queueFamilyProperties
+            physDev,
+            &queuePropsCount,
+            queueProps
         );
 
-        uint32_t queueFamilyIndex = mc_choose_queue_family_index(
-            queueFamilyPropertiesCount,
-            queueFamilyProperties
-        );
+        uint32_t queueFamilyIdx
+            = mc_choose_queue_family_index(queuePropsCount, queueProps);
 
-        free(queueFamilyProperties);
+        free(queueProps);
 
-        if (queueFamilyIndex == queueFamilyPropertiesCount) {
-            physicalDeviceIndex++;
+        if (queueFamilyIdx == queuePropsCount) {
+            physDevIdx++;
             continue;
         }
 
         float queuePriority = 1.0;
-        VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0,
-            .queueFamilyIndex = queueFamilyIndex,
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority,
-        };
+        VkDeviceQueueCreateInfo devQueueInfo = {0};
+        devQueueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        devQueueInfo.queueFamilyIndex = queueFamilyIdx;
+        devQueueInfo.queueCount = 1;
+        devQueueInfo.pQueuePriorities = &queuePriority;
 
-        VkDeviceCreateInfo deviceCreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0,
-            .queueCreateInfoCount = 1,
-            .pQueueCreateInfos = &deviceQueueCreateInfo,
-            .enabledLayerCount = 0,
-            .ppEnabledLayerNames = NULL,
-            .enabledExtensionCount = 0,
-            .ppEnabledExtensionNames = NULL,
-            .pEnabledFeatures = NULL,
-        };
+        VkDeviceCreateInfo devInfo = {0};
+        devInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        devInfo.queueCreateInfoCount = 1;
+        devInfo.pQueueCreateInfos = &devQueueInfo;
 
         VkDevice device;
-        res = vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device);
+        res = vkCreateDevice(physDev, &devInfo, NULL, &device);
 
         if (res != VK_SUCCESS) {
-            physicalDeviceIndex++;
+            physDevIdx++;
             continue;
         }
 
-        self->devices[deviceIndex] = malloc(sizeof *self->devices[deviceIndex]);
-        *self->devices[deviceIndex] = (mc_Device_t){
-            .debugArg = debugArg,
-            .debug_cb = debug_cb,
-            .physicalDevice = physicalDevice,
-            .queueFamilyIndex = queueFamilyIndex,
-            .device = device,
-        };
+        self->devices[devIdx] = malloc(sizeof *self->devices[devIdx]);
+        self->devices[devIdx]->debugArg = debugArg;
+        self->devices[devIdx]->debug_cb = debug_cb;
+        self->devices[devIdx]->physDev = physDev;
+        self->devices[devIdx]->queueFamilyIdx = queueFamilyIdx;
+        self->devices[devIdx]->device = device;
 
-        physicalDeviceIndex++;
-        deviceIndex++;
+        physDevIdx++;
+        devIdx++;
     }
 
-    free(physicalDevices);
+    free(physDevs);
+    self->deviceCount = devIdx;
 
-    self->deviceCount = deviceIndex;
+    MC_MESSAGE_INFO(self, "mc_Instance successfully initialized");
     self->isInitialized = true;
     return self;
 }
 
 void mc_instance_destroy(mc_Instance_t* self) {
-    MC_EMIT_MESSAGE(
-        self,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_Instance_t",
-        "destroying mc_Instance_t"
-    );
+    MC_MESSAGE_INFO(self, "destroying mc_Instance_t");
 
     for (uint32_t i = 0; i < self->deviceCount; i++)
         vkDestroyDevice(self->devices[i]->device, NULL);
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-    // self->destroy_messenger might be NULL, so just to be sure
-    if (self->messenger && self->destroy_messenger) {
-        self->destroy_messenger(self->instance, self->messenger, NULL);
-        self->messenger = NULL;
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessenger
+        = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            self->instance,
+            "vkDestroyDebugUtilsMessengerEXT"
+        );
+
+    // vkGetInstanceProcAddr() can fail, so just to be sure
+    if (self->msg && vkDestroyDebugUtilsMessenger) {
+        vkDestroyDebugUtilsMessenger(self->instance, self->msg, NULL);
+        self->msg = NULL;
     }
 #endif // MC_ENABLE_VALIDATION_LAYER
 
@@ -743,12 +655,7 @@ bool mc_instance_is_initialized(mc_Instance_t* self) {
 
 uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
     if (!self->isInitialized) {
-        MC_EMIT_MESSAGE(
-            self,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Instance_t",
-            "mc_Instance_t not initialized"
-        );
+        MC_MESSAGE_MEDIUM(self, "mc_Instance_t not initialized");
         return 0;
     }
     return self->deviceCount;
@@ -756,119 +663,81 @@ uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
 
 mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
     if (!self->isInitialized) {
-        MC_EMIT_MESSAGE(
-            self,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Instance_t",
-            "mc_Instance_t not initialized"
-        );
+        MC_MESSAGE_MEDIUM(self, "mc_Instance_t not initialized");
         return NULL;
     }
     return self->devices;
 }
 
 bool mc_device_is_discrete_gpu(mc_Device_t* device) {
-    VkPhysicalDeviceProperties deviceProps;
-    vkGetPhysicalDeviceProperties(device->physicalDevice, &deviceProps);
-    return deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    VkPhysicalDeviceProperties devProps;
+    vkGetPhysicalDeviceProperties(device->physDev, &devProps);
+    return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 }
 
 bool mc_device_is_integrated_gpu(mc_Device_t* device) {
-    VkPhysicalDeviceProperties deviceProps;
-    vkGetPhysicalDeviceProperties(device->physicalDevice, &deviceProps);
-    return deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+    VkPhysicalDeviceProperties devProps;
+    vkGetPhysicalDeviceProperties(device->physDev, &devProps);
+    return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
 }
 
 mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     VkResult res;
     mc_Buffer_t* self = malloc(sizeof *self);
 
-    *self = (mc_Buffer_t){
-        .isInitialized = false,
-        .size = size,
-        .mappedMemory = NULL,
-        .device = device,
-        .buffer = NULL,
-        .memory = NULL,
-    };
+    *self = (mc_Buffer_t){0};
+    self->size = size;
+    self->device = device;
 
-    VkBufferCreateInfo createInfo = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .size = self->size,
-        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &self->device->queueFamilyIndex,
-    };
+    VkBufferCreateInfo bufferInfo = {0};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = self->size;
+    bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferInfo.queueFamilyIndexCount = 1;
+    bufferInfo.pQueueFamilyIndices = &self->device->queueFamilyIdx;
 
     res = vkCreateBuffer(
         self->device->device,
-        &createInfo,
+        &bufferInfo,
         NULL,
         &self->buffer
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Buffer_t",
-            "vkCreateBuffer() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create vulkan buffer");
         return self;
     }
 
-    VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(
-        self->device->device,
-        self->buffer,
-        &memoryRequirements
-    );
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(self->device->device, self->buffer, &memReqs);
 
     // check the minimum memory requirement
-    if (memoryRequirements.size > self->size)
-        self->size = memoryRequirements.size;
+    if (memReqs.size > self->size) self->size = memReqs.size;
 
-    VkPhysicalDeviceMemoryProperties memoryProps;
-    vkGetPhysicalDeviceMemoryProperties(
-        self->device->physicalDevice,
-        &memoryProps
-    );
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(self->device->physDev, &memProps);
 
-    uint32_t memoryTypeIdx = mc_choose_memory_type(memoryProps, self->size);
-    if (memoryTypeIdx == memoryProps.memoryTypeCount) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Buffer_t",
-            "no suitable memory type found"
-        );
+    uint32_t memTypeIdx = mc_choose_memory_type(memProps, self->size);
+    if (memTypeIdx == memProps.memoryTypeCount) {
+        MC_MESSAGE_HIGH(self->device, "no suitable memory type found");
         return self;
     }
 
-    VkMemoryAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext = NULL,
-        .allocationSize = self->size,
-        .memoryTypeIndex = memoryTypeIdx,
-    };
+    VkMemoryAllocateInfo memAllocInfo = {0};
+    memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memAllocInfo.allocationSize = self->size;
+    memAllocInfo.memoryTypeIndex = memTypeIdx;
 
     res = vkAllocateMemory(
         self->device->device,
-        &allocInfo,
+        &memAllocInfo,
         NULL,
         &self->memory
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Buffer_t",
-            "vkAllocateMemory() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to allocate vulkan memory");
         return self;
     }
 
@@ -890,13 +759,12 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
         0
     );
 
-    MC_EMIT_MESSAGE(
-        self->device,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_Buffer_t",
-        "mc_Buffer_t successfully initialized"
-    );
+    if (res != VK_SUCCESS) {
+        MC_MESSAGE_HIGH(self->device, "failed to map memory");
+        return self;
+    }
 
+    MC_MESSAGE_INFO(self->device, "mc_Buffer_t successfully initialized");
     self->isInitialized = true;
     return self;
 }
@@ -910,12 +778,7 @@ mc_Buffer_t* mc_buffer_from(mc_Device_t* device, uint64_t size, void* data) {
 }
 
 void mc_buffer_destroy(mc_Buffer_t* self) {
-    MC_EMIT_MESSAGE(
-        self->device,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_Buffer_t",
-        "destroying mc_Buffer_t"
-    );
+    MC_MESSAGE_INFO(self->device, "destroying mc_Buffer_t");
 
     if (self->memory) {
         vkFreeMemory(self->device->device, self->memory, NULL);
@@ -945,22 +808,12 @@ uint64_t mc_buffer_write(
     void* data
 ) {
     if (!self->isInitialized) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer_t",
-            "mc_Buffer_t not initialized"
-        );
+        MC_MESSAGE_MEDIUM(self->device, "mc_Buffer_t not initialized");
         return 0;
     }
 
     if (offset + size > self->size) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer_t",
-            "offset + size > mc_Buffer_t.size"
-        );
+        MC_MESSAGE_MEDIUM(self->device, "offset + size > mc_Buffer_t.size");
         return 0;
     }
 
@@ -976,22 +829,12 @@ uint64_t mc_buffer_read(
     void* data
 ) {
     if (!self->isInitialized) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer_t",
-            "mc_Buffer_t not initialized"
-        );
+        MC_MESSAGE_MEDIUM(self->device, "mc_Buffer_t not initialized");
         return 0;
     }
 
     if (offset + size > self->size) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Buffer_t",
-            "offset + size > mc_Buffer_t.size"
-        );
+        MC_MESSAGE_MEDIUM(self->device, "offset + size > mc_Buffer_t.size");
         return 0;
     }
 
@@ -1008,48 +851,28 @@ mc_Program_t* mc_program_create(
 ) {
     VkResult res;
     mc_Program_t* self = malloc(sizeof *self);
-    *self = (mc_Program_t){
-        .isInitialized = false,
-        .device = device,
-        .shaderModule = NULL,
-        .descriptorSetLayout = NULL,
-        .pipelineLayout = NULL,
-        .pipeline = NULL,
-        .descriptorPool = NULL,
-        .descriptorSet = NULL,
-        .commandPool = NULL,
-        .commandBuffer = NULL,
-        .bufferCount = bufferCount,
-        .descriptorBufferInfo = NULL,
-        .writeDescriptorSet = NULL,
-    };
+    *self = (mc_Program_t){0};
+    self->device = device;
+    self->bufferCount = bufferCount;
 
     size_t shaderSize = mc_read_file(fileName, NULL);
 
     if (shaderSize == 0) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "failed to open file `fileName`"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to open shader file");
         return self;
     }
 
     char* shaderCode = malloc(shaderSize);
     mc_read_file(fileName, shaderCode);
 
-    VkShaderModuleCreateInfo shaderModuleCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .codeSize = shaderSize,
-        .pCode = (const uint32_t*)shaderCode,
-    };
+    VkShaderModuleCreateInfo moduleInfo = {0};
+    moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    moduleInfo.codeSize = shaderSize;
+    moduleInfo.pCode = (const uint32_t*)shaderCode;
 
     res = vkCreateShaderModule(
         self->device->device,
-        &shaderModuleCreateInfo,
+        &moduleInfo,
         NULL,
         &self->shaderModule
     );
@@ -1057,281 +880,195 @@ mc_Program_t* mc_program_create(
     free(shaderCode);
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkCreateShaderModule() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create vulkan shader module");
         return self;
     }
 
-    VkDescriptorSetLayoutBinding* descriptorSetLayoutBindings
-        = malloc(sizeof *descriptorSetLayoutBindings * self->bufferCount);
+    VkDescriptorSetLayoutBinding* descBindings
+        = malloc(sizeof *descBindings * self->bufferCount);
 
     for (uint32_t i = 0; i < self->bufferCount; i++) {
-        descriptorSetLayoutBindings[i] = (VkDescriptorSetLayoutBinding){
-            .binding = i,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .pImmutableSamplers = NULL,
-        };
+        descBindings[i] = (VkDescriptorSetLayoutBinding){0};
+        descBindings[i].binding = i;
+        descBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descBindings[i].descriptorCount = 1;
+        descBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .bindingCount = self->bufferCount,
-        .pBindings = descriptorSetLayoutBindings,
-    };
+    VkDescriptorSetLayoutCreateInfo descLayoutInfo = {0};
+    descLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descLayoutInfo.bindingCount = self->bufferCount;
+    descLayoutInfo.pBindings = descBindings;
 
     res = vkCreateDescriptorSetLayout(
         self->device->device,
-        &descriptorSetLayoutCreateInfo,
+        &descLayoutInfo,
         NULL,
-        &self->descriptorSetLayout
+        &self->descSetLayout
     );
 
-    free(descriptorSetLayoutBindings);
+    free(descBindings);
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkCreateDescriptorSetLayout() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create descriptor set layout");
         return self;
     }
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .setLayoutCount = 1,
-        .pSetLayouts = &self->descriptorSetLayout,
-        .pushConstantRangeCount = 0,
-        .pPushConstantRanges = NULL,
-    };
+    VkPipelineLayoutCreateInfo pipelineInfo = {0};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineInfo.setLayoutCount = 1;
+    pipelineInfo.pSetLayouts = &self->descSetLayout;
 
     res = vkCreatePipelineLayout(
         self->device->device,
-        &pipelineLayoutCreateInfo,
+        &pipelineInfo,
         NULL,
         &self->pipelineLayout
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkCreatePipelineLayout() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create pipeline layout");
         return self;
     }
 
-    VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = self->shaderModule,
-        .pName = entryPoint,
-        .pSpecializationInfo = NULL,
-    };
+    VkPipelineShaderStageCreateInfo shaderStageInfo = {0};
+    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStageInfo.module = self->shaderModule;
+    shaderStageInfo.pName = entryPoint;
 
-    VkComputePipelineCreateInfo computePipelineCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .stage = pipelineShaderStageCreateInfo,
-        .layout = self->pipelineLayout,
-        .basePipelineHandle = 0,
-        .basePipelineIndex = 0,
-    };
+    VkComputePipelineCreateInfo computePipelineInfo = {0};
+    computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineInfo.stage = shaderStageInfo;
+    computePipelineInfo.layout = self->pipelineLayout;
 
     res = vkCreateComputePipelines(
         self->device->device,
         0,
         1,
-        &computePipelineCreateInfo,
+        &computePipelineInfo,
         NULL,
         &self->pipeline
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkCreateComputePipelines() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create compute pipeline");
         return self;
     }
 
-    VkDescriptorPoolSize descriptorPoolSize = {
-        .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        .descriptorCount = self->bufferCount,
-    };
+    VkDescriptorPoolSize descPoolSize = {0};
+    descPoolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descPoolSize.descriptorCount = self->bufferCount;
 
-    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .pNext = NULL,
-        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 1,
-        .poolSizeCount = 1,
-        .pPoolSizes = &descriptorPoolSize,
-    };
+    VkDescriptorPoolCreateInfo descPoolInfo = {0};
+    descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    descPoolInfo.maxSets = 1;
+    descPoolInfo.poolSizeCount = 1;
+    descPoolInfo.pPoolSizes = &descPoolSize;
 
     res = vkCreateDescriptorPool(
         self->device->device,
-        &descriptorPoolCreateInfo,
+        &descPoolInfo,
         NULL,
-        &self->descriptorPool
+        &self->descPool
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkCreateDescriptorPool() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create descriptor pool");
         return self;
     }
 
-    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = NULL,
-        .descriptorPool = self->descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &self->descriptorSetLayout,
-    };
+    VkDescriptorSetAllocateInfo descAllocInfo = {0};
+    descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descAllocInfo.descriptorPool = self->descPool;
+    descAllocInfo.descriptorSetCount = 1;
+    descAllocInfo.pSetLayouts = &self->descSetLayout;
 
     res = vkAllocateDescriptorSets(
         self->device->device,
-        &descriptorSetAllocateInfo,
-        &self->descriptorSet
+        &descAllocInfo,
+        &self->descSet
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkAllocateDescriptorSets() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to allocate descriptor sets");
         return self;
     }
 
-    VkCommandPoolCreateInfo commandPoolCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .pNext = NULL,
-        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = self->device->queueFamilyIndex,
-    };
+    VkCommandPoolCreateInfo cmdPoolInfo = {0};
+    cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    cmdPoolInfo.queueFamilyIndex = self->device->queueFamilyIdx;
 
     res = vkCreateCommandPool(
         self->device->device,
-        &commandPoolCreateInfo,
+        &cmdPoolInfo,
         NULL,
-        &self->commandPool
+        &self->cmdPool
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkCreateCommandPool() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to create command pool");
         return self;
     }
 
-    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .pNext = NULL,
-        .commandPool = self->commandPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
+    VkCommandBufferAllocateInfo cmdBuffInfo = {0};
+    cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdBuffInfo.commandPool = self->cmdPool;
+    cmdBuffInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdBuffInfo.commandBufferCount = 1;
 
     res = vkAllocateCommandBuffers(
         self->device->device,
-        &commandBufferAllocateInfo,
-        &self->commandBuffer
+        &cmdBuffInfo,
+        &self->cmdBuff
     );
 
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkAllocateCommandBuffers() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to allocate command buffers");
         return self;
     }
 
-    MC_EMIT_MESSAGE(
-        self->device,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_Program_t",
-        "mc_Program_t successfully created"
-    );
+    self->descBuffInfo = malloc(sizeof *self->descBuffInfo * self->bufferCount);
+    self->wrtDescSet = malloc(sizeof *self->wrtDescSet * self->bufferCount);
 
-    self->descriptorBufferInfo
-        = malloc(sizeof *self->descriptorBufferInfo * self->bufferCount);
-
-    self->writeDescriptorSet
-        = malloc(sizeof *self->writeDescriptorSet * self->bufferCount);
-
+    MC_MESSAGE_INFO(self->device, "mc_Program_t successfully created");
     self->isInitialized = true;
     return self;
 }
 
 void mc_program_destroy(mc_Program_t* self) {
-    MC_EMIT_MESSAGE(
-        self->device,
-        MC_DEBUG_LEVEL_INFO,
-        "mc_Program_t",
-        "destroying mc_Program_t"
-    );
+    MC_MESSAGE_INFO(self->device, "destroying mc_Program_t");
 
-    if (self->commandBuffer) {
+    if (self->cmdBuff) {
         vkFreeCommandBuffers(
             self->device->device,
-            self->commandPool,
+            self->cmdPool,
             1,
-            &self->commandBuffer
+            &self->cmdBuff
         );
-        self->commandBuffer = NULL;
+        self->cmdBuff = NULL;
     }
 
-    if (self->commandPool) {
-        vkDestroyCommandPool(self->device->device, self->commandPool, NULL);
-        self->commandPool = NULL;
+    if (self->cmdPool) {
+        vkDestroyCommandPool(self->device->device, self->cmdPool, NULL);
+        self->cmdPool = NULL;
     }
 
-    if (self->descriptorSet) {
+    if (self->descSet) {
         vkFreeDescriptorSets(
             self->device->device,
-            self->descriptorPool,
+            self->descPool,
             1,
-            &self->descriptorSet
+            &self->descSet
         );
-        self->descriptorSet = NULL;
+        self->descSet = NULL;
     }
 
-    if (self->descriptorPool) {
-        vkDestroyDescriptorPool(
-            self->device->device,
-            self->descriptorPool,
-            NULL
-        );
-        self->descriptorPool = NULL;
+    if (self->descPool) {
+        vkDestroyDescriptorPool(self->device->device, self->descPool, NULL);
+        self->descPool = NULL;
     }
 
     if (self->pipeline) {
@@ -1348,13 +1085,13 @@ void mc_program_destroy(mc_Program_t* self) {
         self->pipelineLayout = NULL;
     }
 
-    if (self->descriptorSetLayout) {
+    if (self->descSetLayout) {
         vkDestroyDescriptorSetLayout(
             self->device->device,
-            self->descriptorSetLayout,
+            self->descSetLayout,
             NULL
         );
-        self->descriptorSetLayout = NULL;
+        self->descSetLayout = NULL;
     }
 
     if (self->shaderModule) {
@@ -1373,23 +1110,13 @@ double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...) {
     VkResult res;
 
     if (!self->isInitialized) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "mc_Program_t not initialized"
-        );
+        MC_MESSAGE_MEDIUM(self->device, "mc_Program_t not initialized");
         return -1.0;
     }
 
     // an easy mistake to make
     if (dims.x * dims.y * dims.z == 0) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_MEDIUM,
-            "mc_Program_t",
-            "at least one dimension is 0"
-        );
+        MC_MESSAGE_MEDIUM(self->device, "at least one dimension is 0");
         return -1.0;
     }
 
@@ -1400,33 +1127,21 @@ double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...) {
         mc_Buffer_t* buffer = va_arg(args, void*);
 
         if (!buffer->isInitialized) {
-            MC_EMIT_MESSAGE(
-                self->device,
-                MC_DEBUG_LEVEL_MEDIUM,
-                "mc_Program_t",
-                "at least one buffer has not been initialized"
-            );
+            MC_MESSAGE_MEDIUM(self->device, "found uninitialized buffer");
             return -1.0;
         }
 
-        self->descriptorBufferInfo[i] = (VkDescriptorBufferInfo){
-            .buffer = buffer->buffer,
-            .offset = 0,
-            .range = VK_WHOLE_SIZE,
-        };
+        self->descBuffInfo[i] = (VkDescriptorBufferInfo){0};
+        self->descBuffInfo[i].buffer = buffer->buffer;
+        self->descBuffInfo[i].range = VK_WHOLE_SIZE;
 
-        self->writeDescriptorSet[i] = (VkWriteDescriptorSet){
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .pNext = 0,
-            .dstSet = self->descriptorSet,
-            .dstBinding = i,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .pImageInfo = NULL,
-            .pBufferInfo = &self->descriptorBufferInfo[i],
-            .pTexelBufferView = NULL,
-        };
+        self->wrtDescSet[i] = (VkWriteDescriptorSet){0};
+        self->wrtDescSet[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        self->wrtDescSet[i].dstSet = self->descSet;
+        self->wrtDescSet[i].dstBinding = i;
+        self->wrtDescSet[i].descriptorCount = 1;
+        self->wrtDescSet[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        self->wrtDescSet[i].pBufferInfo = &self->descBuffInfo[i];
     }
 
     va_end(args);
@@ -1434,98 +1149,68 @@ double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...) {
     vkUpdateDescriptorSets(
         self->device->device,
         self->bufferCount,
-        self->writeDescriptorSet,
+        self->wrtDescSet,
         0,
         NULL
     );
 
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = NULL,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-        .pInheritanceInfo = NULL,
-    };
+    VkCommandBufferBeginInfo cmdBuffInfo = {0};
+    cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    res = vkBeginCommandBuffer(self->commandBuffer, &commandBufferBeginInfo);
+    res = vkBeginCommandBuffer(self->cmdBuff, &cmdBuffInfo);
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkBeginCommandBuffer() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to begin command buffer");
         return -1.0;
     }
 
     vkCmdBindPipeline(
-        self->commandBuffer,
+        self->cmdBuff,
         VK_PIPELINE_BIND_POINT_COMPUTE,
         self->pipeline
     );
 
     vkCmdBindDescriptorSets(
-        self->commandBuffer,
+        self->cmdBuff,
         VK_PIPELINE_BIND_POINT_COMPUTE,
         self->pipelineLayout,
         0,
         1,
-        &self->descriptorSet,
+        &self->descSet,
         0,
         NULL
     );
 
-    vkCmdDispatch(self->commandBuffer, dims.x, dims.y, dims.z);
-    res = vkEndCommandBuffer(self->commandBuffer);
+    vkCmdDispatch(self->cmdBuff, dims.x, dims.y, dims.z);
+    res = vkEndCommandBuffer(self->cmdBuff);
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkEndCommandBuffer() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to end command buffer");
         return -1.0;
     }
 
     VkQueue queue;
     vkGetDeviceQueue(
         self->device->device,
-        self->device->queueFamilyIndex,
+        self->device->queueFamilyIdx,
         0,
         &queue
     );
 
-    VkSubmitInfo submitInfo = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = NULL,
-        .waitSemaphoreCount = 0,
-        .pWaitSemaphores = NULL,
-        .pWaitDstStageMask = NULL,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &self->commandBuffer,
-        .signalSemaphoreCount = 0,
-        .pSignalSemaphores = NULL,
-    };
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &self->cmdBuff;
 
     res = vkQueueSubmit(queue, 1, &submitInfo, 0);
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkQueueSubmit() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to submit queue");
         return -1.0;
     }
 
     double startTime = mc_get_time();
     res = vkQueueWaitIdle(queue);
     if (res != VK_SUCCESS) {
-        MC_EMIT_MESSAGE(
-            self->device,
-            MC_DEBUG_LEVEL_HIGH,
-            "mc_Program_t",
-            "vkQueueWaitIdle() failed"
-        );
+        MC_MESSAGE_HIGH(self->device, "failed to wait for queue completion");
         return -1.0;
     }
 
