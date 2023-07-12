@@ -20,7 +20,6 @@ int main(void) {
     mc_Buffer_t* buff2 = mc_buffer_from(device, sizeof arr2, arr2);
 
     mc_Program_t* program = mc_program_create(device, "array.spv", "main", 2);
-
     mc_program_run(program, (mc_uvec3_t){5, 1, 1}, buff1, buff2);
 
     mc_buffer_read(buff1, 0, sizeof arr1, arr1);
