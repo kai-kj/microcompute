@@ -7,9 +7,9 @@
 #include "stb_image_write.h"
 
 struct Settings {
-    mc_vec2_t center;
-    mc_float_t zoom;
-    mc_int_t maxIter;
+    float center[2];
+    float zoom;
+    int maxIter;
 };
 
 static void debug_cb(mc_DebugLevel_t level, char* src, char* msg, void* arg) {
@@ -18,11 +18,11 @@ static void debug_cb(mc_DebugLevel_t level, char* src, char* msg, void* arg) {
 }
 
 int main(void) {
-    mc_uvec3_t size = (mc_uvec3_t){3840, 2160, 1};
-    size_t imgSize = sizeof(mc_int_t) * size.x * size.y;
+    int width = 3840, height = 2160;
+    size_t imgSize = sizeof(int) * width * height;
 
     struct Settings settings = {
-        .center = (mc_vec2_t){-0.7615, -0.08459},
+        .center = {-0.7615, -0.08459},
         .zoom = 1000,
         .maxIter = 500,
     };
@@ -34,13 +34,13 @@ int main(void) {
     mc_Buffer_t* dataBuff = mc_buffer_from(dev, sizeof settings, &settings);
     mc_Buffer_t* imgBuff = mc_buffer_create(dev, imgSize);
 
-    double time = mc_program_run(prog, size, dataBuff, imgBuff);
+    double time = mc_program_run(prog, width, height, 1, dataBuff, imgBuff);
     printf("compute time: %f[state]\n", time);
 
     void* img = malloc(imgSize);
     mc_buffer_read(imgBuff, 0, imgSize, img);
 
-    stbi_write_bmp("mandelbrot.bmp", size.x, size.y, 4, img);
+    stbi_write_bmp("mandelbrot.bmp", width, height, 4, img);
 
     free(img);
     mc_buffer_destroy(dataBuff);

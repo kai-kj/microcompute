@@ -2,8 +2,7 @@
 # `microcompute.h`
 
 This library contains utilities that can be used to easily run compute
-SPIR-V shaders using vulkan. The library is built to be used with GLSL
-shaders, although it should also work with other shader types.
+SPIR-V shaders using vulkan.
 
 ## Types
 
@@ -36,58 +35,6 @@ The debug callback type passed to `mc_set_debug_cb()`.
 - `source`: The message source (NULL terminated)
 - `msg`: The message contents (NULL terminated)
 - `arg`: The value passed to `debugArg` in `mc_instance_create()`
-
-----
-
-```c
-typedef float mc_float_t;
-typedef int32_t mc_int_t;
-typedef uint32_t mc_uint_t;
-```
-
-Basic scalar data types that can be used in GLSL.
-
-----
-
-```c
-typedef struct mc_vec2 {
-    mc_float_t x, y;
-} mc_vec2_t;
-
-typedef struct mc_vec3 {
-    mc_float_t x, y, z;
-} mc_vec3_t;
-
-typedef struct mc_vec4 {
-    mc_float_t x, y, z, w;
-} mc_vec4_t;
-
-typedef struct mc_ivec2 {
-    mc_int_t x, y;
-} mc_ivec2_t;
-
-typedef struct mc_ivec3 {
-    mc_int_t x, y, z;
-} mc_ivec3_t;
-
-typedef struct mc_ivec4 {
-    mc_int_t x, y, z, w;
-} mc_ivec4_t;
-
-typedef struct mc_uvec2 {
-    mc_uint_t x, y;
-} mc_uvec2_t;
-
-typedef struct mc_uvec3 {
-    mc_uint_t x, y, z;
-} mc_uvec3_t;
-
-typedef struct mc_uvec4 {
-    mc_uint_t x, y, z, w;
-} mc_uvec4_t;
-```
-
-The basic vector types that can be used in GLSL.
 
 ----
 
@@ -327,7 +274,13 @@ Checks whether a `mc_Program_t` object has been successfully initialized.
 ----
 
 ```c
-double mc_program_run(mc_Program_t* self, mc_uvec3_t dims, ...);
+double mc_program_run(
+    mc_Program_t* self,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    ...
+);
 ```
 
 Run a `mc_Program_t` object.
