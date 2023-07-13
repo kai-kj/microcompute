@@ -13,5 +13,7 @@ layout(std430, binding = 1) buffer buff2 {
 void main(void) {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = ivec2(gl_NumWorkGroups.xy);
-    data2[pos.x] = data1[pos.x] * data2[pos.x];
+
+    data1[pos.x] = data1[pos.x] + 2;
+    data2[pos.x] = data2[pos.x] * 2;
 }

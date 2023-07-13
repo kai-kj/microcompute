@@ -13,14 +13,15 @@ int main(void) {
     mc_Instance_t* instance = mc_instance_create((mc_debug_cb*)debug_cb, NULL);
     mc_Device_t* device = mc_instance_get_devices(instance)[0];
 
-    float arr1[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    mc_Buffer_t* buff1 = mc_buffer_from(device, sizeof arr1, arr1);
+    float arr1[] = {0.0, 1.0, 2.0, 3.0, 4.0};
+    float arr2[] = {5.0, 6.0, 7.0, 8.0, 9.0};
 
-    float arr2[] = {10.0, 100.0, 1000.0, 10000.0, 100000.0};
-    mc_Buffer_t* buff2 = mc_buffer_from(device, sizeof arr2, arr2);
+    mc_Buffer_t* buff1 = mc_buffer_create_from(device, sizeof arr1, arr1);
+    mc_Buffer_t* buff2 = mc_buffer_create_from(device, sizeof arr2, arr2);
 
-    mc_Program_t* program = mc_program_create(device, "array.spv", "main", 2);
-    mc_program_run(program, 5, 1, 1, buff1, buff2);
+    mc_Program_t* program = mc_program_create(device, "array.spv");
+    mc_program_setup(program, "main", 5, 1, 1, buff1, buff2);
+    mc_program_run(program);
 
     mc_buffer_read(buff1, 0, sizeof arr1, arr1);
     mc_buffer_read(buff2, 0, sizeof arr2, arr2);

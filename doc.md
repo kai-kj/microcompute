@@ -152,7 +152,11 @@ Create a `mc_Buffer_t` object.
 ----
 
 ```c
-mc_Buffer_t* mc_buffer_from(mc_Device_t* device, uint64_t size, void* data);
+mc_Buffer_t* mc_buffer_create_from(
+    mc_Device_t* device,
+    uint64_t size,
+    void* data
+);
 ```
 
 Create a `mc_Buffer_t` object and initializes with some data.
@@ -234,20 +238,13 @@ Read data from a `mc_Buffer_t` object.
 ----
 
 ```c
-mc_Program_t* mc_program_create(
-    mc_Device_t* device,
-    const char* fileName,
-    const char* entryPoint,
-    uint32_t bufferCount
-);
+mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName);
 ```
 
 Create a `mc_Program_t` object.
 
 - `device`: A reference to a `mc_Device_t` object
 - `fileName`: The path to the shader code
-- `entryPoint`: The entry point name, generally `"main"`
-- `bufferCount`: The number of buffers to bind
 - returns: A reference to a `mc_Program_t` object
 
 ----
@@ -274,21 +271,29 @@ Checks whether a `mc_Program_t` object has been successfully initialized.
 ----
 
 ```c
-double mc_program_run(
-    mc_Program_t* self,
-    uint32_t dimX,
-    uint32_t dimY,
-    uint32_t dimZ,
-    ...
-);
+#define mc_program_setup(self, entryPoint, dimX, dimY, dimZ, ...)              \
+    mc_program_setup__(self, entryPoint, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
+```
+
+Bind buffers to a `mc_Program_t` object.
+
+- `self`: A reference to a `mc_Program_t` object
+- `entryPoint`: The entry point name, generally `"main"`
+- `dimX`: The number of local workgroups in the x dimension
+- `dimY`: The number of local workgroups in the y dimension
+- `dimZ`: The number of local workgroups in the z dimension
+- `...`: A list of buffers to bind to the program
+
+----
+
+```c
+double mc_program_run(mc_Program_t* self);
 ```
 
 Run a `mc_Program_t` object.
 
 - `self`: A reference to a `mc_Program_t` object
 - `size`: The number of work groups to dispatch in each dimension
-- `...`: A list of buffers to bind to the program, must be of the same length
-         as the `bufferCount` value passed to `mc_program_create()`
 - returns: The time taken waiting for the compute operation tio finish, in
            seconds, -1.0 on fail
 
@@ -301,6 +306,22 @@ double mc_get_time();
 Get the current time.
 
 - returns: The current time, in seconds
+
+----
+
+```c
+void mc_program_setup__(
+    mc_Program_t* self,
+    const char* entryPoint,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    ...
+);
+```
+
+Wrapped functions. Don't use these directly, use their corresponding macros.
+
 
 ----
 

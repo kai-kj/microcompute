@@ -8,7 +8,7 @@ class T:
 
 def d_start(l): return re.search(r"^\/\*\*\s*(\w*)", l)
 def d_end(l): return re.search(r"^ \*\/", l) if l else True
-def d_line(l): return re.search(r"^ \* ?(.*)", l).groups()[0] + "\n"
+def d_line(l): return re.search(r"^ ?\*? ?(.*)", l).groups()[0] + "\n"
 
 def d_iter(txt):
     while not d_end(l := txt.next()): yield d_line(l)
