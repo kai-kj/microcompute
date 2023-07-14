@@ -4,11 +4,13 @@
 /** text
  * # `microcompute.h`
  *
- * This library contains systems that can be used to easily run compute shaders
- * in GLSL.
+ * This library contains utilities that can be used to easily run compute
+ * SPIR-V shaders using vulkan.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 /** text
  * ## Types
@@ -18,304 +20,248 @@
  * The severity of a debug message.
  */
 typedef enum mc_DebugLevel {
-    MC_LVL_INFO,
-    MC_LVL_LOW,
-    MC_LVL_MEDIUM,
-    MC_LVL_HIGH,
-} mc_DebugLevel;
+    MC_DEBUG_LEVEL_INFO,
+    MC_DEBUG_LEVEL_LOW,
+    MC_DEBUG_LEVEL_MEDIUM,
+    MC_DEBUG_LEVEL_HIGH,
+    MC_DEBUG_LEVEL_UNKNOWN,
+} mc_DebugLevel_t;
 
 /** code
  * The debug callback type passed to `mc_set_debug_cb()`.
  *
  * - `level`: A `mc_DebugLevel` indicating the severity of the message
- * - `msg`: The message (NULL terminated), memory is handled the library, so
- *          dont free
- * - `arg`: A pointer to some user defined data passed to `mc_set_debug_cb()`
+ * - `source`: The message source (NULL terminated)
+ * - `msg`: The message contents (NULL terminated)
+ * - `arg`: The value passed to `debugArg` in `mc_instance_create()`
  */
-typedef void(mc_debug_cb)(mc_DebugLevel level, const char* msg, void* arg);
+typedef void(mc_debug_cb)(
+    mc_DebugLevel_t level,
+    const char* source,
+    const char* msg,
+    void* arg
+);
 
 /** code
- * All basic value types supported by `mc_buffer_pack()` and
- * `mc_buffer_unpack()`.
+ * Core microcompute types.
  */
-typedef enum mc_ValueType {
-    MC_FLOAT = 0x00010101,
-    MC_VEC2 = 0x00020202,
-    MC_VEC3 = 0x00040303,
-    MC_VEC4 = 0x00040404,
-    MC_INT = 0x00010105,
-    MC_IVEC2 = 0x00020206,
-    MC_IVEC3 = 0x00040307,
-    MC_IVEC4 = 0x00040408,
-    MC_UINT = 0x00010109,
-    MC_UVEC2 = 0x0002020A,
-    MC_UVEC3 = 0x0004030B,
-    MC_UVEC4 = 0x0004040C,
-} mc_ValueType;
-
-/** code
- * Use with `mc_ValueType` to indicate an array of values.
- */
-#define MC_ARRAY(len) (((len)&0xFF) << 24)
-
-/** code
- * Buffer type.
- */
-typedef struct mc_Buffer__ mc_Buffer;
-
-/** code
- * Program type.
- */
-typedef struct mc_Program__ mc_Program;
-
-/** code
- * Basic scalar data types that can be used in GLSL.
- */
-
-typedef float mc_float;
-typedef int32_t mc_int;
-typedef uint32_t mc_uint;
-
-/** code
- * The basic vector types.
- */
-
-typedef struct mc_vec2 {
-    mc_float x, y;
-} mc_vec2;
-
-typedef struct mc_vec3 {
-    mc_float x, y, z;
-} mc_vec3;
-
-typedef struct mc_vec4 {
-    mc_float x, y, z, w;
-} mc_vec4;
-
-typedef struct mc_ivec2 {
-    mc_int x, y;
-} mc_ivec2;
-
-typedef struct mc_ivec3 {
-    mc_int x, y, z;
-} mc_ivec3;
-
-typedef struct mc_ivec4 {
-    mc_int x, y, z, w;
-} mc_ivec4;
-
-typedef struct mc_uvec2 {
-    mc_uint x, y;
-} mc_uvec2;
-
-typedef struct mc_uvec3 {
-    mc_uint x, y, z;
-} mc_uvec3;
-
-typedef struct mc_uvec4 {
-    mc_uint x, y, z, w;
-} mc_uvec4;
+typedef struct mc_Instance mc_Instance_t;
+typedef struct mc_Device mc_Device_t;
+typedef struct mc_Buffer mc_Buffer_t;
+typedef struct mc_Program mc_Program_t;
 
 /** text
  * ## Functions
  */
 
 /** code
- * Initialize microcompute.
+ * Convert a `mc_DebugLevel_t` enum to a human readable string.
  *
- * - `cb`: A function to call when a error occurs, set to `NULL` to ignore
- * - `arg`: An pointer to pass to the debug callback, set to `NULL` to ignore
- * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
- *            handled by the library, so dont free)
+ * - `level`: A `mc_DebugLevel_t` value
+ * - returns: A human readable string (`NULL` terminated)
  */
-char* mc_initialize(mc_debug_cb cb, void* arg);
+const char* mc_debug_level_to_str(mc_DebugLevel_t level);
 
 /** code
- * Stop microcompute.
+ * Create a `mc_Instance_t` object.
+ *
+ * - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
+ * - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
+ * - returns: A reference to a `mc_Instance_t` object
  */
-void mc_terminate();
+mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
 
 /** code
- * Wait for all compute operations to finish.
+ * Destroy a `mc_Instance_t` object.
  *
- * - returns: The time spent waiting
+ * - `self`: A reference to a `mc_Instance_t` object
  */
-double mc_finish_tasks();
+void mc_instance_destroy(mc_Instance_t* self);
 
 /** code
- * Get the current time in seconds.
+ * Checks whether a `mc_Instance_t` object has been successfully initialized.
  *
- * - returns: The current time
+ * - `self`: A reference to a `mc_Instance_t` object
+ * - returns: `true` if successful, `false` otherwise
+ */
+bool mc_instance_is_initialized(mc_Instance_t* self);
+
+/** code
+ * Get the number of available `mc_Device_t` objects.
+ *
+ * - `self`: A reference to a `mc_Instance_t` object
+ * - returns: The number of devices
+ */
+uint32_t mc_instance_get_device_count(mc_Instance_t* self);
+
+/** code
+ * Get a list of of available `mc_Device_t` objects.
+ *
+ * - `self`: A reference to a `mc_Instance_t` object
+ * - returns: A list of devices
+ */
+mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
+
+/** code
+ * Check if a `mc_Device_t` object is a discrete GPU.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: `true` if it is, `false` otherwise
+ */
+bool mc_device_is_discrete_gpu(mc_Device_t* self);
+
+/** code
+ * Check if a `mc_Device_t` object is a integrated GPU.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: `true` if it is, `false` otherwise
+ */
+bool mc_device_is_integrated_gpu(mc_Device_t* self);
+
+/** code
+ * Create a `mc_Buffer_t` object.
+ *
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `size`: The size of the buffer
+ * - returns: A reference to a `mc_Buffer_t` object
+ */
+mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size);
+
+/** code
+ * Create a `mc_Buffer_t` object and initializes with some data.
+ *
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `size`: The size of the buffer
+ * - `data`: A reference to the data the initialize the buffer with
+ * - returns: A reference to a `mc_Buffer_t` object
+ */
+mc_Buffer_t* mc_buffer_create_from(
+    mc_Device_t* device,
+    uint64_t size,
+    void* data
+);
+
+/** code
+ * Destroy a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ */
+void mc_buffer_destroy(mc_Buffer_t* self);
+
+/** code
+ * Checks whether a `mc_Buffer_t` object been successfully initialized.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ */
+bool mc_buffer_is_initialized(mc_Buffer_t* self);
+
+/** code
+ * Get the size of a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - returns: The size, in bytes
+ */
+uint64_t mc_buffer_get_size(mc_Buffer_t* self);
+
+/** code
+ * Write data to a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - `offset`: The offset from witch to start writing the data, in bytes
+ * - `size`: The size of the data to write, in bytes
+ * - `data`: The data to write
+ * - returns: The number of bytes written
+ */
+uint64_t mc_buffer_write(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
+
+/** code
+ * Read data from a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - `offset`: The offset from witch to start reading the data, in bytes
+ * - `size`: The size of the data to read, in bytes
+ * - `data`: Where to read the data to
+ * - returns: The number of bytes read
+ */
+uint64_t mc_buffer_read(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
+
+/** code
+ * Create a `mc_Program_t` object.
+ *
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `fileName`: The path to the shader code
+ * - returns: A reference to a `mc_Program_t` object
+ */
+mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName);
+
+/** code
+ * Destroy a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ */
+void mc_program_destroy(mc_Program_t* self);
+
+/** code
+ * Checks whether a `mc_Program_t` object has been successfully initialized.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - returns: `true` if successful, `false` otherwise
+ */
+bool mc_program_is_initialized(mc_Program_t* self);
+
+/** code
+ * Bind buffers to a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - `entryPoint`: The entry point name, generally `"main"`
+ * - `dimX`: The number of local workgroups in the x dimension
+ * - `dimY`: The number of local workgroups in the y dimension
+ * - `dimZ`: The number of local workgroups in the z dimension
+ * - `...`: A list of buffers to bind to the program
+ */
+#define mc_program_setup(self, entryPoint, dimX, dimY, dimZ, ...)              \
+    mc_program_setup__(self, entryPoint, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
+
+/** code
+ * Run a `mc_Program_t` object.
+ *
+ * - `self`: A reference to a `mc_Program_t` object
+ * - `size`: The number of work groups to dispatch in each dimension
+ * - returns: The time taken waiting for the compute operation tio finish, in
+ *            seconds, -1.0 on fail
+ */
+double mc_program_run(mc_Program_t* self);
+
+/** code
+ * Get the current time.
+ *
+ * - returns: The current time, in seconds
  */
 double mc_get_time();
 
 /** code
- * Create a SSBO buffer.
+ * Wrapped functions. Don't use these directly, use their corresponding macros.
  *
- * - `size`: The initial size of the buffer, can be changed later
- * - returns: `NULL` on fail, a buffer otherwise
  */
-mc_Buffer* mc_buffer_create(uint64_t size);
 
-/** code
- * Destroy a buffer.
- *
- * - `buffer`: A buffer
- */
-void mc_buffer_destroy(mc_Buffer* buffer);
-
-/** code
- * Get the current size of a buffer.
- *
- * - `buffer`: A buffer
- * - returns: The size of the buffer (in bytes)
- */
-uint64_t mc_buffer_get_size(mc_Buffer* buffer);
-
-/** code
- * Set the size of a buffer.
- *
- * - `buffer`: A buffer
- * - `size`: The new size of the buffer (in bytes)
- */
-void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size);
-
-/** code
- * Write data to a buffer. Check the std140 and std430 layouts to make sure the
- * data is transferred correctly.
- *
- * - `buffer`: A buffer
- * - `offset`: The offset from witch to start writing the data
- * - `size`: The size of the data to write
- * - `data`: A pointer to the data
- */
-void mc_buffer_write(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
+void mc_program_setup__(
+    mc_Program_t* self,
+    const char* entryPoint,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    ...
 );
-
-/** code
- * Read data from a buffer. Check the std140 and std430 layouts to make sure the
- * data is transferred correctly.
- *
- * - `buffer`: A buffer
- * - `offset`: The offset from witch to start reading the data
- * - `size`: The size of the data to read
- * - `data`: A pointer to write the data to (pre-allocated with enough space)
- */
-void mc_buffer_read(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-);
-
-/** code
- * Pack and write data to a buffer. Takes care of alignment automatically. No
- * support for structs, only basic variables and arrays. The maximum size of a
- * buffer that can be automatically packed is 1024 bytes.
- *
- * The arguments should be formatted as follows:
- * 1. Pass the type of the value with `mc_ValueType`
- * 2. Pass a reference to the value
- * 3. Repeat 1. and 2. for every value
- *
- * Arrays can be specified by performing a bit-wise or (`|`) between the type of
- * the value (`mc_ValueType`) and `MC_ARRAY(len)`, where `len` is the length of
- * the array. The array can be passed directly (dont reference the array).
- *
- * For example:
- * ```c
- * int a = 12;
- * float b[] = {1.0, 2.0, 3.0};
- * mc_buffer_pack(buff, MC_INT, &a, MC_FLOAT | MC_ARRAY(3), &b)
- * ```
- * will write the integer `12` and the float array `{1.0, 2.0, 3.0}` to the
- * buffer.
- *
- * - `buffer`: A buffer
- * - `...`: Arguments explained above
- * - returns: The number of bytes written to the buffer, 0 on failure.
- */
-#define mc_buffer_pack(buffer, ...)                                            \
-    mc_buffer_pack__(buffer, ##__VA_ARGS__, NULL);
-
-/** code
- * Read and unpack data from a buffer. Takes care of alignment automatically. No
- * support for structs, only basic variables and arrays. The maximum size of a
- * buffer that can be automatically packed is 1024 bytes.
- *
- * See `mc_buffer_pack()` for more info.
- *
- * - `buffer`: A buffer
- * - `...`: Arguments explained above
- * - returns: The number of bytes read from the buffer, 0 on failure.
- */
-#define mc_buffer_unpack(buffer, ...)                                          \
-    mc_buffer_unpack__(buffer, ##__VA_ARGS__, NULL);
-
-/** code
- * Create a program from a string.
- *
- * - `code`: A null-terminated string of GLSL code
- * - returns: A program
- */
-mc_Program* mc_program_create(const char* code);
-
-/** code
- * Destroy a program.
- *
- * - `program`: A program
- */
-void mc_program_destroy(mc_Program* program);
-
-/** code
- * Check if there were any errors while compiling the shader code.
- *
- * - `program`: A program
- * - returns: `NULL` if no errors, a null-terminated string otherwise (memory is
- *            handled by the library, so dont free)
- */
-char* mc_program_check(mc_Program* program);
-
-/** code
- * Run a program on the GPU. The buffers passed to the program will have their
- * binding set depending on its index in `...`.
- *
- * - `program`: A program
- * - `size`: The number of work groups to dispatch in each dimension
- * - `...`: Buffers to pass to the program
- * - returns: The time taken to run the program (in seconds), it is nonblocking,
- *            so the returned value should be approx 0
- */
-#define mc_program_run_nonblocking(program, size, ...)                         \
-    mc_program_run_nonblocking__(program, size, ##__VA_ARGS__, NULL)
-
-/** code
- * Run a program on the GPU. The buffers passed to the program will have their
- * binding set depending on its index in `...`.
- *
- * Because this calls `mc_finish_tasks()` internally, it may significantly
- * affect performance if called many times in succession.
- *
- * - `program`: A program
- * - `size`: The number of work groups to dispatch in each dimension
- * - `...`: Buffers to pass to the program
- * - returns: The time taken to run the program (in seconds)
- */
-#define mc_program_run_blocking(program, size, ...)                            \
-    mc_program_run_blocking__(program, size, ##__VA_ARGS__, NULL)
-
-/** code
- * Wrapped functions. Do not use them directly, use the wrapping macros.
- */
-
-size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
-size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
-double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...);
-double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
 
 /** text
  * ## Licence
@@ -347,217 +293,778 @@ double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <vulkan/vulkan.h>
 
-#define GLAD_GL_IMPLEMENTATION
-#define GLAD_EGL_IMPLEMENTATION
+#define MC_MSG(s, l, m)                                                        \
+    if ((s)->debug_cb) (s)->debug_cb((l), "mc", (m), (s)->debugArg);
 
-#include "microcompute_egl.h"
-#include "microcompute_gl.h"
+#define MC_MSG_INFO(s, m) MC_MSG((s), MC_DEBUG_LEVEL_INFO, (m))
+#define MC_MSG_LOW(s, m) MC_MSG((s), MC_DEBUG_LEVEL_LOW, (m))
+#define MC_MSG_MEDIUM(s, m) MC_MSG((s), MC_DEBUG_LEVEL_MEDIUM, (m))
+#define MC_MSG_HIGH(s, m) MC_MSG((s), MC_DEBUG_LEVEL_HIGH, (m))
 
-struct mc_State {
-    EGLDisplay disp;
-    EGLContext ctx;
+struct mc_Device {
+    void* debugArg;
     mc_debug_cb* debug_cb;
-    void* debug_cb_arg;
+    VkPhysicalDevice physDev;
+    uint32_t queueFamilyIdx;
+    VkDevice device;
 };
 
-typedef struct mc_Program__ {
-    GLint shader;
-    GLint program;
-    char* error;
-} mc_Program__;
+struct mc_Instance {
+    bool isInitialized;
+    void* debugArg;
+    mc_debug_cb* debug_cb;
+    VkInstance instance;
+    uint32_t devCount;
+    mc_Device_t** devs;
 
-typedef struct mc_Buffer__ {
-    GLuint buffer;
-} mc_Buffer__;
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    VkDebugUtilsMessengerEXT msg;
+#endif // MC_ENABLE_VALIDATION_LAYER
+};
 
-static struct mc_State S;
+struct mc_Buffer {
+    bool isInitialized;
+    mc_Device_t* dev;
+    uint64_t size;
+    void* mappedMemory;
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+};
 
-#define MC_TYPE_SIZE(type) (((type) >> 8) & 0xFF)
-#define MC_TYPE_ALIGN(type) (((type) >> 16) & 0xFF)
-#define MC_TYPE_ARRAY_LEN(type) (((type) >> 24) & 0xFF)
-#define MC_ALIGN_POS(pos, align)                                               \
-    ((pos) % (align) != 0 ? pos + align - ((pos) % (align)) : pos)
+struct mc_Program {
+    bool isInitialized;
+    mc_Device_t* dev;
+    VkShaderModule shaderModule;
+    VkDescriptorSetLayout descSetLayout;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline pipeline;
+    VkDescriptorPool descPool;
+    VkDescriptorSet descSet;
+    VkCommandPool cmdPool;
+    VkCommandBuffer cmdBuff;
+};
 
-static void mc_gl_debug_cb__(
-    GLenum source,
-    GLenum type,
-    GLuint id,
-    GLenum severity,
-    GLsizei length,
-    const GLchar* message,
-    const void* arg
+#ifdef MC_ENABLE_VALIDATION_LAYER
+static VkBool32 mc_vk_debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
+    const VkDebugUtilsMessengerCallbackDataEXT* message,
+    void* userData
 ) {
-    if (!S.debug_cb) return;
+    mc_Instance_t* instance = (mc_Instance_t*)userData;
+    if (!instance->debug_cb) return VK_FALSE;
 
-    mc_DebugLevel level;
+    enum mc_DebugLevel level;
     switch (severity) {
-        case GL_DEBUG_SEVERITY_NOTIFICATION: level = MC_LVL_INFO; break;
-        case GL_DEBUG_SEVERITY_LOW: level = MC_LVL_LOW; break;
-        case GL_DEBUG_SEVERITY_MEDIUM: level = MC_LVL_MEDIUM; break;
-        case GL_DEBUG_SEVERITY_HIGH: level = MC_LVL_HIGH; break;
-        default: return;
+        case 0x00000100: level = MC_DEBUG_LEVEL_MEDIUM; break; // warning
+        case 0x00001000: level = MC_DEBUG_LEVEL_HIGH; break;   // error
+        default: return VK_FALSE;                              // other
     }
 
-    uint32_t strLen = snprintf(NULL, 0, "GL: %s", message) + 1;
-    char* str = malloc(strLen);
-    snprintf(str, strLen, "GL: %s", message);
+    instance->debug_cb(level, "vk", message->pMessage, instance->debugArg);
+    return VK_FALSE;
+}
+#endif // MC_ENABLE_VALIDATION_LAYER
 
-    S.debug_cb(level, str, S.debug_cb_arg);
-
-    free(str);
+static size_t mc_read_file(const char* path, char* contents) {
+    FILE* fp = fopen(path, "rb");
+    if (!fp) return 0;
+    fseek(fp, 0, SEEK_END);
+    size_t length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (contents) (void)!fread(contents, 1, length, fp);
+    fclose(fp);
+    return length;
 }
 
-static char* mc_get_shader_errors__(GLuint shader) {
-    int32_t success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (success) return NULL;
-
-    GLint len;
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-    char* error = malloc(len);
-    glGetShaderInfoLog(shader, len, NULL, error);
-
-    return error;
+const char* mc_debug_level_to_str(mc_DebugLevel_t level) {
+    switch (level) {
+        case MC_DEBUG_LEVEL_INFO: return "MC_DEBUG_LEVEL_INFO";
+        case MC_DEBUG_LEVEL_LOW: return "MC_DEBUG_LEVEL_LOW";
+        case MC_DEBUG_LEVEL_MEDIUM: return "MC_DEBUG_LEVEL_MEDIUM";
+        case MC_DEBUG_LEVEL_HIGH: return "MC_DEBUG_LEVEL_HIGH";
+        default: return "MC_DEBUG_LEVEL_UNKNOWN"; // just incase
+    }
 }
 
-static char* mc_get_program_errors__(GLuint program) {
-    int32_t success;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (success) return NULL;
+mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
+    mc_Instance_t* self = malloc(sizeof *self);
+    *self = (mc_Instance_t){0};
 
-    GLint len;
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
-    char* error = malloc(len);
-    glGetProgramInfoLog(program, len, NULL, error);
+    VkApplicationInfo appInfo = {0};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "microcompute";
+    appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 
-    return error;
-}
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    MC_MSG_INFO(self, "enabling vulkan validation layer");
 
-static size_t mc_buffer_iter__(mc_Buffer* buffer, int upload, va_list args) {
-    int data[256] = {0};
-    int pos = 0;
+    VkDebugUtilsMessengerCreateInfoEXT msgInfo = {0};
+    msgInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    msgInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    msgInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+                        | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                        | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    msgInfo.pfnUserCallback = mc_vk_debug_callback;
+    msgInfo.pUserData = self;
 
-    if (!upload) {
-        uint64_t size = mc_buffer_get_size(buffer);
-        mc_buffer_read(buffer, 0, size > 256 ? 256 : size, data);
+    VkInstanceCreateInfo instanceInfo = {0};
+    instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instanceInfo.pApplicationInfo = &appInfo;
+    instanceInfo.pNext = &msgInfo;
+    instanceInfo.enabledLayerCount = 1;
+    instanceInfo.ppEnabledLayerNames = (const char*[]){
+        "VK_LAYER_KHRONOS_validation",
+    };
+    instanceInfo.enabledExtensionCount = 1;
+    instanceInfo.ppEnabledExtensionNames = (const char*[]){
+        "VK_EXT_debug_utils",
+    };
+#else
+    VkInstanceCreateInfo instanceInfo = {0};
+    instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instanceInfo.pApplicationInfo = &appInfo;
+#endif // MC_ENABLE_VALIDATION_LAYER
+
+    if (vkCreateInstance(&instanceInfo, NULL, &self->instance)) {
+        MC_MSG_HIGH(self, "failed to create vulkan instance");
+        return self;
     }
 
-    while (pos < 256) {
-        mc_ValueType type = va_arg(args, mc_ValueType);
-        if (!type) break;
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    PFN_vkCreateDebugUtilsMessengerEXT msg_create
+        = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            self->instance,
+            "vkCreateDebugUtilsMessengerEXT"
+        );
 
-        int size = MC_TYPE_SIZE(type);
-        int align = MC_TYPE_ALIGN(type);
-        int arrLen = MC_TYPE_ARRAY_LEN(type);
-        void* val = va_arg(args, void*);
+    // vkGetInstanceProcAddr() can fail, so just to be sure
+    if (msg_create) msg_create(self->instance, &msgInfo, NULL, &self->msg);
+#endif // MC_ENABLE_VALIDATION_LAYER
 
-        if (arrLen == 0) {
-            pos = MC_ALIGN_POS(pos, align);
-            if (upload) memcpy(&(data[pos]), val, size * sizeof(int));
-            else memcpy(val, &(data[pos]), size * sizeof(int));
-            pos += size;
-        } else {
-            for (int i = 0; i < arrLen; i++) {
-                pos = MC_ALIGN_POS(pos, align);
-                void* element = (int*)val + i * size;
-                if (upload) memcpy(&(data[pos]), element, size * sizeof(int));
-                else memcpy(element, &(data[pos]), size * sizeof(int));
-                pos += size;
+    uint32_t physDevCount = 0;
+    if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, NULL)) {
+        MC_MSG_HIGH(self, "failed to get vulkan devices");
+        return self;
+    }
+
+    VkPhysicalDevice* physDevs = malloc(sizeof *physDevs * physDevCount);
+    if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, physDevs)) {
+        MC_MSG_HIGH(self, "failed to get vulkan devices");
+        return self;
+    }
+
+    self->devs = malloc(sizeof *self->devs * physDevCount);
+
+    uint32_t physDevIdx = 0, devIdx = 0;
+    while (physDevIdx < physDevCount) {
+        VkPhysicalDevice physDev = physDevs[physDevIdx];
+
+        uint32_t queuePropsCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            physDev,
+            &queuePropsCount,
+            NULL
+        );
+
+        VkQueueFamilyProperties* queueProps
+            = malloc(sizeof *queueProps * queuePropsCount);
+
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            physDev,
+            &queuePropsCount,
+            queueProps
+        );
+
+        // so its easy to tell if no queue was found
+        uint32_t queueFamilyIdx = queuePropsCount;
+
+        // find dedicated compute queue, best case
+        for (uint32_t i = 0; i < queuePropsCount; i++) {
+            if (VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags
+                & !(VK_QUEUE_GRAPHICS_BIT & queueProps[i].queueFlags))
+                queueFamilyIdx = i;
+        }
+
+        if (queueFamilyIdx == queuePropsCount) {
+            // find compute capable queue
+            for (uint32_t i = 0; i < queuePropsCount; i++) {
+                if (VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags)
+                    queueFamilyIdx = i;
             }
         }
-    }
 
-    if (pos >= 256) return 0;
+        free(queueProps);
 
-    if (upload) {
-        mc_buffer_set_size(buffer, pos * sizeof(int));
-        mc_buffer_write(buffer, 0, pos * sizeof(int), data);
-    }
-
-    return pos * sizeof(int);
-}
-
-static void mc_program_run__(
-    mc_Program* program,
-    mc_uvec3 workgroupSize,
-    va_list args
-) {
-    if (program->error) return;
-    glUseProgram(program->program);
-
-    mc_Buffer* buffer;
-    for (int i = 0; (buffer = va_arg(args, mc_Buffer*)); i++)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, buffer->buffer);
-
-    glDispatchCompute(workgroupSize.x, workgroupSize.y, workgroupSize.z);
-}
-
-char* mc_initialize(mc_debug_cb cb, void* arg) {
-    S.debug_cb = cb;
-    S.debug_cb_arg = arg;
-
-    if (!gladLoaderLoadEGL(NULL)) return "failed to load egl";
-    S.disp = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (S.disp == EGL_NO_DISPLAY) return "failed to get egl disp";
-
-    EGLint major, minor;
-    if (!eglInitialize(S.disp, &major, &minor)) return "failed to init egl";
-    if (major < 1 || (major == 1 && minor < 5)) return "egl version too low";
-
-    if (!gladLoaderLoadEGL(S.disp)) return "failed to reload egl";
-    if (!eglBindAPI(EGL_OPENGL_API)) return "failed to bind opengl to egl";
-
-    EGLConfig eglCfg;
-    if (!eglChooseConfig(
-            S.disp,
-            (EGLint[]){EGL_NONE},
-            &eglCfg,
-            1,
-            &(EGLint){0}
-        ))
-        return "failed to choose egl config";
-
-    S.ctx = eglCreateContext(
-        S.disp,
-        eglCfg,
-        EGL_NO_CONTEXT,
-        (EGLint[]){
-            EGL_CONTEXT_MAJOR_VERSION,
-            4,
-            EGL_CONTEXT_MINOR_VERSION,
-            3,
-            EGL_CONTEXT_OPENGL_DEBUG,
-            EGL_TRUE,
-            EGL_NONE,
+        if (queueFamilyIdx == queuePropsCount) {
+            physDevIdx++;
+            continue;
         }
+
+        float queuePriority = 1.0;
+        VkDeviceQueueCreateInfo devQueueInfo = {0};
+        devQueueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        devQueueInfo.queueFamilyIndex = queueFamilyIdx;
+        devQueueInfo.queueCount = 1;
+        devQueueInfo.pQueuePriorities = &queuePriority;
+
+        VkDeviceCreateInfo devInfo = {0};
+        devInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        devInfo.queueCreateInfoCount = 1;
+        devInfo.pQueueCreateInfos = &devQueueInfo;
+
+        VkDevice device;
+        if (vkCreateDevice(physDev, &devInfo, NULL, &device)) {
+            physDevIdx++;
+            continue;
+        }
+
+        self->devs[devIdx] = malloc(sizeof *self->devs[devIdx]);
+        self->devs[devIdx]->debugArg = debugArg;
+        self->devs[devIdx]->debug_cb = debug_cb;
+        self->devs[devIdx]->physDev = physDev;
+        self->devs[devIdx]->queueFamilyIdx = queueFamilyIdx;
+        self->devs[devIdx]->device = device;
+
+        physDevIdx++;
+        devIdx++;
+    }
+
+    free(physDevs);
+    self->devCount = devIdx;
+
+    MC_MSG_INFO(self, "mc_Instance successfully initialized");
+    self->isInitialized = true;
+    return self;
+}
+
+void mc_instance_destroy(mc_Instance_t* self) {
+    MC_MSG_INFO(self, "destroying mc_Instance_t");
+
+    for (uint32_t i = 0; i < self->devCount; i++)
+        vkDestroyDevice(self->devs[i]->device, NULL);
+
+#ifdef MC_ENABLE_VALIDATION_LAYER
+    PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessenger
+        = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            self->instance,
+            "vkDestroyDebugUtilsMessengerEXT"
+        );
+
+    // vkGetInstanceProcAddr() can fail, so just to be sure
+    if (vkDestroyDebugUtilsMessenger)
+        vkDestroyDebugUtilsMessenger(self->instance, self->msg, NULL);
+#endif // MC_ENABLE_VALIDATION_LAYER
+
+    vkDestroyInstance(self->instance, NULL);
+    free(self);
+}
+
+bool mc_instance_is_initialized(mc_Instance_t* self) {
+    return self->isInitialized;
+}
+
+uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self, "mc_Instance_t not initialized");
+        return 0;
+    }
+    return self->devCount;
+}
+
+mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self, "mc_Instance_t not initialized");
+        return NULL;
+    }
+    return self->devs;
+}
+
+bool mc_device_is_discrete_gpu(mc_Device_t* device) {
+    VkPhysicalDeviceProperties devProps;
+    vkGetPhysicalDeviceProperties(device->physDev, &devProps);
+    return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+}
+
+bool mc_device_is_integrated_gpu(mc_Device_t* device) {
+    VkPhysicalDeviceProperties devProps;
+    vkGetPhysicalDeviceProperties(device->physDev, &devProps);
+    return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+}
+
+mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
+    mc_Buffer_t* self = malloc(sizeof *self);
+
+    *self = (mc_Buffer_t){0};
+    self->size = size;
+    self->dev = device;
+
+    VkBufferCreateInfo bufferInfo = {0};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = self->size;
+    bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferInfo.queueFamilyIndexCount = 1;
+    bufferInfo.pQueueFamilyIndices = &self->dev->queueFamilyIdx;
+
+    if (vkCreateBuffer(self->dev->device, &bufferInfo, NULL, &self->buffer)) {
+        MC_MSG_HIGH(self->dev, "failed to create vulkan buffer");
+        return self;
+    }
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(self->dev->device, self->buffer, &memReqs);
+
+    // check the minimum memory size
+    if (memReqs.size > self->size) self->size = memReqs.size;
+
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(self->dev->physDev, &memProps);
+
+    uint32_t memTypeIdx = memProps.memoryTypeCount;
+
+    for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
+        VkMemoryType type = memProps.memoryTypes[i];
+        VkMemoryHeap heap = memProps.memoryHeaps[type.heapIndex];
+        bool v = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & type.propertyFlags;
+        bool c = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT & type.propertyFlags;
+        if (v && c && self->size < heap.size) {
+            memTypeIdx = i;
+            break; // just get the  first valid memory
+        }
+    }
+
+    if (memTypeIdx == memProps.memoryTypeCount) {
+        MC_MSG_HIGH(self->dev, "no suitable memory type found");
+        return self;
+    }
+
+    VkMemoryAllocateInfo memAllocInfo = {0};
+    memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memAllocInfo.allocationSize = self->size;
+    memAllocInfo.memoryTypeIndex = memTypeIdx;
+
+    if (vkAllocateMemory(
+            self->dev->device,
+            &memAllocInfo,
+            NULL,
+            &self->memory
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to allocate vulkan memory");
+        return self;
+    }
+
+    // reading / writing to self->memory has the same effect as
+    // reading / writing to the buffer
+    vkMapMemory(
+        self->dev->device,
+        self->memory,
+        0,
+        self->size,
+        0,
+        &self->mappedMemory
     );
 
-    if (S.ctx == EGL_NO_CONTEXT) return "failed to create egl context";
+    if (vkBindBufferMemory(self->dev->device, self->buffer, self->memory, 0)) {
+        MC_MSG_HIGH(self->dev, "failed to map memory");
+        return self;
+    }
 
-    if (!eglMakeCurrent(S.disp, EGL_NO_SURFACE, EGL_NO_SURFACE, S.ctx))
-        return "failed to make egl context current";
-
-    if (gladLoaderLoadGL() == 0) return "failed to load gl";
-
-    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(mc_gl_debug_cb__, NULL);
-
-    return NULL;
+    MC_MSG_INFO(self->dev, "mc_Buffer_t successfully initialized");
+    self->isInitialized = true;
+    return self;
 }
 
-void mc_terminate() {
-    if (S.ctx != 0) eglDestroyContext(S.disp, S.ctx);
-    if (S.disp != 0) eglTerminate(S.disp);
+mc_Buffer_t* mc_buffer_create_from(
+    mc_Device_t* device,
+    uint64_t size,
+    void* data
+) {
+    mc_Buffer_t* self = mc_buffer_create(device, size);
+    if (!self->isInitialized) return self;
+
+    mc_buffer_write(self, 0, size, data);
+    return self;
 }
 
-double mc_finish_tasks() {
+void mc_buffer_destroy(mc_Buffer_t* self) {
+    MC_MSG_INFO(self->dev, "destroying mc_Buffer_t");
+    vkFreeMemory(self->dev->device, self->memory, NULL);
+    vkDestroyBuffer(self->dev->device, self->buffer, NULL);
+    free(self);
+}
+
+bool mc_buffer_is_initialized(mc_Buffer_t* self) {
+    return self->isInitialized;
+}
+
+uint64_t mc_buffer_get_size(mc_Buffer_t* self) {
+    return self->size;
+}
+
+uint64_t mc_buffer_write(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self->dev, "mc_Buffer_t not initialized");
+        return 0;
+    }
+
+    if (offset + size > self->size) {
+        MC_MSG_MEDIUM(self->dev, "offset + size > mc_Buffer_t.size");
+        return 0;
+    }
+
+    // since the buffer has been mapped, this is all thats needed
+    memcpy((char*)self->mappedMemory + offset, data, size);
+    return size;
+}
+
+uint64_t mc_buffer_read(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self->dev, "mc_Buffer_t not initialized");
+        return 0;
+    }
+
+    if (offset + size > self->size) {
+        MC_MSG_MEDIUM(self->dev, "offset + size > mc_Buffer_t.size");
+        return 0;
+    }
+
+    // since the buffer has been mapped, this is all thats needed
+    memcpy(data, (char*)self->mappedMemory + offset, size);
+    return size;
+}
+
+mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName) {
+    mc_Program_t* self = malloc(sizeof *self);
+    *self = (mc_Program_t){0};
+    self->dev = device;
+
+    size_t shaderSize = mc_read_file(fileName, NULL);
+
+    if (shaderSize == 0) {
+        MC_MSG_HIGH(self->dev, "failed to open shader file");
+        return self;
+    }
+
+    char* shaderCode = malloc(shaderSize);
+    mc_read_file(fileName, shaderCode);
+
+    VkShaderModuleCreateInfo moduleInfo = {0};
+    moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    moduleInfo.codeSize = shaderSize;
+    moduleInfo.pCode = (const uint32_t*)shaderCode;
+
+    if (vkCreateShaderModule(
+            self->dev->device,
+            &moduleInfo,
+            NULL,
+            &self->shaderModule
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create vulkan shader module");
+        free(shaderCode);
+        return self;
+    }
+
+    free(shaderCode);
+
+    MC_MSG_INFO(self->dev, "mc_Program_t successfully created");
+    self->isInitialized = true;
+    return self;
+}
+
+void mc_program_destroy(mc_Program_t* self) {
+    MC_MSG_INFO(self->dev, "destroying mc_Program_t");
+    vkFreeCommandBuffers(self->dev->device, self->cmdPool, 1, &self->cmdBuff);
+    vkDestroyCommandPool(self->dev->device, self->cmdPool, NULL);
+    vkFreeDescriptorSets(self->dev->device, self->descPool, 1, &self->descSet);
+    vkDestroyDescriptorPool(self->dev->device, self->descPool, NULL);
+    vkDestroyPipeline(self->dev->device, self->pipeline, NULL);
+    vkDestroyPipelineLayout(self->dev->device, self->pipelineLayout, NULL);
+    vkDestroyDescriptorSetLayout(self->dev->device, self->descSetLayout, NULL);
+    vkDestroyShaderModule(self->dev->device, self->shaderModule, NULL);
+    free(self);
+}
+
+bool mc_program_is_initialized(mc_Program_t* self) {
+    return self->isInitialized;
+}
+
+void mc_program_setup__(
+    mc_Program_t* self,
+    const char* entryPoint,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    ...
+) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
+        return;
+    }
+
+    // an easy mistake to make
+    if (dimX * dimY * dimZ == 0) {
+        MC_MSG_MEDIUM(self->dev, "at least one dimension is 0");
+        return;
+    }
+
+    // destroy old objects if they exist
+    vkFreeCommandBuffers(self->dev->device, self->cmdPool, 1, &self->cmdBuff);
+    vkDestroyCommandPool(self->dev->device, self->cmdPool, NULL);
+    vkFreeDescriptorSets(self->dev->device, self->descPool, 1, &self->descSet);
+    vkDestroyDescriptorPool(self->dev->device, self->descPool, NULL);
+    vkDestroyPipeline(self->dev->device, self->pipeline, NULL);
+    vkDestroyPipelineLayout(self->dev->device, self->pipelineLayout, NULL);
+    vkDestroyDescriptorSetLayout(self->dev->device, self->descSetLayout, NULL);
+
+    va_list args;
+
+    va_start(args, dimZ);
+    uint32_t argc = 0;
+    while (va_arg(args, void*) != NULL) argc++;
+    va_end(args);
+
+    VkDescriptorSetLayoutBinding* descBindings
+        = malloc(sizeof *descBindings * argc);
+
+    for (uint32_t i = 0; i < argc; i++) {
+        descBindings[i] = (VkDescriptorSetLayoutBinding){0};
+        descBindings[i].binding = i;
+        descBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descBindings[i].descriptorCount = 1;
+        descBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+
+    VkDescriptorSetLayoutCreateInfo descLayoutInfo = {0};
+    descLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descLayoutInfo.bindingCount = argc;
+    descLayoutInfo.pBindings = descBindings;
+
+    if (vkCreateDescriptorSetLayout(
+            self->dev->device,
+            &descLayoutInfo,
+            NULL,
+            &self->descSetLayout
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create descriptor set layout");
+        free(descBindings);
+        return;
+    }
+
+    free(descBindings);
+
+    VkPipelineLayoutCreateInfo pipelineInfo = {0};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineInfo.setLayoutCount = 1;
+    pipelineInfo.pSetLayouts = &self->descSetLayout;
+
+    if (vkCreatePipelineLayout(
+            self->dev->device,
+            &pipelineInfo,
+            NULL,
+            &self->pipelineLayout
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create pipeline layout");
+        return;
+    }
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo = {0};
+    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStageInfo.module = self->shaderModule;
+    shaderStageInfo.pName = entryPoint;
+
+    VkComputePipelineCreateInfo computePipelineInfo = {0};
+    computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineInfo.stage = shaderStageInfo;
+    computePipelineInfo.layout = self->pipelineLayout;
+
+    if (vkCreateComputePipelines(
+            self->dev->device,
+            0,
+            1,
+            &computePipelineInfo,
+            NULL,
+            &self->pipeline
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create compute pipeline");
+        return;
+    }
+
+    VkDescriptorPoolSize descPoolSize = {0};
+    descPoolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descPoolSize.descriptorCount = argc;
+
+    VkDescriptorPoolCreateInfo descPoolInfo = {0};
+    descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    descPoolInfo.maxSets = 1;
+    descPoolInfo.poolSizeCount = 1;
+    descPoolInfo.pPoolSizes = &descPoolSize;
+
+    if (vkCreateDescriptorPool(
+            self->dev->device,
+            &descPoolInfo,
+            NULL,
+            &self->descPool
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create descriptor pool");
+        return;
+    }
+
+    VkDescriptorSetAllocateInfo descAllocInfo = {0};
+    descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descAllocInfo.descriptorPool = self->descPool;
+    descAllocInfo.descriptorSetCount = 1;
+    descAllocInfo.pSetLayouts = &self->descSetLayout;
+
+    if (vkAllocateDescriptorSets(
+            self->dev->device,
+            &descAllocInfo,
+            &self->descSet
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to allocate descriptor sets");
+        return;
+    }
+
+    VkCommandPoolCreateInfo cmdPoolInfo = {0};
+    cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    cmdPoolInfo.queueFamilyIndex = self->dev->queueFamilyIdx;
+
+    if (vkCreateCommandPool(
+            self->dev->device,
+            &cmdPoolInfo,
+            NULL,
+            &self->cmdPool
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create command pool");
+        return;
+    }
+
+    VkDescriptorBufferInfo* descBuffInfo = malloc(sizeof *descBuffInfo * argc);
+    VkWriteDescriptorSet* wrtDescSet = malloc(sizeof *wrtDescSet * argc);
+    va_start(args, dimZ);
+
+    for (uint32_t i = 0; i < argc; i++) {
+        mc_Buffer_t* buffer = va_arg(args, void*);
+
+        if (!buffer->isInitialized) {
+            MC_MSG_MEDIUM(self->dev, "found uninitialized buffer");
+            return;
+        }
+
+        descBuffInfo[i] = (VkDescriptorBufferInfo){0};
+        descBuffInfo[i].buffer = buffer->buffer;
+        descBuffInfo[i].range = VK_WHOLE_SIZE;
+
+        wrtDescSet[i] = (VkWriteDescriptorSet){0};
+        wrtDescSet[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        wrtDescSet[i].dstSet = self->descSet;
+        wrtDescSet[i].dstBinding = i;
+        wrtDescSet[i].descriptorCount = 1;
+        wrtDescSet[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        wrtDescSet[i].pBufferInfo = &descBuffInfo[i];
+    }
+
+    va_end(args);
+
+    vkUpdateDescriptorSets(self->dev->device, argc, wrtDescSet, 0, NULL);
+    free(descBuffInfo);
+    free(wrtDescSet);
+
+    VkCommandBufferAllocateInfo cmdBuffAllocInfo = {0};
+    cmdBuffAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdBuffAllocInfo.commandPool = self->cmdPool;
+    cmdBuffAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdBuffAllocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(
+            self->dev->device,
+            &cmdBuffAllocInfo,
+            &self->cmdBuff
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to allocate command buffers");
+        return;
+    }
+
+    VkCommandBufferBeginInfo cmdBuffBeginInfo = {0};
+    cmdBuffBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBuffBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(self->cmdBuff, &cmdBuffBeginInfo)) {
+        MC_MSG_HIGH(self->dev, "failed to begin command buffer");
+        return;
+    }
+
+    vkCmdBindPipeline(
+        self->cmdBuff,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        self->pipeline
+    );
+
+    vkCmdBindDescriptorSets(
+        self->cmdBuff,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        self->pipelineLayout,
+        0,
+        1,
+        &self->descSet,
+        0,
+        NULL
+    );
+
+    vkCmdDispatch(self->cmdBuff, dimX, dimY, dimZ);
+    if (vkEndCommandBuffer(self->cmdBuff)) {
+        MC_MSG_HIGH(self->dev, "failed to end command buffer");
+        return;
+    }
+
+    MC_MSG_INFO(self->dev, "mc_Program_t successfully setup");
+}
+
+double mc_program_run(mc_Program_t* self) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
+        return -1.0;
+    }
+
+    VkQueue queue;
+    vkGetDeviceQueue(self->dev->device, self->dev->queueFamilyIdx, 0, &queue);
+
+    VkSubmitInfo submitInfo = {0};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &self->cmdBuff;
+
+    if (vkQueueSubmit(queue, 1, &submitInfo, 0)) {
+        MC_MSG_HIGH(self->dev, "failed to submit queue");
+        return -1.0;
+    }
+
     double startTime = mc_get_time();
-    glFinish();
+    if (vkQueueWaitIdle(queue)) {
+        MC_MSG_HIGH(self->dev, "failed to wait for queue completion");
+        return -1.0;
+    }
+
     return mc_get_time() - startTime;
 }
 
@@ -566,132 +1073,6 @@ double mc_get_time() {
     gettimeofday(&tv, NULL);
     return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
-
-mc_Buffer* mc_buffer_create(uint64_t size) {
-    mc_Buffer* buffer = malloc(sizeof *buffer);
-    glGenBuffers(1, &buffer->buffer);
-    mc_buffer_set_size(buffer, size);
-    return buffer;
-}
-
-void mc_buffer_destroy(mc_Buffer* buffer) {
-    if (!buffer) return;
-    if (buffer->buffer) glDeleteBuffers(1, &buffer->buffer);
-    free(buffer);
-}
-
-uint64_t mc_buffer_get_size(mc_Buffer* buffer) {
-    GLint size;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE, &size);
-    return size;
-}
-
-void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_DRAW);
-}
-
-void mc_buffer_write(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
-}
-
-void mc_buffer_read(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer->buffer);
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, size, data);
-}
-
-size_t mc_buffer_pack__(mc_Buffer* buffer, ...) {
-    va_list args;
-    va_start(args, buffer);
-    size_t len = mc_buffer_iter__(buffer, 1, args);
-    va_end(args);
-    return len;
-}
-
-size_t mc_buffer_unpack__(mc_Buffer* buffer, ...) {
-    va_list args;
-    va_start(args, buffer);
-    size_t len = mc_buffer_iter__(buffer, 0, args);
-    va_end(args);
-    return len;
-}
-
-mc_Program* mc_program_create(const char* code) {
-    mc_Program* program = malloc(sizeof *program);
-    program->error = NULL;
-
-    program->shader = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderSource(program->shader, 1, &code, NULL);
-    glCompileShader(program->shader);
-
-    if ((program->error = mc_get_shader_errors__(program->shader)))
-        return program;
-
-    program->program = glCreateProgram();
-    glAttachShader(program->program, program->shader);
-    glLinkProgram(program->program);
-
-    if ((program->error = mc_get_program_errors__(program->program))) {
-        glDeleteShader(program->shader);
-        return program;
-    }
-
-    return program;
-}
-
-void mc_program_destroy(mc_Program* program) {
-    if (!program) return;
-    if (program->shader) glDeleteShader(program->shader);
-    if (program->program) glDeleteProgram(program->program);
-    if (program->error) free(program->error);
-    free(program);
-}
-
-char* mc_program_check(mc_Program* program) {
-    return program->error;
-}
-
-double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...) {
-    va_list args;
-    va_start(args, size);
-
-    double startTime = mc_get_time();
-    mc_program_run__(program, size, args);
-    double time = mc_get_time() - startTime;
-
-    va_end(args);
-    return time;
-}
-
-double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...) {
-    va_list args;
-    va_start(args, size);
-
-    double startTime = mc_get_time();
-    mc_program_run__(program, size, args);
-    mc_finish_tasks();
-    double time = mc_get_time() - startTime;
-
-    va_end(args);
-    return time;
-}
-
-#undef MC_TYPE_SIZE
-#undef MC_TYPE_ALIGN
-#undef MC_TYPE_ARRAY_LEN
-#undef MC_ALIGN_POS
 
 #endif // MICROCOMPUTE_IMPLEMENTATION
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD

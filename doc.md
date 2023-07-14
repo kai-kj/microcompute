@@ -1,18 +1,19 @@
 
 # `microcompute.h`
 
-This library contains systems that can be used to easily run compute shaders
-in GLSL.
+This library contains utilities that can be used to easily run compute
+SPIR-V shaders using vulkan.
 
 ## Types
 
 ```c
 typedef enum mc_DebugLevel {
-    MC_LVL_INFO,
-    MC_LVL_LOW,
-    MC_LVL_MEDIUM,
-    MC_LVL_HIGH,
-} mc_DebugLevel;
+    MC_DEBUG_LEVEL_INFO,
+    MC_DEBUG_LEVEL_LOW,
+    MC_DEBUG_LEVEL_MEDIUM,
+    MC_DEBUG_LEVEL_HIGH,
+    MC_DEBUG_LEVEL_UNKNOWN,
+} mc_DebugLevel_t;
 ```
 
 The severity of a debug message.
@@ -20,146 +21,281 @@ The severity of a debug message.
 ----
 
 ```c
-typedef void(mc_debug_cb)(mc_DebugLevel level, const char* msg, void* arg);
+typedef void(mc_debug_cb)(
+    mc_DebugLevel_t level,
+    const char* source,
+    const char* msg,
+    void* arg
+);
 ```
 
 The debug callback type passed to `mc_set_debug_cb()`.
 
 - `level`: A `mc_DebugLevel` indicating the severity of the message
-- `msg`: The message (NULL terminated), memory is handled the library, so
-         dont free
-- `arg`: A pointer to some user defined data passed to `mc_set_debug_cb()`
+- `source`: The message source (NULL terminated)
+- `msg`: The message contents (NULL terminated)
+- `arg`: The value passed to `debugArg` in `mc_instance_create()`
 
 ----
 
 ```c
-typedef enum mc_ValueType {
-    MC_FLOAT = 0x00010101,
-    MC_VEC2 = 0x00020202,
-    MC_VEC3 = 0x00040303,
-    MC_VEC4 = 0x00040404,
-    MC_INT = 0x00010105,
-    MC_IVEC2 = 0x00020206,
-    MC_IVEC3 = 0x00040307,
-    MC_IVEC4 = 0x00040408,
-    MC_UINT = 0x00010109,
-    MC_UVEC2 = 0x0002020A,
-    MC_UVEC3 = 0x0004030B,
-    MC_UVEC4 = 0x0004040C,
-} mc_ValueType;
+typedef struct mc_Instance mc_Instance_t;
+typedef struct mc_Device mc_Device_t;
+typedef struct mc_Buffer mc_Buffer_t;
+typedef struct mc_Program mc_Program_t;
 ```
 
-All basic value types supported by `mc_buffer_pack()` and
-`mc_buffer_unpack()`.
-
-----
-
-```c
-#define MC_ARRAY(len) (((len)&0xFF) << 24)
-```
-
-Use with `mc_ValueType` to indicate an array of values.
-
-----
-
-```c
-typedef struct mc_Buffer__ mc_Buffer;
-```
-
-Buffer type.
-
-----
-
-```c
-typedef struct mc_Program__ mc_Program;
-```
-
-Program type.
-
-----
-
-```c
-typedef float mc_float;
-typedef int32_t mc_int;
-typedef uint32_t mc_uint;
-```
-
-Basic scalar data types that can be used in GLSL.
-
-----
-
-```c
-typedef struct mc_vec2 {
-    mc_float x, y;
-} mc_vec2;
-
-typedef struct mc_vec3 {
-    mc_float x, y, z;
-} mc_vec3;
-
-typedef struct mc_vec4 {
-    mc_float x, y, z, w;
-} mc_vec4;
-
-typedef struct mc_ivec2 {
-    mc_int x, y;
-} mc_ivec2;
-
-typedef struct mc_ivec3 {
-    mc_int x, y, z;
-} mc_ivec3;
-
-typedef struct mc_ivec4 {
-    mc_int x, y, z, w;
-} mc_ivec4;
-
-typedef struct mc_uvec2 {
-    mc_uint x, y;
-} mc_uvec2;
-
-typedef struct mc_uvec3 {
-    mc_uint x, y, z;
-} mc_uvec3;
-
-typedef struct mc_uvec4 {
-    mc_uint x, y, z, w;
-} mc_uvec4;
-```
-
-The basic vector types.
+Core microcompute types.
 
 ----
 
 ## Functions
 
 ```c
-char* mc_initialize(mc_debug_cb cb, void* arg);
+const char* mc_debug_level_to_str(mc_DebugLevel_t level);
 ```
 
-Initialize microcompute.
+Convert a `mc_DebugLevel_t` enum to a human readable string.
 
-- `cb`: A function to call when a error occurs, set to `NULL` to ignore
-- `arg`: An pointer to pass to the debug callback, set to `NULL` to ignore
-- returns: `NULL` if no errors, a null-terminated string otherwise (memory is
-           handled by the library, so dont free)
+- `level`: A `mc_DebugLevel_t` value
+- returns: A human readable string (`NULL` terminated)
 
 ----
 
 ```c
-void mc_terminate();
+mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
 ```
 
-Stop microcompute.
+Create a `mc_Instance_t` object.
+
+- `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
+- `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
+- returns: A reference to a `mc_Instance_t` object
 
 ----
 
 ```c
-double mc_finish_tasks();
+void mc_instance_destroy(mc_Instance_t* self);
 ```
 
-Wait for all compute operations to finish.
+Destroy a `mc_Instance_t` object.
 
-- returns: The time spent waiting
+- `self`: A reference to a `mc_Instance_t` object
+
+----
+
+```c
+bool mc_instance_is_initialized(mc_Instance_t* self);
+```
+
+Checks whether a `mc_Instance_t` object has been successfully initialized.
+
+- `self`: A reference to a `mc_Instance_t` object
+- returns: `true` if successful, `false` otherwise
+
+----
+
+```c
+uint32_t mc_instance_get_device_count(mc_Instance_t* self);
+```
+
+Get the number of available `mc_Device_t` objects.
+
+- `self`: A reference to a `mc_Instance_t` object
+- returns: The number of devices
+
+----
+
+```c
+mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
+```
+
+Get a list of of available `mc_Device_t` objects.
+
+- `self`: A reference to a `mc_Instance_t` object
+- returns: A list of devices
+
+----
+
+```c
+bool mc_device_is_discrete_gpu(mc_Device_t* self);
+```
+
+Check if a `mc_Device_t` object is a discrete GPU.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: `true` if it is, `false` otherwise
+
+----
+
+```c
+bool mc_device_is_integrated_gpu(mc_Device_t* self);
+```
+
+Check if a `mc_Device_t` object is a integrated GPU.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: `true` if it is, `false` otherwise
+
+----
+
+```c
+mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size);
+```
+
+Create a `mc_Buffer_t` object.
+
+- `device`: A reference to a `mc_Device_t` object
+- `size`: The size of the buffer
+- returns: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+mc_Buffer_t* mc_buffer_create_from(
+    mc_Device_t* device,
+    uint64_t size,
+    void* data
+);
+```
+
+Create a `mc_Buffer_t` object and initializes with some data.
+
+- `device`: A reference to a `mc_Device_t` object
+- `size`: The size of the buffer
+- `data`: A reference to the data the initialize the buffer with
+- returns: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+void mc_buffer_destroy(mc_Buffer_t* self);
+```
+
+Destroy a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+bool mc_buffer_is_initialized(mc_Buffer_t* self);
+```
+
+Checks whether a `mc_Buffer_t` object been successfully initialized.
+
+- `self`: A reference to a `mc_Buffer_t` object
+
+----
+
+```c
+uint64_t mc_buffer_get_size(mc_Buffer_t* self);
+```
+
+Get the size of a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- returns: The size, in bytes
+
+----
+
+```c
+uint64_t mc_buffer_write(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
+```
+
+Write data to a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- `offset`: The offset from witch to start writing the data, in bytes
+- `size`: The size of the data to write, in bytes
+- `data`: The data to write
+- returns: The number of bytes written
+
+----
+
+```c
+uint64_t mc_buffer_read(
+    mc_Buffer_t* self,
+    uint64_t offset,
+    uint64_t size,
+    void* data
+);
+```
+
+Read data from a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- `offset`: The offset from witch to start reading the data, in bytes
+- `size`: The size of the data to read, in bytes
+- `data`: Where to read the data to
+- returns: The number of bytes read
+
+----
+
+```c
+mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName);
+```
+
+Create a `mc_Program_t` object.
+
+- `device`: A reference to a `mc_Device_t` object
+- `fileName`: The path to the shader code
+- returns: A reference to a `mc_Program_t` object
+
+----
+
+```c
+void mc_program_destroy(mc_Program_t* self);
+```
+
+Destroy a `mc_Program_t` object.
+
+- `self`: A reference to a `mc_Program_t` object
+
+----
+
+```c
+bool mc_program_is_initialized(mc_Program_t* self);
+```
+
+Checks whether a `mc_Program_t` object has been successfully initialized.
+
+- `self`: A reference to a `mc_Program_t` object
+- returns: `true` if successful, `false` otherwise
+
+----
+
+```c
+#define mc_program_setup(self, entryPoint, dimX, dimY, dimZ, ...)              \
+    mc_program_setup__(self, entryPoint, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
+```
+
+Bind buffers to a `mc_Program_t` object.
+
+- `self`: A reference to a `mc_Program_t` object
+- `entryPoint`: The entry point name, generally `"main"`
+- `dimX`: The number of local workgroups in the x dimension
+- `dimY`: The number of local workgroups in the y dimension
+- `dimZ`: The number of local workgroups in the z dimension
+- `...`: A list of buffers to bind to the program
+
+----
+
+```c
+double mc_program_run(mc_Program_t* self);
+```
+
+Run a `mc_Program_t` object.
+
+- `self`: A reference to a `mc_Program_t` object
+- `size`: The number of work groups to dispatch in each dimension
+- returns: The time taken waiting for the compute operation tio finish, in
+           seconds, -1.0 on fail
 
 ----
 
@@ -167,218 +303,25 @@ Wait for all compute operations to finish.
 double mc_get_time();
 ```
 
-Get the current time in seconds.
+Get the current time.
 
-- returns: The current time
-
-----
-
-```c
-mc_Buffer* mc_buffer_create(uint64_t size);
-```
-
-Create a SSBO buffer.
-
-- `size`: The initial size of the buffer, can be changed later
-- returns: `NULL` on fail, a buffer otherwise
+- returns: The current time, in seconds
 
 ----
 
 ```c
-void mc_buffer_destroy(mc_Buffer* buffer);
-```
-
-Destroy a buffer.
-
-- `buffer`: A buffer
-
-----
-
-```c
-uint64_t mc_buffer_get_size(mc_Buffer* buffer);
-```
-
-Get the current size of a buffer.
-
-- `buffer`: A buffer
-- returns: The size of the buffer (in bytes)
-
-----
-
-```c
-void mc_buffer_set_size(mc_Buffer* buffer, uint64_t size);
-```
-
-Set the size of a buffer.
-
-- `buffer`: A buffer
-- `size`: The new size of the buffer (in bytes)
-
-----
-
-```c
-void mc_buffer_write(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
+void mc_program_setup__(
+    mc_Program_t* self,
+    const char* entryPoint,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    ...
 );
 ```
 
-Write data to a buffer. Check the std140 and std430 layouts to make sure the
-data is transferred correctly.
+Wrapped functions. Don't use these directly, use their corresponding macros.
 
-- `buffer`: A buffer
-- `offset`: The offset from witch to start writing the data
-- `size`: The size of the data to write
-- `data`: A pointer to the data
-
-----
-
-```c
-void mc_buffer_read(
-    mc_Buffer* buffer,
-    uint64_t offset,
-    uint64_t size,
-    void* data
-);
-```
-
-Read data from a buffer. Check the std140 and std430 layouts to make sure the
-data is transferred correctly.
-
-- `buffer`: A buffer
-- `offset`: The offset from witch to start reading the data
-- `size`: The size of the data to read
-- `data`: A pointer to write the data to (pre-allocated with enough space)
-
-----
-
-```c
-#define mc_buffer_pack(buffer, ...)                                            \
-    mc_buffer_pack__(buffer, ##__VA_ARGS__, NULL);
-```
-
-Pack and write data to a buffer. Takes care of alignment automatically. No
-support for structs, only basic variables and arrays. The maximum size of a
-buffer that can be automatically packed is 1024 bytes.
-
-The arguments should be formatted as follows:
-1. Pass the type of the value with `mc_ValueType`
-2. Pass a reference to the value
-3. Repeat 1. and 2. for every value
-
-Arrays can be specified by performing a bit-wise or (`|`) between the type of
-the value (`mc_ValueType`) and `MC_ARRAY(len)`, where `len` is the length of
-the array. The array can be passed directly (dont reference the array).
-
-For example:
-```c
-int a = 12;
-float b[] = {1.0, 2.0, 3.0};
-mc_buffer_pack(buff, MC_INT, &a, MC_FLOAT | MC_ARRAY(3), &b)
-```
-will write the integer `12` and the float array `{1.0, 2.0, 3.0}` to the
-buffer.
-
-- `buffer`: A buffer
-- `...`: Arguments explained above
-- returns: The number of bytes written to the buffer, 0 on failure.
-
-----
-
-```c
-#define mc_buffer_unpack(buffer, ...)                                          \
-    mc_buffer_unpack__(buffer, ##__VA_ARGS__, NULL);
-```
-
-Read and unpack data from a buffer. Takes care of alignment automatically. No
-support for structs, only basic variables and arrays. The maximum size of a
-buffer that can be automatically packed is 1024 bytes.
-
-See `mc_buffer_pack()` for more info.
-
-- `buffer`: A buffer
-- `...`: Arguments explained above
-- returns: The number of bytes read from the buffer, 0 on failure.
-
-----
-
-```c
-mc_Program* mc_program_create(const char* code);
-```
-
-Create a program from a string.
-
-- `code`: A null-terminated string of GLSL code
-- returns: A program
-
-----
-
-```c
-void mc_program_destroy(mc_Program* program);
-```
-
-Destroy a program.
-
-- `program`: A program
-
-----
-
-```c
-char* mc_program_check(mc_Program* program);
-```
-
-Check if there were any errors while compiling the shader code.
-
-- `program`: A program
-- returns: `NULL` if no errors, a null-terminated string otherwise (memory is
-           handled by the library, so dont free)
-
-----
-
-```c
-#define mc_program_run_nonblocking(program, size, ...)                         \
-    mc_program_run_nonblocking__(program, size, ##__VA_ARGS__, NULL)
-```
-
-Run a program on the GPU. The buffers passed to the program will have their
-binding set depending on its index in `...`.
-
-- `program`: A program
-- `size`: The number of work groups to dispatch in each dimension
-- `...`: Buffers to pass to the program
-- returns: The time taken to run the program (in seconds), it is nonblocking,
-           so the returned value should be approx 0
-
-----
-
-```c
-#define mc_program_run_blocking(program, size, ...)                            \
-    mc_program_run_blocking__(program, size, ##__VA_ARGS__, NULL)
-```
-
-Run a program on the GPU. The buffers passed to the program will have their
-binding set depending on its index in `...`.
-
-Because this calls `mc_finish_tasks()` internally, it may significantly
-affect performance if called many times in succession.
-
-- `program`: A program
-- `size`: The number of work groups to dispatch in each dimension
-- `...`: Buffers to pass to the program
-- returns: The time taken to run the program (in seconds)
-
-----
-
-```c
-size_t mc_buffer_pack__(mc_Buffer* buffer, ...);
-size_t mc_buffer_unpack__(mc_Buffer* buffer, ...);
-double mc_program_run_nonblocking__(mc_Program* program, mc_uvec3 size, ...);
-double mc_program_run_blocking__(mc_Program* program, mc_uvec3 size, ...);
-```
-
-Wrapped functions. Do not use them directly, use the wrapping macros.
 
 ----
 

@@ -10,33 +10,23 @@
 
 ## About
 
-This library makes it easy to run simple OpenGL compute shaders without creating a window. This is done by using EGL, allowing headless programs to use the GPU.
-
-Bindings to lua are also provided in `lua_interface/`. [`luajit`](https://luajit.org/luajit.html) is needed for this library.
+A small and simple library to use compute shaders in Vulkan.
 
 ## Examples
 
 - Array operations
-  - [`array.c`](https://github.com/kal39/microcompute/blob/master/examples/c/array.c)
-  - [`array.lua`](https://github.com/kal39/microcompute/blob/master/examples/lua/array.lua)
+  - [`array.c`](https://github.com/kal39/microcompute/blob/master/examples/array.c)
+  - [`array.glsl`](https://github.com/kal39/microcompute/blob/master/examples/array.glsl)
 - Mandelbrot renderer
-  - [`mandelbrot.c`](https://github.com/kal39/microcompute/blob/master/examples/c/mandelbrot.c)
-  - [`mandelbrot.lua`](https://github.com/kal39/microcompute/blob/master/examples/lua/mandelbrot.lua)
+  - [`mandelbrot.c`](https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.glsl)
+  - [`mandelbrot.glsl`](https://github.com/kal39/microcompute/blob/master/examples/mandelbrot.glsl)
+
+Run `make all` in `examples/` to build all examples. It requires `gcc` and `glslangValidator` to be installed.
 
 ## Documentation
 
-- C
-  - [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md)
-  - [`microcompute.h`](https://github.com/kal39/microcompute/blob/master/microcompute.h) (generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html))
-- lua
-  - [`microcompute.lua`](https://github.com/kal39/microcompute/blob/master/lua_interface/microcompute.lua)
-
-## Building
-
-- To build the C examples, simply run `make` in `examples/c`.
-- The examples can be run with `./array` or `./mandelbrot` (in `examples/c`).
-- To build the lua interface, simply run `make` in `microcompute/lua_interface`.
-- The lua examples can be run with `luajit array.lua` and `luajit mandelbrot.lua` (in `examples/lua`)
+- [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md)
+- [`microcompute.h`](https://github.com/kal39/microcompute/blob/master/microcompute.h) (generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html))
 
 ## License
 
