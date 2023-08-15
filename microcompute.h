@@ -268,6 +268,8 @@ void mc_program_setup__(
     ...
 );
 
+#endif // MICROCOMPUTE_H_INCLUDE_GUARD
+
 /** text
  * ## Licence
  *
@@ -1103,4 +1105,3 @@ double mc_get_time() {
 }
 
 #endif // MICROCOMPUTE_IMPLEMENTATION
-#endif // MICROCOMPUTE_H_INCLUDE_GUARD
