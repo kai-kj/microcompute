@@ -20,19 +20,23 @@ int main(void) {
     mc_Buffer_t* buff2 = mc_buffer_create_from(device, sizeof arr2, arr2);
 
     mc_Program_t* program = mc_program_create(device, "array.spv");
-    mc_program_setup(program, "main", 5, 1, 1, buff1, buff2);
-    mc_program_run(program);
+    mc_program_setup(program, "main", 0, buff1, buff2);
 
-    mc_buffer_read(buff1, 0, sizeof arr1, arr1);
-    mc_buffer_read(buff2, 0, sizeof arr2, arr2);
+    for (uint32_t i = 0; i < 5; i++) {
+        printf("iteration %d:\n", i);
+        mc_program_run(program, 5, 1, 1, NULL);
 
-    printf("arr1: ");
-    for (uint32_t i = 0; i < 5; i++) printf("%f, ", arr1[i]);
-    printf("\n");
+        mc_buffer_read(buff1, 0, sizeof arr1, arr1);
+        mc_buffer_read(buff2, 0, sizeof arr2, arr2);
 
-    printf("arr2: ");
-    for (uint32_t i = 0; i < 5; i++) printf("%f, ", arr2[i]);
-    printf("\n");
+        printf("  arr1: ");
+        for (uint32_t i = 0; i < 5; i++) printf("%f, ", arr1[i]);
+        printf("\n");
+
+        printf("  arr2: ");
+        for (uint32_t i = 0; i < 5; i++) printf("%f, ", arr2[i]);
+        printf("\n");
+    }
 
     mc_buffer_destroy(buff1);
     mc_buffer_destroy(buff2);

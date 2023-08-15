@@ -224,23 +224,30 @@ bool mc_program_is_initialized(mc_Program_t* self);
  *
  * - `self`: A reference to a `mc_Program_t` object
  * - `entryPoint`: The entry point name, generally `"main"`
- * - `dimX`: The number of local workgroups in the x dimension
- * - `dimY`: The number of local workgroups in the y dimension
- * - `dimZ`: The number of local workgroups in the z dimension
+ * - `pcSize`: The size of the push constant data, set to 0 to ignore
  * - `...`: A list of buffers to bind to the program
  */
-#define mc_program_setup(self, entryPoint, dimX, dimY, dimZ, ...)              \
-    mc_program_setup__(self, entryPoint, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
+#define mc_program_setup(self, entryPoint, pcSize, ...)                        \
+    mc_program_setup__(self, entryPoint, pcSize, ##__VA_ARGS__, NULL)
 
 /** code
  * Run a `mc_Program_t` object.
  *
  * - `self`: A reference to a `mc_Program_t` object
- * - `size`: The number of work groups to dispatch in each dimension
+ * - `dimX`: The number of local workgroups in the x dimension
+ * - `dimY`: The number of local workgroups in the y dimension
+ * - `dimZ`: The number of local workgroups in the z dimension
+ * - `pcData`: A reference to the push constant data, pass `NULL` to ignore
  * - returns: The time taken waiting for the compute operation tio finish, in
  *            seconds, -1.0 on fail
  */
-double mc_program_run(mc_Program_t* self);
+double mc_program_run(
+    mc_Program_t* self,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    void* pcData
+);
 
 /** code
  * Get the current time.
@@ -257,9 +264,7 @@ double mc_get_time();
 void mc_program_setup__(
     mc_Program_t* self,
     const char* entryPoint,
-    uint32_t dimX,
-    uint32_t dimY,
-    uint32_t dimZ,
+    uint32_t pcSize,
     ...
 );
 
@@ -337,6 +342,7 @@ struct mc_Buffer {
 
 struct mc_Program {
     bool isInitialized;
+    uint32_t pcSize;
     mc_Device_t* dev;
     VkShaderModule shaderModule;
     VkDescriptorSetLayout descSetLayout;
@@ -661,8 +667,6 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
         return self;
     }
 
-    // reading / writing to self->memory has the same effect as
-    // reading / writing to the buffer
     vkMapMemory(
         self->dev->device,
         self->memory,
@@ -809,9 +813,7 @@ bool mc_program_is_initialized(mc_Program_t* self) {
 void mc_program_setup__(
     mc_Program_t* self,
     const char* entryPoint,
-    uint32_t dimX,
-    uint32_t dimY,
-    uint32_t dimZ,
+    uint32_t pcSize,
     ...
 ) {
     if (!self->isInitialized) {
@@ -819,11 +821,7 @@ void mc_program_setup__(
         return;
     }
 
-    // an easy mistake to make
-    if (dimX * dimY * dimZ == 0) {
-        MC_MSG_MEDIUM(self->dev, "at least one dimension is 0");
-        return;
-    }
+    self->pcSize = pcSize;
 
     // destroy old objects if they exist
     vkFreeCommandBuffers(self->dev->device, self->cmdPool, 1, &self->cmdBuff);
@@ -836,7 +834,7 @@ void mc_program_setup__(
 
     va_list args;
 
-    va_start(args, dimZ);
+    va_start(args, pcSize);
     uint32_t argc = 0;
     while (va_arg(args, void*) != NULL) argc++;
     va_end(args);
@@ -870,10 +868,17 @@ void mc_program_setup__(
 
     free(descBindings);
 
+    VkPushConstantRange pushConstant;
+    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstant.offset = 0;
+    pushConstant.size = self->pcSize;
+
     VkPipelineLayoutCreateInfo pipelineInfo = {0};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineInfo.setLayoutCount = 1;
     pipelineInfo.pSetLayouts = &self->descSetLayout;
+    pipelineInfo.pushConstantRangeCount = 1;
+    pipelineInfo.pPushConstantRanges = &pushConstant;
 
     if (vkCreatePipelineLayout(
             self->dev->device,
@@ -961,7 +966,7 @@ void mc_program_setup__(
 
     VkDescriptorBufferInfo* descBuffInfo = malloc(sizeof *descBuffInfo * argc);
     VkWriteDescriptorSet* wrtDescSet = malloc(sizeof *wrtDescSet * argc);
-    va_start(args, dimZ);
+    va_start(args, pcSize);
 
     for (uint32_t i = 0; i < argc; i++) {
         mc_Buffer_t* buffer = va_arg(args, void*);
@@ -1005,13 +1010,34 @@ void mc_program_setup__(
         return;
     }
 
+    MC_MSG_INFO(self->dev, "mc_Program_t successfully setup");
+}
+
+double mc_program_run(
+    mc_Program_t* self,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    void* pcData
+) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
+        return -1.0;
+    }
+
+    // an easy mistake to make
+    if (dimX * dimY * dimZ == 0) {
+        MC_MSG_MEDIUM(self->dev, "at least one dimension is 0");
+        return -1.0;
+    }
+
     VkCommandBufferBeginInfo cmdBuffBeginInfo = {0};
     cmdBuffBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     cmdBuffBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     if (vkBeginCommandBuffer(self->cmdBuff, &cmdBuffBeginInfo)) {
         MC_MSG_HIGH(self->dev, "failed to begin command buffer");
-        return;
+        return -1.0;
     }
 
     vkCmdBindPipeline(
@@ -1031,18 +1057,20 @@ void mc_program_setup__(
         NULL
     );
 
+    if (pcData) {
+        vkCmdPushConstants(
+            self->cmdBuff,
+            self->pipelineLayout,
+            VK_SHADER_STAGE_COMPUTE_BIT,
+            0,
+            self->pcSize,
+            pcData
+        );
+    }
+
     vkCmdDispatch(self->cmdBuff, dimX, dimY, dimZ);
     if (vkEndCommandBuffer(self->cmdBuff)) {
         MC_MSG_HIGH(self->dev, "failed to end command buffer");
-        return;
-    }
-
-    MC_MSG_INFO(self->dev, "mc_Program_t successfully setup");
-}
-
-double mc_program_run(mc_Program_t* self) {
-    if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
         return -1.0;
     }
 

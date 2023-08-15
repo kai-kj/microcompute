@@ -30,22 +30,19 @@ int main(void) {
     mc_Instance_t* instance = mc_instance_create((mc_debug_cb*)debug_cb, NULL);
     mc_Device_t* dev = mc_instance_get_devices(instance)[0];
 
-    mc_Buffer_t* dBuff = mc_buffer_create_from(dev, sizeof settings, &settings);
-    mc_Buffer_t* iBuff = mc_buffer_create(dev, imgSize);
+    mc_Buffer_t* imgBuff = mc_buffer_create(dev, imgSize);
 
     mc_Program_t* prog = mc_program_create(dev, "mandelbrot.spv");
-    mc_program_setup(prog, "main", width, height, 1, dBuff, iBuff);
-    double time = mc_program_run(prog);
+    mc_program_setup(prog, "main", sizeof settings, imgBuff);
+    double time = mc_program_run(prog, width, height, 1, &settings);
     printf("compute time: %f[state]\n", time);
 
     void* img = malloc(imgSize);
-    mc_buffer_read(iBuff, 0, imgSize, img);
-
+    mc_buffer_read(imgBuff, 0, imgSize, img);
     stbi_write_bmp("mandelbrot.bmp", width, height, 4, img);
 
     free(img);
-    mc_buffer_destroy(dBuff);
-    mc_buffer_destroy(iBuff);
+    mc_buffer_destroy(imgBuff);
     mc_program_destroy(prog);
     mc_instance_destroy(instance);
 }
