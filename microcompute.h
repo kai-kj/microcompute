@@ -4,8 +4,8 @@
 /** text
  * # `microcompute.h`
  *
- * This library contains utilities that can be used to easily run compute
- * SPIR-V shaders using vulkan.
+ * This library contains utilities that can be used to easily run SPIR-V compute
+ * shaders using vulkan.
  */
 
 #include <stdbool.h>
@@ -260,7 +260,6 @@ double mc_get_time();
  * Wrapped functions. Don't use these directly, use their corresponding macros.
  *
  */
-
 void mc_program_setup__(
     mc_Program_t* self,
     const char* entryPoint,
