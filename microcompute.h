@@ -119,6 +119,22 @@ bool mc_device_is_discrete_gpu(mc_Device_t* self);
 bool mc_device_is_integrated_gpu(mc_Device_t* self);
 
 /** code
+ * Get the video memory of a device.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: The size of the video memory in bytes
+ */
+uint64_t mc_device_get_memory_size(mc_Device_t* self);
+
+/** code
+ * Get the name of a device.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: A `NULL` terminated string containing the name of the device
+ */
+char* mc_device_get_name(mc_Device_t* self);
+
+/** code
  * Create a `mc_Buffer_t` object.
  *
  * - `device`: A reference to a `mc_Device_t` object
@@ -317,6 +333,7 @@ struct mc_Device {
     VkPhysicalDevice physDev;
     uint32_t queueFamilyIdx;
     VkDevice device;
+    char devName[256];
 };
 
 struct mc_Instance {
@@ -540,6 +557,14 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         self->devs[devIdx]->queueFamilyIdx = queueFamilyIdx;
         self->devs[devIdx]->device = device;
 
+        VkPhysicalDeviceProperties devProps;
+        vkGetPhysicalDeviceProperties(self->devs[devIdx]->physDev, &devProps);
+        memcpy(
+            self->devs[devIdx]->devName,
+            devProps.deviceName,
+            sizeof devProps.deviceName
+        );
+
         physDevIdx++;
         devIdx++;
     }
@@ -594,16 +619,32 @@ mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
     return self->devs;
 }
 
-bool mc_device_is_discrete_gpu(mc_Device_t* device) {
+bool mc_device_is_discrete_gpu(mc_Device_t* self) {
     VkPhysicalDeviceProperties devProps;
-    vkGetPhysicalDeviceProperties(device->physDev, &devProps);
+    vkGetPhysicalDeviceProperties(self->physDev, &devProps);
     return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 }
 
-bool mc_device_is_integrated_gpu(mc_Device_t* device) {
+bool mc_device_is_integrated_gpu(mc_Device_t* self) {
     VkPhysicalDeviceProperties devProps;
-    vkGetPhysicalDeviceProperties(device->physDev, &devProps);
+    vkGetPhysicalDeviceProperties(self->physDev, &devProps);
     return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+}
+
+uint64_t mc_device_get_memory_size(mc_Device_t* self) {
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(self->physDev, &memProps);
+
+    for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
+        if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            return memProps.memoryHeaps[i].size;
+    }
+
+    return 0;
+}
+
+char* mc_device_get_name(mc_Device_t* self) {
+    return self->devName;
 }
 
 mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
