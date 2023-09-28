@@ -3,23 +3,23 @@ GLCC     := glslangValidator -V -S comp
 
 INCLUDES := -I ../
 LIBS     := -lvulkan
-FLAGS    := -g -O3 -std=c99 -Wall -Wextra -pedantic -D MC_ENABLE_VALIDATION_LAYER
+FLAGS    := -g -O3 -std=c99 -Wall -Wextra -pedantic -Wno-unused-parameter -D MC_ENABLE_VALIDATION_LAYER
 
 .PHONY: all clean
 
-all: array mandelbrot
+all: check_devs mandelbrot
 
-array.spv: array.glsl
-	$(GLCC) array.glsl -o $@
+check_devs.spv: check_devs.glsl
+	$(GLCC) check_devs.glsl -o $@
 
 mandelbrot.spv: mandelbrot.glsl
 	$(GLCC) mandelbrot.glsl -o $@
 
-array: array.spv array.c ../microcompute.h
+check_devs: check_devs.spv check_devs.c ../microcompute.h
 	$(CC) $(FLAGS) $(INCLUDES) $@.c -o $@ $(LIBS)
 
 mandelbrot: mandelbrot.spv mandelbrot.c ../microcompute.h
 	$(CC) $(FLAGS) $(INCLUDES) $@.c -o $@ $(LIBS)
 
 clean:
-	rm -f array array.spv mandelbrot mandelbrot.spv mandelbrot.bmp
+	rm -f check_devs check_devs.spv mandelbrot mandelbrot.spv mandelbrot.bmp

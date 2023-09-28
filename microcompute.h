@@ -28,6 +28,17 @@ typedef enum mc_DebugLevel {
 } mc_DebugLevel_t;
 
 /** code
+ * The type of a mc_Device_t.
+ */
+typedef enum mc_DeviceType {
+    MC_DEVICE_TYPE_DGPU, // discrete GPU
+    MC_DEVICE_TYPE_IGPU, // integrated GPU
+    MC_DEVICE_TYPE_VGPU, // virtual GPU
+    MC_DEVICE_TYPE_CPU,
+    MC_DEVICE_TYPE_OTHER,
+} mc_DeviceType_t;
+
+/** code
  * The debug callback type passed to `mc_set_debug_cb()`.
  *
  * - `level`: A `mc_DebugLevel` indicating the severity of the message
@@ -35,12 +46,8 @@ typedef enum mc_DebugLevel {
  * - `msg`: The message contents (NULL terminated)
  * - `arg`: The value passed to `debugArg` in `mc_instance_create()`
  */
-typedef void(mc_debug_cb)(
-    mc_DebugLevel_t level,
-    const char* source,
-    const char* msg,
-    void* arg
-);
+typedef void(mc_debug_cb
+)(mc_DebugLevel_t lvl, const char* src, const char* msg, void* arg);
 
 /** code
  * Core microcompute types.
@@ -61,6 +68,14 @@ typedef struct mc_Program mc_Program_t;
  * - returns: A human readable string (`NULL` terminated)
  */
 const char* mc_debug_level_to_str(mc_DebugLevel_t level);
+
+/** code
+ * Convert a `mc_DeviceType_t` enum to a human readable string.
+ *
+ * - `type`: A `mc_DeviceType_t` value
+ * - returns: A human readable string (`NULL` terminated)
+ */
+const char* mc_device_type_to_str(mc_DeviceType_t type);
 
 /** code
  * Create a `mc_Instance_t` object.
@@ -103,20 +118,12 @@ uint32_t mc_instance_get_device_count(mc_Instance_t* self);
 mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
 
 /** code
- * Check if a `mc_Device_t` object is a discrete GPU.
+ * Get the type of the device (discrete gpu etc).
  *
  * - `self`: A reference to a `mc_Device_t` object
- * - returns: `true` if it is, `false` otherwise
+ * - returns: The type of the GPU
  */
-bool mc_device_is_discrete_gpu(mc_Device_t* self);
-
-/** code
- * Check if a `mc_Device_t` object is a integrated GPU.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: `true` if it is, `false` otherwise
- */
-bool mc_device_is_integrated_gpu(mc_Device_t* self);
+mc_DeviceType_t mc_device_get_type(mc_Device_t* self);
 
 /** code
  * Get the video memory of a device.
@@ -415,6 +422,16 @@ const char* mc_debug_level_to_str(mc_DebugLevel_t level) {
     }
 }
 
+const char* mc_device_type_to_str(mc_DeviceType_t type) {
+    switch (type) {
+        case MC_DEVICE_TYPE_DGPU: return "MC_DEVICE_TYPE_DGPU";
+        case MC_DEVICE_TYPE_IGPU: return "MC_DEVICE_TYPE_IGPU";
+        case MC_DEVICE_TYPE_VGPU: return "MC_DEVICE_TYPE_VGPU";
+        case MC_DEVICE_TYPE_CPU: return "MC_DEVICE_TYPE_CPU";
+        default: return "MC_DEVICE_TYPE_OTHER";
+    }
+}
+
 mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     mc_Instance_t* self = malloc(sizeof *self);
     *self = (mc_Instance_t){0};
@@ -507,22 +524,11 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
             queueProps
         );
 
-        // so its easy to tell if no queue was found
         uint32_t queueFamilyIdx = queuePropsCount;
 
-        // find dedicated compute queue, best case
         for (uint32_t i = 0; i < queuePropsCount; i++) {
-            if (VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags
-                & !(VK_QUEUE_GRAPHICS_BIT & queueProps[i].queueFlags))
+            if (VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags)
                 queueFamilyIdx = i;
-        }
-
-        if (queueFamilyIdx == queuePropsCount) {
-            // find compute capable queue
-            for (uint32_t i = 0; i < queuePropsCount; i++) {
-                if (VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags)
-                    queueFamilyIdx = i;
-            }
         }
 
         free(queueProps);
@@ -619,27 +625,25 @@ mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
     return self->devs;
 }
 
-bool mc_device_is_discrete_gpu(mc_Device_t* self) {
+mc_DeviceType_t mc_device_get_type(mc_Device_t* self) {
     VkPhysicalDeviceProperties devProps;
     vkGetPhysicalDeviceProperties(self->physDev, &devProps);
-    return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-}
-
-bool mc_device_is_integrated_gpu(mc_Device_t* self) {
-    VkPhysicalDeviceProperties devProps;
-    vkGetPhysicalDeviceProperties(self->physDev, &devProps);
-    return devProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+    switch (devProps.deviceType) {
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return MC_DEVICE_TYPE_IGPU;
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return MC_DEVICE_TYPE_DGPU;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: return MC_DEVICE_TYPE_VGPU;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU: return MC_DEVICE_TYPE_CPU;
+        default: return MC_DEVICE_TYPE_OTHER;
+    }
 }
 
 uint64_t mc_device_get_memory_size(mc_Device_t* self) {
     VkPhysicalDeviceMemoryProperties memProps;
     vkGetPhysicalDeviceMemoryProperties(self->physDev, &memProps);
-
     for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
         if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
             return memProps.memoryHeaps[i].size;
     }
-
     return 0;
 }
 
