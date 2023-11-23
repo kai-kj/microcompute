@@ -12,6 +12,11 @@ int main(void) {
     mc_Instance_t* instance = mc_instance_create((mc_debug_cb*)debug_cb, NULL);
     mc_Device_t** devs = mc_instance_get_devices(instance);
 
+    printf(
+        "%d supported devices found\n\n",
+        mc_instance_get_device_count(instance)
+    );
+
     for (uint32_t i = 0; i < mc_instance_get_device_count(instance); i++) {
         mc_Device_t* dev = devs[i];
         printf("\n=== %s ===\n", mc_device_get_name(dev));

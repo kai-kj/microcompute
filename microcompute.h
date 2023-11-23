@@ -339,7 +339,7 @@ struct mc_Device {
     mc_debug_cb* debug_cb;
     VkPhysicalDevice physDev;
     uint32_t queueFamilyIdx;
-    VkDevice device;
+    VkDevice dev;
     char devName[256];
 };
 
@@ -435,6 +435,8 @@ const char* mc_device_type_to_str(mc_DeviceType_t type) {
 mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     mc_Instance_t* self = malloc(sizeof *self);
     *self = (mc_Instance_t){0};
+    self->debug_cb = debug_cb;
+    self->debugArg = debugArg;
 
     VkApplicationInfo appInfo = {0};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -561,7 +563,7 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         self->devs[devIdx]->debug_cb = debug_cb;
         self->devs[devIdx]->physDev = physDev;
         self->devs[devIdx]->queueFamilyIdx = queueFamilyIdx;
-        self->devs[devIdx]->device = device;
+        self->devs[devIdx]->dev = device;
 
         VkPhysicalDeviceProperties devProps;
         vkGetPhysicalDeviceProperties(self->devs[devIdx]->physDev, &devProps);
@@ -586,8 +588,9 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 void mc_instance_destroy(mc_Instance_t* self) {
     MC_MSG_INFO(self, "destroying mc_Instance_t");
 
-    for (uint32_t i = 0; i < self->devCount; i++)
-        vkDestroyDevice(self->devs[i]->device, NULL);
+    for (uint32_t i = 0; i < self->devCount; i++) {
+        if (self->devs[i]->dev) vkDestroyDevice(self->devs[i]->dev, NULL);
+    }
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
     PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessenger
@@ -601,7 +604,7 @@ void mc_instance_destroy(mc_Instance_t* self) {
         vkDestroyDebugUtilsMessenger(self->instance, self->msg, NULL);
 #endif // MC_ENABLE_VALIDATION_LAYER
 
-    vkDestroyInstance(self->instance, NULL);
+    if (self->instance) vkDestroyInstance(self->instance, NULL);
     free(self);
 }
 
@@ -666,13 +669,13 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     bufferInfo.queueFamilyIndexCount = 1;
     bufferInfo.pQueueFamilyIndices = &self->dev->queueFamilyIdx;
 
-    if (vkCreateBuffer(self->dev->device, &bufferInfo, NULL, &self->buffer)) {
+    if (vkCreateBuffer(self->dev->dev, &bufferInfo, NULL, &self->buffer)) {
         MC_MSG_HIGH(self->dev, "failed to create vulkan buffer");
         return self;
     }
 
     VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements(self->dev->device, self->buffer, &memReqs);
+    vkGetBufferMemoryRequirements(self->dev->dev, self->buffer, &memReqs);
 
     // check the minimum memory size
     if (memReqs.size > self->size) self->size = memReqs.size;
@@ -703,18 +706,13 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     memAllocInfo.allocationSize = self->size;
     memAllocInfo.memoryTypeIndex = memTypeIdx;
 
-    if (vkAllocateMemory(
-            self->dev->device,
-            &memAllocInfo,
-            NULL,
-            &self->memory
-        )) {
+    if (vkAllocateMemory(self->dev->dev, &memAllocInfo, NULL, &self->memory)) {
         MC_MSG_HIGH(self->dev, "failed to allocate vulkan memory");
         return self;
     }
 
     vkMapMemory(
-        self->dev->device,
+        self->dev->dev,
         self->memory,
         0,
         self->size,
@@ -722,7 +720,7 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
         &self->mappedMemory
     );
 
-    if (vkBindBufferMemory(self->dev->device, self->buffer, self->memory, 0)) {
+    if (vkBindBufferMemory(self->dev->dev, self->buffer, self->memory, 0)) {
         MC_MSG_HIGH(self->dev, "failed to map memory");
         return self;
     }
@@ -746,8 +744,8 @@ mc_Buffer_t* mc_buffer_create_from(
 
 void mc_buffer_destroy(mc_Buffer_t* self) {
     MC_MSG_INFO(self->dev, "destroying mc_Buffer_t");
-    vkFreeMemory(self->dev->device, self->memory, NULL);
-    vkDestroyBuffer(self->dev->device, self->buffer, NULL);
+    if (self->memory) vkFreeMemory(self->dev->dev, self->memory, NULL);
+    if (self->buffer) vkDestroyBuffer(self->dev->dev, self->buffer, NULL);
     free(self);
 }
 
@@ -822,7 +820,7 @@ mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName) {
     moduleInfo.pCode = (const uint32_t*)shaderCode;
 
     if (vkCreateShaderModule(
-            self->dev->device,
+            self->dev->dev,
             &moduleInfo,
             NULL,
             &self->shaderModule
@@ -841,14 +839,22 @@ mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName) {
 
 void mc_program_destroy(mc_Program_t* self) {
     MC_MSG_INFO(self->dev, "destroying mc_Program_t");
-    vkFreeCommandBuffers(self->dev->device, self->cmdPool, 1, &self->cmdBuff);
-    vkDestroyCommandPool(self->dev->device, self->cmdPool, NULL);
-    vkFreeDescriptorSets(self->dev->device, self->descPool, 1, &self->descSet);
-    vkDestroyDescriptorPool(self->dev->device, self->descPool, NULL);
-    vkDestroyPipeline(self->dev->device, self->pipeline, NULL);
-    vkDestroyPipelineLayout(self->dev->device, self->pipelineLayout, NULL);
-    vkDestroyDescriptorSetLayout(self->dev->device, self->descSetLayout, NULL);
-    vkDestroyShaderModule(self->dev->device, self->shaderModule, NULL);
+    if (self->cmdBuff)
+        vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
+    if (self->cmdPool)
+        vkDestroyCommandPool(self->dev->dev, self->cmdPool, NULL);
+    if (self->descSet)
+        vkFreeDescriptorSets(self->dev->dev, self->descPool, 1, &self->descSet);
+    if (self->descPool)
+        vkDestroyDescriptorPool(self->dev->dev, self->descPool, NULL);
+    if (self->pipeline) //
+        vkDestroyPipeline(self->dev->dev, self->pipeline, NULL);
+    if (self->pipelineLayout)
+        vkDestroyPipelineLayout(self->dev->dev, self->pipelineLayout, NULL);
+    if (self->descSetLayout)
+        vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
+    if (self->shaderModule)
+        vkDestroyShaderModule(self->dev->dev, self->shaderModule, NULL);
     free(self);
 }
 
@@ -870,13 +876,20 @@ void mc_program_setup__(
     self->pcSize = pcSize;
 
     // destroy old objects if they exist
-    vkFreeCommandBuffers(self->dev->device, self->cmdPool, 1, &self->cmdBuff);
-    vkDestroyCommandPool(self->dev->device, self->cmdPool, NULL);
-    vkFreeDescriptorSets(self->dev->device, self->descPool, 1, &self->descSet);
-    vkDestroyDescriptorPool(self->dev->device, self->descPool, NULL);
-    vkDestroyPipeline(self->dev->device, self->pipeline, NULL);
-    vkDestroyPipelineLayout(self->dev->device, self->pipelineLayout, NULL);
-    vkDestroyDescriptorSetLayout(self->dev->device, self->descSetLayout, NULL);
+    if (self->cmdBuff)
+        vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
+    if (self->cmdPool)
+        vkDestroyCommandPool(self->dev->dev, self->cmdPool, NULL);
+    if (self->descSet)
+        vkFreeDescriptorSets(self->dev->dev, self->descPool, 1, &self->descSet);
+    if (self->descPool)
+        vkDestroyDescriptorPool(self->dev->dev, self->descPool, NULL);
+    if (self->pipeline) //
+        vkDestroyPipeline(self->dev->dev, self->pipeline, NULL);
+    if (self->pipelineLayout)
+        vkDestroyPipelineLayout(self->dev->dev, self->pipelineLayout, NULL);
+    if (self->descSetLayout)
+        vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
 
     va_list args;
 
@@ -902,7 +915,7 @@ void mc_program_setup__(
     descLayoutInfo.pBindings = descBindings;
 
     if (vkCreateDescriptorSetLayout(
-            self->dev->device,
+            self->dev->dev,
             &descLayoutInfo,
             NULL,
             &self->descSetLayout
@@ -923,11 +936,11 @@ void mc_program_setup__(
     pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineInfo.setLayoutCount = 1;
     pipelineInfo.pSetLayouts = &self->descSetLayout;
-    pipelineInfo.pushConstantRangeCount = 1;
+    pipelineInfo.pushConstantRangeCount = self->pcSize ? 1 : 0;
     pipelineInfo.pPushConstantRanges = &pushConstant;
 
     if (vkCreatePipelineLayout(
-            self->dev->device,
+            self->dev->dev,
             &pipelineInfo,
             NULL,
             &self->pipelineLayout
@@ -948,7 +961,7 @@ void mc_program_setup__(
     computePipelineInfo.layout = self->pipelineLayout;
 
     if (vkCreateComputePipelines(
-            self->dev->device,
+            self->dev->dev,
             0,
             1,
             &computePipelineInfo,
@@ -971,7 +984,7 @@ void mc_program_setup__(
     descPoolInfo.pPoolSizes = &descPoolSize;
 
     if (vkCreateDescriptorPool(
-            self->dev->device,
+            self->dev->dev,
             &descPoolInfo,
             NULL,
             &self->descPool
@@ -987,7 +1000,7 @@ void mc_program_setup__(
     descAllocInfo.pSetLayouts = &self->descSetLayout;
 
     if (vkAllocateDescriptorSets(
-            self->dev->device,
+            self->dev->dev,
             &descAllocInfo,
             &self->descSet
         )) {
@@ -1001,7 +1014,7 @@ void mc_program_setup__(
     cmdPoolInfo.queueFamilyIndex = self->dev->queueFamilyIdx;
 
     if (vkCreateCommandPool(
-            self->dev->device,
+            self->dev->dev,
             &cmdPoolInfo,
             NULL,
             &self->cmdPool
@@ -1037,7 +1050,7 @@ void mc_program_setup__(
 
     va_end(args);
 
-    vkUpdateDescriptorSets(self->dev->device, argc, wrtDescSet, 0, NULL);
+    vkUpdateDescriptorSets(self->dev->dev, argc, wrtDescSet, 0, NULL);
     free(descBuffInfo);
     free(wrtDescSet);
 
@@ -1048,7 +1061,7 @@ void mc_program_setup__(
     cmdBuffAllocInfo.commandBufferCount = 1;
 
     if (vkAllocateCommandBuffers(
-            self->dev->device,
+            self->dev->dev,
             &cmdBuffAllocInfo,
             &self->cmdBuff
         )) {
@@ -1121,7 +1134,7 @@ double mc_program_run(
     }
 
     VkQueue queue;
-    vkGetDeviceQueue(self->dev->device, self->dev->queueFamilyIdx, 0, &queue);
+    vkGetDeviceQueue(self->dev->dev, self->dev->queueFamilyIdx, 0, &queue);
 
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

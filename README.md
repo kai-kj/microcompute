@@ -12,6 +12,17 @@
 
 A small and simple library to use compute shaders in Vulkan.
 
+## Dependencies
+
+For Ubuntu (tested on `22.04`):
+
+- `build-essential`
+- `libvulkan-dev`
+- `vulkan-validationlayers-dev` (only for the validation layer)
+- `glslang-tools` (only for the included examples)
+
+Or equivalent for other systems.
+
 ## Examples
 
 - Array operations
