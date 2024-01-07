@@ -1,8 +1,25 @@
 
 # `microcompute.h`
 
-This library contains utilities that can be used to easily run compute
-SPIR-V shaders using vulkan.
+This library contains utilities that can be used to easily run SPIR-V compute
+shaders using vulkan.
+
+## Usage
+
+Define `MICROCOMPUTE_IMPLEMENTATION` before including this file in one of
+your C files to create the implementation. It should look something like:
+
+```c
+#include ...
+#include ...
+
+#define MICROCOMPUTE_IMPLEMENTATION
+#include "microcompute.h"
+```
+
+In other C files, just include this file as normal.
+
+See https://github.com/kal39/microcompute for more info.
 
 ## Types
 
@@ -21,20 +38,40 @@ The severity of a debug message.
 ----
 
 ```c
-typedef void(mc_debug_cb)(
-    mc_DebugLevel_t level,
-    const char* source,
-    const char* msg,
-    void* arg
+typedef enum mc_DeviceType {
+    MC_DEVICE_TYPE_DGPU, // discrete GPU
+    MC_DEVICE_TYPE_IGPU, // integrated GPU
+    MC_DEVICE_TYPE_VGPU, // virtual GPU
+    MC_DEVICE_TYPE_CPU,
+    MC_DEVICE_TYPE_OTHER,
+} mc_DeviceType_t;
+```
+
+The type of a mc_Device_t.
+
+----
+
+```c
+typedef void(mc_debug_cb)( //
+    mc_DebugLevel_t lvl,
+    const char* src,
+    void* arg,
+    const char* file,
+    int line,
+    const char* fmt,
+    ...
 );
 ```
 
 The debug callback type passed to `mc_set_debug_cb()`.
 
-- `level`: A `mc_DebugLevel` indicating the severity of the message
-- `source`: The message source (NULL terminated)
-- `msg`: The message contents (NULL terminated)
+- `lvl`: A `mc_DebugLevel` indicating the severity of the message
+- `src`: The message source (NULL terminated)
 - `arg`: The value passed to `debugArg` in `mc_instance_create()`
+- `file`: The file the message originated from (NULL terminated)
+- `line`: The line the message originated from
+- `fmt`: The message formatting (same format as `printf()`)
+- `...`: The arguments for the formatting
 
 ----
 
@@ -50,17 +87,6 @@ Core microcompute types.
 ----
 
 ## Functions
-
-```c
-const char* mc_debug_level_to_str(mc_DebugLevel_t level);
-```
-
-Convert a `mc_DebugLevel_t` enum to a human readable string.
-
-- `level`: A `mc_DebugLevel_t` value
-- returns: A human readable string (`NULL` terminated)
-
-----
 
 ```c
 mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
@@ -118,24 +144,46 @@ Get a list of of available `mc_Device_t` objects.
 ----
 
 ```c
-bool mc_device_is_discrete_gpu(mc_Device_t* self);
+mc_DeviceType_t mc_device_get_type(mc_Device_t* self);
 ```
 
-Check if a `mc_Device_t` object is a discrete GPU.
+Get the type of the device (discrete gpu etc).
 
 - `self`: A reference to a `mc_Device_t` object
-- returns: `true` if it is, `false` otherwise
+- returns: The type of the GPU
 
 ----
 
 ```c
-bool mc_device_is_integrated_gpu(mc_Device_t* self);
+uint64_t mc_device_get_total_memory_size(mc_Device_t* self);
 ```
 
-Check if a `mc_Device_t` object is a integrated GPU.
+Get the total video memory of a device.
 
 - `self`: A reference to a `mc_Device_t` object
-- returns: `true` if it is, `false` otherwise
+- returns: The size of the video memory in bytes
+
+----
+
+```c
+uint64_t mc_device_get_used_memory_size(mc_Device_t* self);
+```
+
+Get the used video memory of a device.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: The size of the used video memory in bytes
+
+----
+
+```c
+char* mc_device_get_name(mc_Device_t* self);
+```
+
+Get the name of a device.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: A `NULL` terminated string containing the name of the device
 
 ----
 
@@ -271,29 +319,36 @@ Checks whether a `mc_Program_t` object has been successfully initialized.
 ----
 
 ```c
-#define mc_program_setup(self, entryPoint, dimX, dimY, dimZ, ...)              \
-    mc_program_setup__(self, entryPoint, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
+#define mc_program_setup(self, entryPoint, pcSize, ...)                        \
+    mc_program_setup__(self, entryPoint, pcSize, ##__VA_ARGS__, NULL)
 ```
 
 Bind buffers to a `mc_Program_t` object.
 
 - `self`: A reference to a `mc_Program_t` object
 - `entryPoint`: The entry point name, generally `"main"`
-- `dimX`: The number of local workgroups in the x dimension
-- `dimY`: The number of local workgroups in the y dimension
-- `dimZ`: The number of local workgroups in the z dimension
+- `pcSize`: The size of the push constant data, set to 0 to ignore
 - `...`: A list of buffers to bind to the program
 
 ----
 
 ```c
-double mc_program_run(mc_Program_t* self);
+double mc_program_run(
+    mc_Program_t* self,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    void* pcData
+);
 ```
 
 Run a `mc_Program_t` object.
 
 - `self`: A reference to a `mc_Program_t` object
-- `size`: The number of work groups to dispatch in each dimension
+- `dimX`: The number of local workgroups in the x dimension
+- `dimY`: The number of local workgroups in the y dimension
+- `dimZ`: The number of local workgroups in the z dimension
+- `pcData`: A reference to the push constant data, pass `NULL` to ignore
 - returns: The time taken waiting for the compute operation tio finish, in
            seconds, -1.0 on fail
 
@@ -310,18 +365,58 @@ Get the current time.
 ----
 
 ```c
-void mc_program_setup__(
-    mc_Program_t* self,
-    const char* entryPoint,
-    uint32_t dimX,
-    uint32_t dimY,
-    uint32_t dimZ,
+const char* mc_debug_level_to_str(mc_DebugLevel_t level);
+```
+
+Convert a `mc_DebugLevel_t` enum to a human readable string.
+
+- `level`: A `mc_DebugLevel_t` value
+- returns: A human readable string (`NULL` terminated)
+
+----
+
+```c
+const char* mc_device_type_to_str(mc_DeviceType_t type);
+```
+
+Convert a `mc_DeviceType_t` enum to a human readable string.
+
+- `type`: A `mc_DeviceType_t` value
+- returns: A human readable string (`NULL` terminated)
+
+----
+
+```c
+void mc_default_debug_cb( //
+    mc_DebugLevel_t lvl,
+    const char* src,
+    void* arg,
+    char const* file,
+    int line,
+    const char* fmt,
     ...
 );
 ```
 
-Wrapped functions. Don't use these directly, use their corresponding macros.
+Default callback function that can be passed to `mc_instance_create()`. Just
+prints all messages to stdout. Use as a template for your own callback.
 
+See `mc_debug_cb` for more info about the arguments.
+
+----
+
+```c
+void mc_program_setup__(
+    mc_Program_t* self,
+    const char* entryPoint,
+    uint32_t pcSize,
+    ...
+);
+
+#endif // MICROCOMPUTE_H_INCLUDE_GUARD
+```
+
+Wrapped functions. Don't use these directly, use their corresponding macros.
 
 ----
 

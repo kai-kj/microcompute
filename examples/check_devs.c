@@ -4,23 +4,19 @@
 #define MICROCOMPUTE_IMPLEMENTATION
 #include "microcompute.h"
 
-static void debug_cb(mc_DebugLevel_t level, char* src, char* msg, void* arg) {
-    if (level > MC_DEBUG_LEVEL_INFO) printf("ERROR: %s\n", msg);
-}
-
 int main(void) {
-    mc_Instance_t* instance = mc_instance_create((mc_debug_cb*)debug_cb, NULL);
+    mc_Instance_t* instance = mc_instance_create(mc_default_debug_cb, NULL);
     mc_Device_t** devs = mc_instance_get_devices(instance);
 
     printf(
-        "%d supported devices found\n\n",
+        "\n%d supported device(s) found\n\n",
         mc_instance_get_device_count(instance)
     );
 
     for (uint32_t i = 0; i < mc_instance_get_device_count(instance); i++) {
         mc_Device_t* dev = devs[i];
-        printf("\n=== %s ===\n", mc_device_get_name(dev));
-        printf("- memory size: %ldGB\n", mc_device_get_memory_size(dev) >> 30);
+        printf("=== %s ===\n", mc_device_get_name(dev));
+        printf("- memory: %ldGB\n", mc_device_get_total_memory_size(dev) >> 30);
         printf("- type: %s\n", mc_device_type_to_str(mc_device_get_type(dev)));
         printf("- testing (values should be doubled every iteration):\n");
 
@@ -40,6 +36,8 @@ int main(void) {
                 printf("%f%s", arr[i], i != 4 ? ", " : "");
             printf("}\n");
         }
+
+        printf("\n");
 
         mc_buffer_destroy(buff);
         mc_program_destroy(program);

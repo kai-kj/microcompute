@@ -6,6 +6,23 @@
  *
  * This library contains utilities that can be used to easily run SPIR-V compute
  * shaders using vulkan.
+ *
+ * ## Usage
+ *
+ * Define `MICROCOMPUTE_IMPLEMENTATION` before including this file in one of
+ * your C files to create the implementation. It should look something like:
+ *
+ * ```c
+ * #include ...
+ * #include ...
+ *
+ * #define MICROCOMPUTE_IMPLEMENTATION
+ * #include "microcompute.h"
+ * ```
+ *
+ * In other C files, just include this file as normal.
+ *
+ * See https://github.com/kal39/microcompute for more info.
  */
 
 #include <stdbool.h>
@@ -41,13 +58,23 @@ typedef enum mc_DeviceType {
 /** code
  * The debug callback type passed to `mc_set_debug_cb()`.
  *
- * - `level`: A `mc_DebugLevel` indicating the severity of the message
- * - `source`: The message source (NULL terminated)
- * - `msg`: The message contents (NULL terminated)
+ * - `lvl`: A `mc_DebugLevel` indicating the severity of the message
+ * - `src`: The message source (NULL terminated)
  * - `arg`: The value passed to `debugArg` in `mc_instance_create()`
+ * - `file`: The file the message originated from (NULL terminated)
+ * - `line`: The line the message originated from
+ * - `fmt`: The message formatting (same format as `printf()`)
+ * - `...`: The arguments for the formatting
  */
-typedef void(mc_debug_cb
-)(mc_DebugLevel_t lvl, const char* src, const char* msg, void* arg);
+typedef void(mc_debug_cb)( //
+    mc_DebugLevel_t lvl,
+    const char* src,
+    void* arg,
+    const char* file,
+    int line,
+    const char* fmt,
+    ...
+);
 
 /** code
  * Core microcompute types.
@@ -60,22 +87,6 @@ typedef struct mc_Program mc_Program_t;
 /** text
  * ## Functions
  */
-
-/** code
- * Convert a `mc_DebugLevel_t` enum to a human readable string.
- *
- * - `level`: A `mc_DebugLevel_t` value
- * - returns: A human readable string (`NULL` terminated)
- */
-const char* mc_debug_level_to_str(mc_DebugLevel_t level);
-
-/** code
- * Convert a `mc_DeviceType_t` enum to a human readable string.
- *
- * - `type`: A `mc_DeviceType_t` value
- * - returns: A human readable string (`NULL` terminated)
- */
-const char* mc_device_type_to_str(mc_DeviceType_t type);
 
 /** code
  * Create a `mc_Instance_t` object.
@@ -126,12 +137,20 @@ mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
 mc_DeviceType_t mc_device_get_type(mc_Device_t* self);
 
 /** code
- * Get the video memory of a device.
+ * Get the total video memory of a device.
  *
  * - `self`: A reference to a `mc_Device_t` object
  * - returns: The size of the video memory in bytes
  */
-uint64_t mc_device_get_memory_size(mc_Device_t* self);
+uint64_t mc_device_get_total_memory_size(mc_Device_t* self);
+
+/** code
+ * Get the used video memory of a device.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: The size of the used video memory in bytes
+ */
+uint64_t mc_device_get_used_memory_size(mc_Device_t* self);
 
 /** code
  * Get the name of a device.
@@ -280,8 +299,39 @@ double mc_program_run(
 double mc_get_time();
 
 /** code
- * Wrapped functions. Don't use these directly, use their corresponding macros.
+ * Convert a `mc_DebugLevel_t` enum to a human readable string.
  *
+ * - `level`: A `mc_DebugLevel_t` value
+ * - returns: A human readable string (`NULL` terminated)
+ */
+const char* mc_debug_level_to_str(mc_DebugLevel_t level);
+
+/** code
+ * Convert a `mc_DeviceType_t` enum to a human readable string.
+ *
+ * - `type`: A `mc_DeviceType_t` value
+ * - returns: A human readable string (`NULL` terminated)
+ */
+const char* mc_device_type_to_str(mc_DeviceType_t type);
+
+/** code
+ * Default callback function that can be passed to `mc_instance_create()`. Just
+ * prints all messages to stdout. Use as a template for your own callback.
+ *
+ * See `mc_debug_cb` for more info about the arguments.
+ */
+void mc_default_debug_cb( //
+    mc_DebugLevel_t lvl,
+    const char* src,
+    void* arg,
+    char const* file,
+    int line,
+    const char* fmt,
+    ...
+);
+
+/** code
+ * Wrapped functions. Don't use these directly, use their corresponding macros.
  */
 void mc_program_setup__(
     mc_Program_t* self,
@@ -322,17 +372,26 @@ void mc_program_setup__(
 #ifdef MICROCOMPUTE_IMPLEMENTATION
 
 #include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
 #include <vulkan/vulkan.h>
 
-#define MC_MSG(s, l, m)                                                        \
-    if ((s)->debug_cb) (s)->debug_cb((l), "mc", (m), (s)->debugArg);
+#define MC_MSG(s, l, ...)                                                      \
+    if ((s)->debug_cb)                                                         \
+        (s)->debug_cb(                                                         \
+            (l),                                                               \
+            "microcompute",                                                    \
+            (s)->debugArg,                                                     \
+            __FILE__,                                                          \
+            __LINE__,                                                          \
+            __VA_ARGS__                                                        \
+        );
 
-#define MC_MSG_INFO(s, m) MC_MSG((s), MC_DEBUG_LEVEL_INFO, (m))
-#define MC_MSG_LOW(s, m) MC_MSG((s), MC_DEBUG_LEVEL_LOW, (m))
-#define MC_MSG_MEDIUM(s, m) MC_MSG((s), MC_DEBUG_LEVEL_MEDIUM, (m))
-#define MC_MSG_HIGH(s, m) MC_MSG((s), MC_DEBUG_LEVEL_HIGH, (m))
+#define MC_MSG_INFO(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_INFO, __VA_ARGS__)
+#define MC_MSG_LOW(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_LOW, __VA_ARGS__)
+#define MC_MSG_MEDIUM(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_MEDIUM, __VA_ARGS__)
+#define MC_MSG_HIGH(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_HIGH, __VA_ARGS__)
 
 struct mc_Device {
     void* debugArg;
@@ -340,6 +399,8 @@ struct mc_Device {
     VkPhysicalDevice physDev;
     uint32_t queueFamilyIdx;
     VkDevice dev;
+    uint64_t totalMemory;
+    uint64_t usedMemory;
     char devName[256];
 };
 
@@ -396,7 +457,16 @@ static VkBool32 mc_vk_debug_callback(
         default: return VK_FALSE;                              // other
     }
 
-    instance->debug_cb(level, "vk", message->pMessage, instance->debugArg);
+    instance->debug_cb(
+        level,
+        "vulkan",
+        instance->debugArg,
+        "vulkan.h",
+        0,
+        "%s",
+        message->pMessage
+    );
+
     return VK_FALSE;
 }
 #endif // MC_ENABLE_VALIDATION_LAYER
@@ -437,6 +507,8 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     *self = (mc_Instance_t){0};
     self->debug_cb = debug_cb;
     self->debugArg = debugArg;
+
+    MC_MSG_INFO(self, "initializing mc_Instance_t");
 
     VkApplicationInfo appInfo = {0};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -497,6 +569,8 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         MC_MSG_HIGH(self, "failed to get vulkan devices");
         return self;
     }
+
+    MC_MSG_INFO(self, "found %d vulkan device(s)", physDevCount);
 
     VkPhysicalDevice* physDevs = malloc(sizeof *physDevs * physDevCount);
     if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, physDevs)) {
@@ -565,12 +639,29 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         self->devs[devIdx]->queueFamilyIdx = queueFamilyIdx;
         self->devs[devIdx]->dev = device;
 
+        VkPhysicalDeviceMemoryProperties memProps;
+        vkGetPhysicalDeviceMemoryProperties(
+            self->devs[devIdx]->physDev,
+            &memProps
+        );
+        for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
+            if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+                self->devs[devIdx]->totalMemory = memProps.memoryHeaps[i].size;
+        }
+
         VkPhysicalDeviceProperties devProps;
         vkGetPhysicalDeviceProperties(self->devs[devIdx]->physDev, &devProps);
         memcpy(
             self->devs[devIdx]->devName,
             devProps.deviceName,
             sizeof devProps.deviceName
+        );
+
+        MC_MSG_INFO(
+            self,
+            "  found device %s (memory: %ldGB)",
+            self->devs[devIdx]->devName,
+            self->devs[devIdx]->totalMemory >> 30
         );
 
         physDevIdx++;
@@ -580,7 +671,6 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     free(physDevs);
     self->devCount = devIdx;
 
-    MC_MSG_INFO(self, "mc_Instance successfully initialized");
     self->isInitialized = true;
     return self;
 }
@@ -640,14 +730,12 @@ mc_DeviceType_t mc_device_get_type(mc_Device_t* self) {
     }
 }
 
-uint64_t mc_device_get_memory_size(mc_Device_t* self) {
-    VkPhysicalDeviceMemoryProperties memProps;
-    vkGetPhysicalDeviceMemoryProperties(self->physDev, &memProps);
-    for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
-        if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-            return memProps.memoryHeaps[i].size;
-    }
-    return 0;
+uint64_t mc_device_get_total_memory_size(mc_Device_t* self) {
+    return self->totalMemory;
+}
+
+uint64_t mc_device_get_used_memory_size(mc_Device_t* self) {
+    return self->usedMemory;
 }
 
 char* mc_device_get_name(mc_Device_t* self) {
@@ -656,10 +744,27 @@ char* mc_device_get_name(mc_Device_t* self) {
 
 mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     mc_Buffer_t* self = malloc(sizeof *self);
-
     *self = (mc_Buffer_t){0};
     self->size = size;
     self->dev = device;
+
+    MC_MSG_INFO(self->dev, "initializing mc_Buffer_t of size %ld", size);
+
+    if (self->dev->usedMemory + size > self->dev->totalMemory) {
+        MC_MSG_HIGH(
+            self->dev,
+            "not enough memory (available: %ld)",
+            self->dev->totalMemory - self->dev->usedMemory
+        );
+        return self;
+    }
+
+    self->dev->usedMemory += size;
+    MC_MSG_INFO(
+        self->dev,
+        "remaining memory: %ld",
+        self->dev->totalMemory - self->dev->usedMemory
+    );
 
     VkBufferCreateInfo bufferInfo = {0};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -725,7 +830,6 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
         return self;
     }
 
-    MC_MSG_INFO(self->dev, "mc_Buffer_t successfully initialized");
     self->isInitialized = true;
     return self;
 }
@@ -744,6 +848,7 @@ mc_Buffer_t* mc_buffer_create_from(
 
 void mc_buffer_destroy(mc_Buffer_t* self) {
     MC_MSG_INFO(self->dev, "destroying mc_Buffer_t");
+    self->dev->usedMemory -= self->size;
     if (self->memory) vkFreeMemory(self->dev->dev, self->memory, NULL);
     if (self->buffer) vkDestroyBuffer(self->dev->dev, self->buffer, NULL);
     free(self);
@@ -769,7 +874,12 @@ uint64_t mc_buffer_write(
     }
 
     if (offset + size > self->size) {
-        MC_MSG_MEDIUM(self->dev, "offset + size > mc_Buffer_t.size");
+        MC_MSG_MEDIUM(
+            self->dev,
+            "offset + size > mc_Buffer_t.size (%ld > %ld)",
+            offset + size,
+            self->size
+        );
         return 0;
     }
 
@@ -790,7 +900,12 @@ uint64_t mc_buffer_read(
     }
 
     if (offset + size > self->size) {
-        MC_MSG_MEDIUM(self->dev, "offset + size > mc_Buffer_t.size");
+        MC_MSG_MEDIUM(
+            self->dev,
+            "offset + size > mc_Buffer_t.size (%ld > %ld)",
+            offset + size,
+            self->size
+        );
         return 0;
     }
 
@@ -804,10 +919,11 @@ mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName) {
     *self = (mc_Program_t){0};
     self->dev = device;
 
-    size_t shaderSize = mc_read_file(fileName, NULL);
+    MC_MSG_INFO(self->dev, "initializing mc_Program_t");
 
+    size_t shaderSize = mc_read_file(fileName, NULL);
     if (shaderSize == 0) {
-        MC_MSG_HIGH(self->dev, "failed to open shader file");
+        MC_MSG_HIGH(self->dev, "failed to open %s", fileName);
         return self;
     }
 
@@ -832,7 +948,6 @@ mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName) {
 
     free(shaderCode);
 
-    MC_MSG_INFO(self->dev, "mc_Program_t successfully created");
     self->isInitialized = true;
     return self;
 }
@@ -897,6 +1012,13 @@ void mc_program_setup__(
     uint32_t argc = 0;
     while (va_arg(args, void*) != NULL) argc++;
     va_end(args);
+
+    MC_MSG_INFO(
+        self->dev,
+        "setting up mc_Program_t (push constant size: %d, buffer count: %d)",
+        pcSize,
+        argc
+    );
 
     VkDescriptorSetLayoutBinding* descBindings
         = malloc(sizeof *descBindings * argc);
@@ -1068,8 +1190,6 @@ void mc_program_setup__(
         MC_MSG_HIGH(self->dev, "failed to allocate command buffers");
         return;
     }
-
-    MC_MSG_INFO(self->dev, "mc_Program_t successfully setup");
 }
 
 double mc_program_run(
@@ -1159,6 +1279,33 @@ double mc_get_time() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
+}
+
+void mc_default_debug_cb( //
+    mc_DebugLevel_t lvl,
+    const char* src,
+    void* arg,
+    const char* file,
+    int line,
+    const char* fmt,
+    ...
+) {
+    va_list args;
+    va_start(args, fmt);
+    int message_len = vsnprintf(NULL, 0, fmt, args);
+    va_start(args, fmt);
+    char* message = malloc(message_len + 1);
+    vsnprintf(message, message_len + 1, fmt, args);
+    va_end(args);
+
+    printf(
+        "[%s from %s] (%s:%d) %s\n",
+        mc_debug_level_to_str(lvl),
+        src,
+        file,
+        line,
+        message
+    );
 }
 
 #endif // MICROCOMPUTE_IMPLEMENTATION
