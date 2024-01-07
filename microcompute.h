@@ -399,8 +399,8 @@ struct mc_Device {
     VkPhysicalDevice physDev;
     uint32_t queueFamilyIdx;
     VkDevice dev;
-    uint64_t totalMemory;
-    uint64_t usedMemory;
+    uint64_t memTot;
+    uint64_t memUse;
     char devName[256];
 };
 
@@ -411,7 +411,6 @@ struct mc_Instance {
     VkInstance instance;
     uint32_t devCount;
     mc_Device_t** devs;
-
 #ifdef MC_ENABLE_VALIDATION_LAYER
     VkDebugUtilsMessengerEXT msg;
 #endif // MC_ENABLE_VALIDATION_LAYER
@@ -421,9 +420,9 @@ struct mc_Buffer {
     bool isInitialized;
     mc_Device_t* dev;
     uint64_t size;
-    void* mappedMemory;
-    VkBuffer buffer;
-    VkDeviceMemory memory;
+    void* map;
+    VkBuffer buf;
+    VkDeviceMemory mem;
 };
 
 struct mc_Program {
@@ -444,29 +443,20 @@ struct mc_Program {
 static VkBool32 mc_vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
-    const VkDebugUtilsMessengerCallbackDataEXT* message,
+    const VkDebugUtilsMessengerCallbackDataEXT* msg,
     void* userData
 ) {
-    mc_Instance_t* instance = (mc_Instance_t*)userData;
-    if (!instance->debug_cb) return VK_FALSE;
+    mc_Instance_t* inst = (mc_Instance_t*)userData;
+    if (!inst->debug_cb) return VK_FALSE;
 
-    enum mc_DebugLevel level;
+    enum mc_DebugLevel lvl;
     switch (severity) {
-        case 0x00000100: level = MC_DEBUG_LEVEL_MEDIUM; break; // warning
-        case 0x00001000: level = MC_DEBUG_LEVEL_HIGH; break;   // error
-        default: return VK_FALSE;                              // other
+        case 0x00000100: lvl = MC_DEBUG_LEVEL_MEDIUM; break; // warning
+        case 0x00001000: lvl = MC_DEBUG_LEVEL_HIGH; break;   // error
+        default: return VK_FALSE;                            // other
     }
 
-    instance->debug_cb(
-        level,
-        "vulkan",
-        instance->debugArg,
-        "vulkan.h",
-        0,
-        "%s",
-        message->pMessage
-    );
-
+    inst->debug_cb(lvl, "vulkan", inst->debugArg, "", 0, "%s", msg->pMessage);
     return VK_FALSE;
 }
 #endif // MC_ENABLE_VALIDATION_LAYER
@@ -559,7 +549,6 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
             self->instance,
             "vkCreateDebugUtilsMessengerEXT"
         );
-
     // vkGetInstanceProcAddr() can fail, so just to be sure
     if (msg_create) msg_create(self->instance, &msgInfo, NULL, &self->msg);
 #endif // MC_ENABLE_VALIDATION_LAYER
@@ -580,9 +569,9 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 
     self->devs = malloc(sizeof *self->devs * physDevCount);
 
-    uint32_t physDevIdx = 0, devIdx = 0;
-    while (physDevIdx < physDevCount) {
-        VkPhysicalDevice physDev = physDevs[physDevIdx];
+    uint32_t physIdx = 0, idx = 0;
+    while (physIdx < physDevCount) {
+        VkPhysicalDevice physDev = physDevs[physIdx];
 
         uint32_t queuePropsCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(
@@ -593,7 +582,6 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 
         VkQueueFamilyProperties* queueProps
             = malloc(sizeof *queueProps * queuePropsCount);
-
         vkGetPhysicalDeviceQueueFamilyProperties(
             physDev,
             &queuePropsCount,
@@ -601,7 +589,6 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         );
 
         uint32_t queueFamilyIdx = queuePropsCount;
-
         for (uint32_t i = 0; i < queuePropsCount; i++) {
             if (VK_QUEUE_COMPUTE_BIT & queueProps[i].queueFlags)
                 queueFamilyIdx = i;
@@ -610,7 +597,7 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         free(queueProps);
 
         if (queueFamilyIdx == queuePropsCount) {
-            physDevIdx++;
+            physIdx++;
             continue;
         }
 
@@ -628,48 +615,38 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 
         VkDevice device;
         if (vkCreateDevice(physDev, &devInfo, NULL, &device)) {
-            physDevIdx++;
+            physIdx++;
             continue;
         }
 
-        self->devs[devIdx] = malloc(sizeof *self->devs[devIdx]);
-        self->devs[devIdx]->debugArg = debugArg;
-        self->devs[devIdx]->debug_cb = debug_cb;
-        self->devs[devIdx]->physDev = physDev;
-        self->devs[devIdx]->queueFamilyIdx = queueFamilyIdx;
-        self->devs[devIdx]->dev = device;
+        mc_Device_t* dev = (self->devs[idx] = malloc(sizeof *self->devs[idx]));
+
+        *dev = (mc_Device_t){0};
+        dev->debugArg = debugArg;
+        dev->debug_cb = debug_cb;
+        dev->physDev = physDev;
+        dev->queueFamilyIdx = queueFamilyIdx;
+        dev->dev = device;
 
         VkPhysicalDeviceMemoryProperties memProps;
-        vkGetPhysicalDeviceMemoryProperties(
-            self->devs[devIdx]->physDev,
-            &memProps
-        );
+        vkGetPhysicalDeviceMemoryProperties(dev->physDev, &memProps);
         for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
             if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-                self->devs[devIdx]->totalMemory = memProps.memoryHeaps[i].size;
+                dev->memTot = memProps.memoryHeaps[i].size;
         }
 
         VkPhysicalDeviceProperties devProps;
-        vkGetPhysicalDeviceProperties(self->devs[devIdx]->physDev, &devProps);
-        memcpy(
-            self->devs[devIdx]->devName,
-            devProps.deviceName,
-            sizeof devProps.deviceName
-        );
+        vkGetPhysicalDeviceProperties(dev->physDev, &devProps);
+        memcpy(dev->devName, devProps.deviceName, sizeof devProps.deviceName);
 
-        MC_MSG_INFO(
-            self,
-            "  found device %s (memory: %ldGB)",
-            self->devs[devIdx]->devName,
-            self->devs[devIdx]->totalMemory >> 30
-        );
+        MC_MSG_INFO(self, "  found device %s", dev->devName);
 
-        physDevIdx++;
-        devIdx++;
+        physIdx++;
+        idx++;
     }
 
     free(physDevs);
-    self->devCount = devIdx;
+    self->devCount = idx;
 
     self->isInitialized = true;
     return self;
@@ -688,7 +665,6 @@ void mc_instance_destroy(mc_Instance_t* self) {
             self->instance,
             "vkDestroyDebugUtilsMessengerEXT"
         );
-
     // vkGetInstanceProcAddr() can fail, so just to be sure
     if (vkDestroyDebugUtilsMessenger)
         vkDestroyDebugUtilsMessenger(self->instance, self->msg, NULL);
@@ -731,11 +707,11 @@ mc_DeviceType_t mc_device_get_type(mc_Device_t* self) {
 }
 
 uint64_t mc_device_get_total_memory_size(mc_Device_t* self) {
-    return self->totalMemory;
+    return self->memTot;
 }
 
 uint64_t mc_device_get_used_memory_size(mc_Device_t* self) {
-    return self->usedMemory;
+    return self->memUse;
 }
 
 char* mc_device_get_name(mc_Device_t* self) {
@@ -750,21 +726,13 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
 
     MC_MSG_INFO(self->dev, "initializing mc_Buffer_t of size %ld", size);
 
-    if (self->dev->usedMemory + size > self->dev->totalMemory) {
-        MC_MSG_HIGH(
-            self->dev,
-            "not enough memory (available: %ld)",
-            self->dev->totalMemory - self->dev->usedMemory
-        );
+    if (self->dev->memUse + size > self->dev->memTot) {
+        uint32_t remaining = self->dev->memTot - self->dev->memUse;
+        MC_MSG_HIGH(self->dev, "not enough memory (available: %ld)", remaining);
         return self;
     }
 
-    self->dev->usedMemory += size;
-    MC_MSG_INFO(
-        self->dev,
-        "remaining memory: %ld",
-        self->dev->totalMemory - self->dev->usedMemory
-    );
+    self->dev->memUse += size;
 
     VkBufferCreateInfo bufferInfo = {0};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -774,22 +742,20 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     bufferInfo.queueFamilyIndexCount = 1;
     bufferInfo.pQueueFamilyIndices = &self->dev->queueFamilyIdx;
 
-    if (vkCreateBuffer(self->dev->dev, &bufferInfo, NULL, &self->buffer)) {
+    if (vkCreateBuffer(self->dev->dev, &bufferInfo, NULL, &self->buf)) {
         MC_MSG_HIGH(self->dev, "failed to create vulkan buffer");
         return self;
     }
 
-    VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements(self->dev->dev, self->buffer, &memReqs);
-
     // check the minimum memory size
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(self->dev->dev, self->buf, &memReqs);
     if (memReqs.size > self->size) self->size = memReqs.size;
 
     VkPhysicalDeviceMemoryProperties memProps;
     vkGetPhysicalDeviceMemoryProperties(self->dev->physDev, &memProps);
 
     uint32_t memTypeIdx = memProps.memoryTypeCount;
-
     for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
         VkMemoryType type = memProps.memoryTypes[i];
         VkMemoryHeap heap = memProps.memoryHeaps[type.heapIndex];
@@ -811,22 +777,18 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     memAllocInfo.allocationSize = self->size;
     memAllocInfo.memoryTypeIndex = memTypeIdx;
 
-    if (vkAllocateMemory(self->dev->dev, &memAllocInfo, NULL, &self->memory)) {
+    if (vkAllocateMemory(self->dev->dev, &memAllocInfo, NULL, &self->mem)) {
         MC_MSG_HIGH(self->dev, "failed to allocate vulkan memory");
         return self;
     }
 
-    vkMapMemory(
-        self->dev->dev,
-        self->memory,
-        0,
-        self->size,
-        0,
-        &self->mappedMemory
-    );
-
-    if (vkBindBufferMemory(self->dev->dev, self->buffer, self->memory, 0)) {
+    if (vkMapMemory(self->dev->dev, self->mem, 0, self->size, 0, &self->map)) {
         MC_MSG_HIGH(self->dev, "failed to map memory");
+        return self;
+    }
+
+    if (vkBindBufferMemory(self->dev->dev, self->buf, self->mem, 0)) {
+        MC_MSG_HIGH(self->dev, "failed to bind memory");
         return self;
     }
 
@@ -848,9 +810,9 @@ mc_Buffer_t* mc_buffer_create_from(
 
 void mc_buffer_destroy(mc_Buffer_t* self) {
     MC_MSG_INFO(self->dev, "destroying mc_Buffer_t");
-    self->dev->usedMemory -= self->size;
-    if (self->memory) vkFreeMemory(self->dev->dev, self->memory, NULL);
-    if (self->buffer) vkDestroyBuffer(self->dev->dev, self->buffer, NULL);
+    self->dev->memUse -= self->size;
+    if (self->mem) vkFreeMemory(self->dev->dev, self->mem, NULL);
+    if (self->buf) vkDestroyBuffer(self->dev->dev, self->buf, NULL);
     free(self);
 }
 
@@ -884,7 +846,7 @@ uint64_t mc_buffer_write(
     }
 
     // since the buffer has been mapped, this is all thats needed
-    memcpy((char*)self->mappedMemory + offset, data, size);
+    memcpy((char*)self->map + offset, data, size);
     return size;
 }
 
@@ -910,7 +872,7 @@ uint64_t mc_buffer_read(
     }
 
     // since the buffer has been mapped, this is all thats needed
-    memcpy(data, (char*)self->mappedMemory + offset, size);
+    memcpy(data, (char*)self->map + offset, size);
     return size;
 }
 
@@ -1158,7 +1120,7 @@ void mc_program_setup__(
         }
 
         descBuffInfo[i] = (VkDescriptorBufferInfo){0};
-        descBuffInfo[i].buffer = buffer->buffer;
+        descBuffInfo[i].buffer = buffer->buf;
         descBuffInfo[i].range = VK_WHOLE_SIZE;
 
         wrtDescSet[i] = (VkWriteDescriptorSet){0};
