@@ -266,11 +266,10 @@ bool mc_program_is_initialized(mc_Program_t* self);
  *
  * - `self`: A reference to a `mc_Program_t` object
  * - `entryPoint`: The entry point name, generally `"main"`
- * - `pcSize`: The size of the push constant data, set to 0 to ignore
  * - `...`: A list of buffers to bind to the program
  */
-#define mc_program_setup(self, entryPoint, pcSize, ...)                        \
-    mc_program_setup__(self, entryPoint, pcSize, ##__VA_ARGS__, NULL)
+#define mc_program_setup(self, entryPoint, ...)                                \
+    mc_program_setup__(self, entryPoint, ##__VA_ARGS__, NULL)
 
 /** code
  * Run a `mc_Program_t` object.
@@ -279,7 +278,6 @@ bool mc_program_is_initialized(mc_Program_t* self);
  * - `dimX`: The number of local workgroups in the x dimension
  * - `dimY`: The number of local workgroups in the y dimension
  * - `dimZ`: The number of local workgroups in the z dimension
- * - `pcData`: A reference to the push constant data, pass `NULL` to ignore
  * - returns: The time taken waiting for the compute operation tio finish, in
  *            seconds, -1.0 on fail
  */
@@ -287,8 +285,7 @@ double mc_program_run(
     mc_Program_t* self,
     uint32_t dimX,
     uint32_t dimY,
-    uint32_t dimZ,
-    void* pcData
+    uint32_t dimZ
 );
 
 /** code
@@ -333,12 +330,7 @@ void mc_default_debug_cb( //
 /** code
  * Wrapped functions. Don't use these directly, use their corresponding macros.
  */
-void mc_program_setup__(
-    mc_Program_t* self,
-    const char* entryPoint,
-    uint32_t pcSize,
-    ...
-);
+void mc_program_setup__(mc_Program_t* self, const char* entryPoint, ...);
 
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD
 
@@ -427,7 +419,6 @@ struct mc_Buffer {
 
 struct mc_Program {
     bool isInitialized;
-    uint32_t pcSize;
     mc_Device_t* dev;
     VkShaderModule shaderModule;
     VkDescriptorSetLayout descSetLayout;
@@ -939,18 +930,11 @@ bool mc_program_is_initialized(mc_Program_t* self) {
     return self->isInitialized;
 }
 
-void mc_program_setup__(
-    mc_Program_t* self,
-    const char* entryPoint,
-    uint32_t pcSize,
-    ...
-) {
+void mc_program_setup__(mc_Program_t* self, const char* entryPoint, ...) {
     if (!self->isInitialized) {
         MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
         return;
     }
-
-    self->pcSize = pcSize;
 
     // destroy old objects if they exist
     if (self->cmdBuff)
@@ -970,17 +954,12 @@ void mc_program_setup__(
 
     va_list args;
 
-    va_start(args, pcSize);
+    va_start(args, entryPoint);
     uint32_t argc = 0;
     while (va_arg(args, void*) != NULL) argc++;
     va_end(args);
 
-    MC_MSG_INFO(
-        self->dev,
-        "setting up mc_Program_t (push constant size: %d, buffer count: %d)",
-        pcSize,
-        argc
-    );
+    MC_MSG_INFO(self->dev, "setting up mc_Program_t (buffer count: %d)", argc);
 
     VkDescriptorSetLayoutBinding* descBindings
         = malloc(sizeof *descBindings * argc);
@@ -1011,17 +990,10 @@ void mc_program_setup__(
 
     free(descBindings);
 
-    VkPushConstantRange pushConstant;
-    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    pushConstant.offset = 0;
-    pushConstant.size = self->pcSize;
-
     VkPipelineLayoutCreateInfo pipelineInfo = {0};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineInfo.setLayoutCount = 1;
     pipelineInfo.pSetLayouts = &self->descSetLayout;
-    pipelineInfo.pushConstantRangeCount = self->pcSize ? 1 : 0;
-    pipelineInfo.pPushConstantRanges = &pushConstant;
 
     if (vkCreatePipelineLayout(
             self->dev->dev,
@@ -1109,7 +1081,7 @@ void mc_program_setup__(
 
     VkDescriptorBufferInfo* descBuffInfo = malloc(sizeof *descBuffInfo * argc);
     VkWriteDescriptorSet* wrtDescSet = malloc(sizeof *wrtDescSet * argc);
-    va_start(args, pcSize);
+    va_start(args, entryPoint);
 
     for (uint32_t i = 0; i < argc; i++) {
         mc_Buffer_t* buffer = va_arg(args, void*);
@@ -1158,8 +1130,7 @@ double mc_program_run(
     mc_Program_t* self,
     uint32_t dimX,
     uint32_t dimY,
-    uint32_t dimZ,
-    void* pcData
+    uint32_t dimZ
 ) {
     if (!self->isInitialized) {
         MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
@@ -1197,17 +1168,6 @@ double mc_program_run(
         0,
         NULL
     );
-
-    if (pcData) {
-        vkCmdPushConstants(
-            self->cmdBuff,
-            self->pipelineLayout,
-            VK_SHADER_STAGE_COMPUTE_BIT,
-            0,
-            self->pcSize,
-            pcData
-        );
-    }
 
     vkCmdDispatch(self->cmdBuff, dimX, dimY, dimZ);
     if (vkEndCommandBuffer(self->cmdBuff)) {
