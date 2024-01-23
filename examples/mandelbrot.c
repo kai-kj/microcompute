@@ -28,9 +28,8 @@ int main(void) {
     mc_Buffer_t* optBuff = mc_buffer_create_from(dev, sizeof opt, &opt);
     mc_Buffer_t* imgBuff = mc_buffer_create(dev, imgSize);
 
-    mc_Program_t* prog = mc_program_create(dev, "mandelbrot.spv");
-    mc_program_setup(prog, "main", optBuff, imgBuff);
-    double time = mc_program_run(prog, width, height, 1);
+    mc_Program_t* prog = mc_program_create(dev, "mandelbrot.spv", "main");
+    double time = mc_program_run(prog, width, height, 1, optBuff, imgBuff);
     printf("compute time: %f[s]\n", time);
 
     void* img = malloc(imgSize);

@@ -242,9 +242,14 @@ uint64_t mc_buffer_read(
  *
  * - `device`: A reference to a `mc_Device_t` object
  * - `fileName`: The path to the shader code
+ * - `entryPoint`: The entry point name, generally `"main"`
  * - returns: A reference to a `mc_Program_t` object
  */
-mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName);
+mc_Program_t* mc_program_create(
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint
+);
 
 /** code
  * Destroy a `mc_Program_t` object.
@@ -265,28 +270,14 @@ bool mc_program_is_initialized(mc_Program_t* self);
  * Bind buffers to a `mc_Program_t` object.
  *
  * - `self`: A reference to a `mc_Program_t` object
- * - `entryPoint`: The entry point name, generally `"main"`
- * - `...`: A list of buffers to bind to the program
- */
-#define mc_program_setup(self, entryPoint, ...)                                \
-    mc_program_setup__(self, entryPoint, ##__VA_ARGS__, NULL)
-
-/** code
- * Run a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
  * - `dimX`: The number of local workgroups in the x dimension
  * - `dimY`: The number of local workgroups in the y dimension
  * - `dimZ`: The number of local workgroups in the z dimension
- * - returns: The time taken waiting for the compute operation tio finish, in
- *            seconds, -1.0 on fail
+ * - `...`: A list of buffers to bind to the program
+ * - returns: Time taken to run the program, in seconds, or `-1.0` on error
  */
-double mc_program_run(
-    mc_Program_t* self,
-    uint32_t dimX,
-    uint32_t dimY,
-    uint32_t dimZ
-);
+#define mc_program_run(self, dimX, dimY, dimZ, ...)                            \
+    mc_program_run__(self, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
 
 /** code
  * Get the current time.
@@ -330,7 +321,13 @@ void mc_default_debug_cb( //
 /** code
  * Wrapped functions. Don't use these directly, use their corresponding macros.
  */
-void mc_program_setup__(mc_Program_t* self, const char* entryPoint, ...);
+double mc_program_run__(
+    mc_Program_t* self,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
+    ...
+);
 
 #endif // MICROCOMPUTE_H_INCLUDE_GUARD
 
@@ -419,7 +416,10 @@ struct mc_Buffer {
 
 struct mc_Program {
     bool isInitialized;
+    const char* entryPoint;
     mc_Device_t* dev;
+    uint32_t buffCount;
+    mc_Buffer_t** buffs;
     VkShaderModule shaderModule;
     VkDescriptorSetLayout descSetLayout;
     VkPipelineLayout pipelineLayout;
@@ -461,6 +461,204 @@ static size_t mc_read_file(const char* path, char* contents) {
     if (contents) (void)!fread(contents, 1, length, fp);
     fclose(fp);
     return length;
+}
+
+static void mc_program_setup(mc_Program_t* self) {
+    if (!self->isInitialized) {
+        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
+        return;
+    }
+
+    // destroy old objects if they exist
+    if (self->cmdBuff)
+        vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
+    if (self->cmdPool)
+        vkDestroyCommandPool(self->dev->dev, self->cmdPool, NULL);
+    if (self->descSet)
+        vkFreeDescriptorSets(self->dev->dev, self->descPool, 1, &self->descSet);
+    if (self->descPool)
+        vkDestroyDescriptorPool(self->dev->dev, self->descPool, NULL);
+    if (self->pipeline) //
+        vkDestroyPipeline(self->dev->dev, self->pipeline, NULL);
+    if (self->pipelineLayout)
+        vkDestroyPipelineLayout(self->dev->dev, self->pipelineLayout, NULL);
+    if (self->descSetLayout)
+        vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
+
+    MC_MSG_INFO(
+        self->dev,
+        "setting up mc_Program_t with %d buffer(s)",
+        self->buffCount
+    );
+
+    VkDescriptorSetLayoutBinding* descBindings
+        = malloc(sizeof *descBindings * self->buffCount);
+
+    for (uint32_t i = 0; i < self->buffCount; i++) {
+        descBindings[i] = (VkDescriptorSetLayoutBinding){0};
+        descBindings[i].binding = i;
+        descBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descBindings[i].descriptorCount = 1;
+        descBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+
+    VkDescriptorSetLayoutCreateInfo descLayoutInfo = {0};
+    descLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descLayoutInfo.bindingCount = self->buffCount;
+    descLayoutInfo.pBindings = descBindings;
+
+    if (vkCreateDescriptorSetLayout(
+            self->dev->dev,
+            &descLayoutInfo,
+            NULL,
+            &self->descSetLayout
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create descriptor set layout");
+        free(descBindings);
+        return;
+    }
+
+    free(descBindings);
+
+    VkPipelineLayoutCreateInfo pipelineInfo = {0};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineInfo.setLayoutCount = 1;
+    pipelineInfo.pSetLayouts = &self->descSetLayout;
+
+    if (vkCreatePipelineLayout(
+            self->dev->dev,
+            &pipelineInfo,
+            NULL,
+            &self->pipelineLayout
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create pipeline layout");
+        return;
+    }
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo = {0};
+    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStageInfo.module = self->shaderModule;
+    shaderStageInfo.pName = self->entryPoint;
+
+    VkComputePipelineCreateInfo computePipelineInfo = {0};
+    computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineInfo.stage = shaderStageInfo;
+    computePipelineInfo.layout = self->pipelineLayout;
+
+    if (vkCreateComputePipelines(
+            self->dev->dev,
+            0,
+            1,
+            &computePipelineInfo,
+            NULL,
+            &self->pipeline
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create compute pipeline");
+        return;
+    }
+
+    VkDescriptorPoolSize descPoolSize = {0};
+    descPoolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descPoolSize.descriptorCount = self->buffCount;
+
+    VkDescriptorPoolCreateInfo descPoolInfo = {0};
+    descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    descPoolInfo.maxSets = 1;
+    descPoolInfo.poolSizeCount = 1;
+    descPoolInfo.pPoolSizes = &descPoolSize;
+
+    if (vkCreateDescriptorPool(
+            self->dev->dev,
+            &descPoolInfo,
+            NULL,
+            &self->descPool
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create descriptor pool");
+        return;
+    }
+
+    VkDescriptorSetAllocateInfo descAllocInfo = {0};
+    descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descAllocInfo.descriptorPool = self->descPool;
+    descAllocInfo.descriptorSetCount = 1;
+    descAllocInfo.pSetLayouts = &self->descSetLayout;
+
+    if (vkAllocateDescriptorSets(
+            self->dev->dev,
+            &descAllocInfo,
+            &self->descSet
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to allocate descriptor sets");
+        return;
+    }
+
+    VkCommandPoolCreateInfo cmdPoolInfo = {0};
+    cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    cmdPoolInfo.queueFamilyIndex = self->dev->queueFamilyIdx;
+
+    if (vkCreateCommandPool(
+            self->dev->dev,
+            &cmdPoolInfo,
+            NULL,
+            &self->cmdPool
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to create command pool");
+        return;
+    }
+
+    VkDescriptorBufferInfo* descBuffInfo
+        = malloc(sizeof *descBuffInfo * self->buffCount);
+    VkWriteDescriptorSet* wrtDescSet
+        = malloc(sizeof *wrtDescSet * self->buffCount);
+
+    for (uint32_t i = 0; i < self->buffCount; i++) {
+        mc_Buffer_t* buffer = self->buffs[i];
+
+        if (!buffer->isInitialized) {
+            MC_MSG_MEDIUM(self->dev, "buffer %d not initialized", i);
+            return;
+        }
+
+        descBuffInfo[i] = (VkDescriptorBufferInfo){0};
+        descBuffInfo[i].buffer = buffer->buf;
+        descBuffInfo[i].range = VK_WHOLE_SIZE;
+
+        wrtDescSet[i] = (VkWriteDescriptorSet){0};
+        wrtDescSet[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        wrtDescSet[i].dstSet = self->descSet;
+        wrtDescSet[i].dstBinding = i;
+        wrtDescSet[i].descriptorCount = 1;
+        wrtDescSet[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        wrtDescSet[i].pBufferInfo = &descBuffInfo[i];
+    }
+
+    vkUpdateDescriptorSets(
+        self->dev->dev,
+        self->buffCount,
+        wrtDescSet,
+        0,
+        NULL
+    );
+    free(descBuffInfo);
+    free(wrtDescSet);
+
+    VkCommandBufferAllocateInfo cmdBuffAllocInfo = {0};
+    cmdBuffAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdBuffAllocInfo.commandPool = self->cmdPool;
+    cmdBuffAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdBuffAllocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(
+            self->dev->dev,
+            &cmdBuffAllocInfo,
+            &self->cmdBuff
+        )) {
+        MC_MSG_HIGH(self->dev, "failed to allocate command buffers");
+        return;
+    }
 }
 
 const char* mc_debug_level_to_str(mc_DebugLevel_t level) {
@@ -867,12 +1065,22 @@ uint64_t mc_buffer_read(
     return size;
 }
 
-mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName) {
+mc_Program_t* mc_program_create(
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint
+) {
     mc_Program_t* self = malloc(sizeof *self);
     *self = (mc_Program_t){0};
     self->dev = device;
+    self->entryPoint = entryPoint;
 
-    MC_MSG_INFO(self->dev, "initializing mc_Program_t");
+    MC_MSG_INFO(
+        self->dev,
+        "initializing mc_Program_t from %s, entry: %s",
+        fileName,
+        entryPoint
+    );
 
     size_t shaderSize = mc_read_file(fileName, NULL);
     if (shaderSize == 0) {
@@ -930,211 +1138,16 @@ bool mc_program_is_initialized(mc_Program_t* self) {
     return self->isInitialized;
 }
 
-void mc_program_setup__(mc_Program_t* self, const char* entryPoint, ...) {
-    if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
-        return;
-    }
-
-    // destroy old objects if they exist
-    if (self->cmdBuff)
-        vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
-    if (self->cmdPool)
-        vkDestroyCommandPool(self->dev->dev, self->cmdPool, NULL);
-    if (self->descSet)
-        vkFreeDescriptorSets(self->dev->dev, self->descPool, 1, &self->descSet);
-    if (self->descPool)
-        vkDestroyDescriptorPool(self->dev->dev, self->descPool, NULL);
-    if (self->pipeline) //
-        vkDestroyPipeline(self->dev->dev, self->pipeline, NULL);
-    if (self->pipelineLayout)
-        vkDestroyPipelineLayout(self->dev->dev, self->pipelineLayout, NULL);
-    if (self->descSetLayout)
-        vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
-
-    va_list args;
-
-    va_start(args, entryPoint);
-    uint32_t argc = 0;
-    while (va_arg(args, void*) != NULL) argc++;
-    va_end(args);
-
-    MC_MSG_INFO(self->dev, "setting up mc_Program_t (buffer count: %d)", argc);
-
-    VkDescriptorSetLayoutBinding* descBindings
-        = malloc(sizeof *descBindings * argc);
-
-    for (uint32_t i = 0; i < argc; i++) {
-        descBindings[i] = (VkDescriptorSetLayoutBinding){0};
-        descBindings[i].binding = i;
-        descBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descBindings[i].descriptorCount = 1;
-        descBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    }
-
-    VkDescriptorSetLayoutCreateInfo descLayoutInfo = {0};
-    descLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descLayoutInfo.bindingCount = argc;
-    descLayoutInfo.pBindings = descBindings;
-
-    if (vkCreateDescriptorSetLayout(
-            self->dev->dev,
-            &descLayoutInfo,
-            NULL,
-            &self->descSetLayout
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to create descriptor set layout");
-        free(descBindings);
-        return;
-    }
-
-    free(descBindings);
-
-    VkPipelineLayoutCreateInfo pipelineInfo = {0};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineInfo.setLayoutCount = 1;
-    pipelineInfo.pSetLayouts = &self->descSetLayout;
-
-    if (vkCreatePipelineLayout(
-            self->dev->dev,
-            &pipelineInfo,
-            NULL,
-            &self->pipelineLayout
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to create pipeline layout");
-        return;
-    }
-
-    VkPipelineShaderStageCreateInfo shaderStageInfo = {0};
-    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shaderStageInfo.module = self->shaderModule;
-    shaderStageInfo.pName = entryPoint;
-
-    VkComputePipelineCreateInfo computePipelineInfo = {0};
-    computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    computePipelineInfo.stage = shaderStageInfo;
-    computePipelineInfo.layout = self->pipelineLayout;
-
-    if (vkCreateComputePipelines(
-            self->dev->dev,
-            0,
-            1,
-            &computePipelineInfo,
-            NULL,
-            &self->pipeline
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to create compute pipeline");
-        return;
-    }
-
-    VkDescriptorPoolSize descPoolSize = {0};
-    descPoolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descPoolSize.descriptorCount = argc;
-
-    VkDescriptorPoolCreateInfo descPoolInfo = {0};
-    descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    descPoolInfo.maxSets = 1;
-    descPoolInfo.poolSizeCount = 1;
-    descPoolInfo.pPoolSizes = &descPoolSize;
-
-    if (vkCreateDescriptorPool(
-            self->dev->dev,
-            &descPoolInfo,
-            NULL,
-            &self->descPool
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to create descriptor pool");
-        return;
-    }
-
-    VkDescriptorSetAllocateInfo descAllocInfo = {0};
-    descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descAllocInfo.descriptorPool = self->descPool;
-    descAllocInfo.descriptorSetCount = 1;
-    descAllocInfo.pSetLayouts = &self->descSetLayout;
-
-    if (vkAllocateDescriptorSets(
-            self->dev->dev,
-            &descAllocInfo,
-            &self->descSet
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to allocate descriptor sets");
-        return;
-    }
-
-    VkCommandPoolCreateInfo cmdPoolInfo = {0};
-    cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    cmdPoolInfo.queueFamilyIndex = self->dev->queueFamilyIdx;
-
-    if (vkCreateCommandPool(
-            self->dev->dev,
-            &cmdPoolInfo,
-            NULL,
-            &self->cmdPool
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to create command pool");
-        return;
-    }
-
-    VkDescriptorBufferInfo* descBuffInfo = malloc(sizeof *descBuffInfo * argc);
-    VkWriteDescriptorSet* wrtDescSet = malloc(sizeof *wrtDescSet * argc);
-    va_start(args, entryPoint);
-
-    for (uint32_t i = 0; i < argc; i++) {
-        mc_Buffer_t* buffer = va_arg(args, void*);
-
-        if (!buffer->isInitialized) {
-            MC_MSG_MEDIUM(self->dev, "found uninitialized buffer");
-            return;
-        }
-
-        descBuffInfo[i] = (VkDescriptorBufferInfo){0};
-        descBuffInfo[i].buffer = buffer->buf;
-        descBuffInfo[i].range = VK_WHOLE_SIZE;
-
-        wrtDescSet[i] = (VkWriteDescriptorSet){0};
-        wrtDescSet[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        wrtDescSet[i].dstSet = self->descSet;
-        wrtDescSet[i].dstBinding = i;
-        wrtDescSet[i].descriptorCount = 1;
-        wrtDescSet[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        wrtDescSet[i].pBufferInfo = &descBuffInfo[i];
-    }
-
-    va_end(args);
-
-    vkUpdateDescriptorSets(self->dev->dev, argc, wrtDescSet, 0, NULL);
-    free(descBuffInfo);
-    free(wrtDescSet);
-
-    VkCommandBufferAllocateInfo cmdBuffAllocInfo = {0};
-    cmdBuffAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdBuffAllocInfo.commandPool = self->cmdPool;
-    cmdBuffAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdBuffAllocInfo.commandBufferCount = 1;
-
-    if (vkAllocateCommandBuffers(
-            self->dev->dev,
-            &cmdBuffAllocInfo,
-            &self->cmdBuff
-        )) {
-        MC_MSG_HIGH(self->dev, "failed to allocate command buffers");
-        return;
-    }
-}
-
-double mc_program_run(
+double mc_program_run__(
     mc_Program_t* self,
     uint32_t dimX,
     uint32_t dimY,
-    uint32_t dimZ
+    uint32_t dimZ,
+    ...
 ) {
     if (!self->isInitialized) {
         MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
-        return -1.0;
+        return false;
     }
 
     // an easy mistake to make
@@ -1142,6 +1155,33 @@ double mc_program_run(
         MC_MSG_MEDIUM(self->dev, "at least one dimension is 0");
         return -1.0;
     }
+
+    // check if the buffers have been changed
+    uint32_t buffCount = 0;
+    va_list args;
+    va_start(args, dimZ);
+    while (va_arg(args, mc_Buffer_t*)) buffCount++;
+    va_end(args);
+
+    if (buffCount != self->buffCount) {
+        self->buffCount = buffCount;
+        self->buffs = realloc(self->buffs, sizeof *self->buffs * buffCount);
+        memset(self->buffs, 0, sizeof *self->buffs * buffCount);
+    }
+
+    bool buffersChanged = false;
+
+    va_start(args, dimZ);
+    for (uint32_t i = 0; i < buffCount; i++) {
+        mc_Buffer_t* buff = va_arg(args, mc_Buffer_t*);
+        if (buff != self->buffs[i]) {
+            self->buffs[i] = buff;
+            buffersChanged = true;
+        }
+    }
+    va_end(args);
+
+    if (buffersChanged) mc_program_setup(self);
 
     VkCommandBufferBeginInfo cmdBuffBeginInfo = {0};
     cmdBuffBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

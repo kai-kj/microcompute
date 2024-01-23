@@ -24,11 +24,10 @@ int main(void) {
 
         mc_Buffer_t* buff = mc_buffer_create_from(dev, sizeof arr, arr);
 
-        mc_Program_t* program = mc_program_create(dev, "check_devs.spv");
-        mc_program_setup(program, "main", buff);
+        mc_Program_t* prog = mc_program_create(dev, "check_devs.spv", "main");
 
         for (uint32_t i = 0; i < 3; i++) {
-            mc_program_run(program, 5, 1, 1);
+            mc_program_run(prog, 5, 1, 1, buff);
             mc_buffer_read(buff, 0, sizeof arr, arr);
 
             printf("  - iteration %d: {", i + 1);
@@ -40,7 +39,7 @@ int main(void) {
         printf("\n");
 
         mc_buffer_destroy(buff);
-        mc_program_destroy(program);
+        mc_program_destroy(prog);
     }
 
     mc_instance_destroy(instance);
