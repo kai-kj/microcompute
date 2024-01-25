@@ -286,13 +286,18 @@ Read data from a `mc_Buffer_t` object.
 ----
 
 ```c
-mc_Program_t* mc_program_create(mc_Device_t* device, const char* fileName);
+mc_Program_t* mc_program_create(
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint
+);
 ```
 
 Create a `mc_Program_t` object.
 
 - `device`: A reference to a `mc_Device_t` object
 - `fileName`: The path to the shader code
+- `entryPoint`: The entry point name, generally `"main"`
 - returns: A reference to a `mc_Program_t` object
 
 ----
@@ -319,38 +324,18 @@ Checks whether a `mc_Program_t` object has been successfully initialized.
 ----
 
 ```c
-#define mc_program_setup(self, entryPoint, pcSize, ...)                        \
-    mc_program_setup__(self, entryPoint, pcSize, ##__VA_ARGS__, NULL)
+#define mc_program_run(self, dimX, dimY, dimZ, ...)                            \
+    mc_program_run__(self, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
 ```
 
 Bind buffers to a `mc_Program_t` object.
 
 - `self`: A reference to a `mc_Program_t` object
-- `entryPoint`: The entry point name, generally `"main"`
-- `pcSize`: The size of the push constant data, set to 0 to ignore
-- `...`: A list of buffers to bind to the program
-
-----
-
-```c
-double mc_program_run(
-    mc_Program_t* self,
-    uint32_t dimX,
-    uint32_t dimY,
-    uint32_t dimZ,
-    void* pcData
-);
-```
-
-Run a `mc_Program_t` object.
-
-- `self`: A reference to a `mc_Program_t` object
 - `dimX`: The number of local workgroups in the x dimension
 - `dimY`: The number of local workgroups in the y dimension
 - `dimZ`: The number of local workgroups in the z dimension
-- `pcData`: A reference to the push constant data, pass `NULL` to ignore
-- returns: The time taken waiting for the compute operation tio finish, in
-           seconds, -1.0 on fail
+- `...`: A list of buffers to bind to the program
+- returns: Time taken to run the program, in seconds, or `-1.0` on error
 
 ----
 
@@ -406,10 +391,11 @@ See `mc_debug_cb` for more info about the arguments.
 ----
 
 ```c
-void mc_program_setup__(
+double mc_program_run__(
     mc_Program_t* self,
-    const char* entryPoint,
-    uint32_t pcSize,
+    uint32_t dimX,
+    uint32_t dimY,
+    uint32_t dimZ,
     ...
 );
 
