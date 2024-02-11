@@ -34,15 +34,15 @@
  */
 
 /** code
- * The severity of a debug message.
+ * The severity of a log message.
  */
-typedef enum mc_DebugLevel {
-    MC_DEBUG_LEVEL_INFO,
-    MC_DEBUG_LEVEL_LOW,
-    MC_DEBUG_LEVEL_MEDIUM,
-    MC_DEBUG_LEVEL_HIGH,
-    MC_DEBUG_LEVEL_UNKNOWN,
-} mc_DebugLevel_t;
+typedef enum mc_LogLevel {
+    MC_LOG_LEVEL_DEBUG,
+    MC_LOG_LEVEL_INFO,
+    MC_LOG_LEVEL_WARN,
+    MC_LOG_LEVEL_ERROR,
+    MC_LOG_LEVEL_UNKNOWN,
+} mc_LogLevel_t;
 
 /** code
  * The type of a mc_Device_t.
@@ -56,18 +56,18 @@ typedef enum mc_DeviceType {
 } mc_DeviceType_t;
 
 /** code
- * The debug callback type passed to `mc_set_debug_cb()`.
+ * The log callback type passed to `mc_set_log_cb()`.
  *
- * - `lvl`: A `mc_DebugLevel` indicating the severity of the message
+ * - `lvl`: A `mc_LogLevel` indicating the severity of the message
  * - `src`: The message source (NULL terminated)
- * - `arg`: The value passed to `debugArg` in `mc_instance_create()`
+ * - `arg`: The value passed to `logArg` in `mc_instance_create()`
  * - `file`: The file the message originated from (NULL terminated)
  * - `line`: The line the message originated from
  * - `fmt`: The message formatting (same format as `printf()`)
  * - `...`: The arguments for the formatting
  */
-typedef void(mc_debug_cb)( //
-    mc_DebugLevel_t lvl,
+typedef void(mc_log_cb)( //
+    mc_LogLevel_t lvl,
     const char* src,
     void* arg,
     const char* file,
@@ -91,11 +91,11 @@ typedef struct mc_Program mc_Program_t;
 /** code
  * Create a `mc_Instance_t` object.
  *
- * - `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
- * - `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
+ * - `log_cb`: A function to call when a error occurs, set to `NULL` to ignore
+ * - `logArg`: A value to pass to the log callback, set to `NULL` to ignore
  * - returns: A reference to a `mc_Instance_t` object
  */
-mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
+mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg);
 
 /** code
  * Destroy a `mc_Instance_t` object.
@@ -287,12 +287,12 @@ bool mc_program_is_initialized(mc_Program_t* self);
 double mc_get_time();
 
 /** code
- * Convert a `mc_DebugLevel_t` enum to a human readable string.
+ * Convert a `mc_LogLevel_t` enum to a human readable string.
  *
- * - `level`: A `mc_DebugLevel_t` value
+ * - `level`: A `mc_LogLevel_t` value
  * - returns: A human readable string (`NULL` terminated)
  */
-const char* mc_debug_level_to_str(mc_DebugLevel_t level);
+const char* mc_log_level_to_str(mc_LogLevel_t level);
 
 /** code
  * Convert a `mc_DeviceType_t` enum to a human readable string.
@@ -306,10 +306,10 @@ const char* mc_device_type_to_str(mc_DeviceType_t type);
  * Default callback function that can be passed to `mc_instance_create()`. Just
  * prints all messages to stdout. Use as a template for your own callback.
  *
- * See `mc_debug_cb` for more info about the arguments.
+ * See `mc_log_cb` for more info about the arguments.
  */
-void mc_default_debug_cb( //
-    mc_DebugLevel_t lvl,
+void mc_default_log_cb( //
+    mc_LogLevel_t lvl,
     const char* src,
     void* arg,
     char const* file,
@@ -366,25 +366,18 @@ double mc_program_run__(
 #include <sys/time.h>
 #include <vulkan/vulkan.h>
 
-#define MC_MSG(s, l, ...)                                                      \
-    if ((s)->debug_cb)                                                         \
-        (s)->debug_cb(                                                         \
-            (l),                                                               \
-            "microcompute",                                                    \
-            (s)->debugArg,                                                     \
-            __FILE__,                                                          \
-            __LINE__,                                                          \
-            __VA_ARGS__                                                        \
-        );
+#define MC_LOG(s, l, ...)                                                      \
+    if ((s)->log_cb)                                                           \
+        (s)->log_cb((l), "mc", (s)->logArg, __FILE__, __LINE__, __VA_ARGS__);
 
-#define MC_MSG_INFO(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_INFO, __VA_ARGS__)
-#define MC_MSG_LOW(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_LOW, __VA_ARGS__)
-#define MC_MSG_MEDIUM(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_MEDIUM, __VA_ARGS__)
-#define MC_MSG_HIGH(s, ...) MC_MSG((s), MC_DEBUG_LEVEL_HIGH, __VA_ARGS__)
+#define MC_LOG_DEBUG(s, ...) MC_LOG((s), MC_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#define MC_LOG_INFO(s, ...) MC_LOG((s), MC_LOG_LEVEL_INFO, __VA_ARGS__)
+#define MC_LOG_WARN(s, ...) MC_LOG((s), MC_LOG_LEVEL_WARN, __VA_ARGS__)
+#define MC_LOG_ERROR(s, ...) MC_LOG((s), MC_LOG_LEVEL_ERROR, __VA_ARGS__)
 
 struct mc_Device {
-    void* debugArg;
-    mc_debug_cb* debug_cb;
+    void* logArg;
+    mc_log_cb* log_cb;
     VkPhysicalDevice physDev;
     uint32_t queueFamilyIdx;
     VkDevice dev;
@@ -395,8 +388,8 @@ struct mc_Device {
 
 struct mc_Instance {
     bool isInitialized;
-    void* debugArg;
-    mc_debug_cb* debug_cb;
+    void* logArg;
+    mc_log_cb* log_cb;
     VkInstance instance;
     uint32_t devCount;
     mc_Device_t** devs;
@@ -431,23 +424,24 @@ struct mc_Program {
 };
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-static VkBool32 mc_vk_debug_callback(
+static VkBool32 mc_vk_log_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
     const VkDebugUtilsMessengerCallbackDataEXT* msg,
     void* userData
 ) {
     mc_Instance_t* inst = (mc_Instance_t*)userData;
-    if (!inst->debug_cb) return VK_FALSE;
+    if (!inst->log_cb) return VK_FALSE;
 
-    enum mc_DebugLevel lvl;
+    enum mc_LogLevel lvl;
     switch (severity) {
-        case 0x00000100: lvl = MC_DEBUG_LEVEL_MEDIUM; break; // warning
-        case 0x00001000: lvl = MC_DEBUG_LEVEL_HIGH; break;   // error
-        default: return VK_FALSE;                            // other
+        case 0x00000010: lvl = MC_LOG_LEVEL_DEBUG; break;
+        case 0x00000100: lvl = MC_LOG_LEVEL_WARN; break;
+        case 0x00001000: lvl = MC_LOG_LEVEL_ERROR; break;
+        default: return VK_FALSE;
     }
 
-    inst->debug_cb(lvl, "vulkan", inst->debugArg, "", 0, "%s", msg->pMessage);
+    inst->log_cb(lvl, "vk", inst->logArg, "", 0, "%s", msg->pMessage);
     return VK_FALSE;
 }
 #endif // MC_ENABLE_VALIDATION_LAYER
@@ -465,7 +459,7 @@ static size_t mc_read_file(const char* path, char* contents) {
 
 static void mc_program_setup(mc_Program_t* self) {
     if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
+        MC_LOG_ERROR(self->dev, "program not initialized");
         return;
     }
 
@@ -485,9 +479,9 @@ static void mc_program_setup(mc_Program_t* self) {
     if (self->descSetLayout)
         vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
 
-    MC_MSG_INFO(
+    MC_LOG_DEBUG(
         self->dev,
-        "setting up mc_Program_t with %d buffer(s)",
+        "setting up program with %d buffer(s):",
         self->buffCount
     );
 
@@ -513,7 +507,7 @@ static void mc_program_setup(mc_Program_t* self) {
             NULL,
             &self->descSetLayout
         )) {
-        MC_MSG_HIGH(self->dev, "failed to create descriptor set layout");
+        MC_LOG_ERROR(self->dev, "failed to create descriptor set layout");
         free(descBindings);
         return;
     }
@@ -531,7 +525,7 @@ static void mc_program_setup(mc_Program_t* self) {
             NULL,
             &self->pipelineLayout
         )) {
-        MC_MSG_HIGH(self->dev, "failed to create pipeline layout");
+        MC_LOG_ERROR(self->dev, "failed to create pipeline layout");
         return;
     }
 
@@ -554,7 +548,7 @@ static void mc_program_setup(mc_Program_t* self) {
             NULL,
             &self->pipeline
         )) {
-        MC_MSG_HIGH(self->dev, "failed to create compute pipeline");
+        MC_LOG_ERROR(self->dev, "failed to create compute pipeline");
         return;
     }
 
@@ -575,7 +569,7 @@ static void mc_program_setup(mc_Program_t* self) {
             NULL,
             &self->descPool
         )) {
-        MC_MSG_HIGH(self->dev, "failed to create descriptor pool");
+        MC_LOG_ERROR(self->dev, "failed to create descriptor pool");
         return;
     }
 
@@ -590,7 +584,7 @@ static void mc_program_setup(mc_Program_t* self) {
             &descAllocInfo,
             &self->descSet
         )) {
-        MC_MSG_HIGH(self->dev, "failed to allocate descriptor sets");
+        MC_LOG_ERROR(self->dev, "failed to allocate descriptor sets");
         return;
     }
 
@@ -605,7 +599,7 @@ static void mc_program_setup(mc_Program_t* self) {
             NULL,
             &self->cmdPool
         )) {
-        MC_MSG_HIGH(self->dev, "failed to create command pool");
+        MC_LOG_ERROR(self->dev, "failed to create command pool");
         return;
     }
 
@@ -617,8 +611,10 @@ static void mc_program_setup(mc_Program_t* self) {
     for (uint32_t i = 0; i < self->buffCount; i++) {
         mc_Buffer_t* buffer = self->buffs[i];
 
+        MC_LOG_DEBUG(self->dev, "- buffer %d: size=%ld", i, buffer->size);
+
         if (!buffer->isInitialized) {
-            MC_MSG_MEDIUM(self->dev, "buffer %d not initialized", i);
+            MC_LOG_ERROR(self->dev, "buffer %d not initialized", i);
             return;
         }
 
@@ -656,18 +652,18 @@ static void mc_program_setup(mc_Program_t* self) {
             &cmdBuffAllocInfo,
             &self->cmdBuff
         )) {
-        MC_MSG_HIGH(self->dev, "failed to allocate command buffers");
+        MC_LOG_ERROR(self->dev, "failed to allocate command buffers");
         return;
     }
 }
 
-const char* mc_debug_level_to_str(mc_DebugLevel_t level) {
+const char* mc_log_level_to_str(mc_LogLevel_t level) {
     switch (level) {
-        case MC_DEBUG_LEVEL_INFO: return "MC_DEBUG_LEVEL_INFO";
-        case MC_DEBUG_LEVEL_LOW: return "MC_DEBUG_LEVEL_LOW";
-        case MC_DEBUG_LEVEL_MEDIUM: return "MC_DEBUG_LEVEL_MEDIUM";
-        case MC_DEBUG_LEVEL_HIGH: return "MC_DEBUG_LEVEL_HIGH";
-        default: return "MC_DEBUG_LEVEL_UNKNOWN"; // just incase
+        case MC_LOG_LEVEL_DEBUG: return "MC_LOG_LEVEL_DEBUG";
+        case MC_LOG_LEVEL_INFO: return "MC_LOG_LEVEL_INFO";
+        case MC_LOG_LEVEL_WARN: return "MC_LOG_LEVEL_WARN";
+        case MC_LOG_LEVEL_ERROR: return "MC_LOG_LEVEL_ERROR";
+        default: return "MC_LOG_LEVEL_UNKNOWN"; // just incase
     }
 }
 
@@ -681,13 +677,13 @@ const char* mc_device_type_to_str(mc_DeviceType_t type) {
     }
 }
 
-mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
+mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
     mc_Instance_t* self = malloc(sizeof *self);
     *self = (mc_Instance_t){0};
-    self->debug_cb = debug_cb;
-    self->debugArg = debugArg;
+    self->log_cb = log_cb;
+    self->logArg = logArg;
 
-    MC_MSG_INFO(self, "initializing mc_Instance_t");
+    MC_LOG_DEBUG(self, "initializing instance");
 
     VkApplicationInfo appInfo = {0};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -695,7 +691,7 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
-    MC_MSG_INFO(self, "enabling vulkan validation layer");
+    MC_LOG_DEBUG(self, "enabling vulkan validation layer");
 
     VkDebugUtilsMessengerCreateInfoEXT msgInfo = {0};
     msgInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -706,7 +702,7 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
     msgInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
                         | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
                         | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    msgInfo.pfnUserCallback = mc_vk_debug_callback;
+    msgInfo.pfnUserCallback = mc_vk_log_callback;
     msgInfo.pUserData = self;
 
     VkInstanceCreateInfo instanceInfo = {0};
@@ -728,9 +724,19 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 #endif // MC_ENABLE_VALIDATION_LAYER
 
     if (vkCreateInstance(&instanceInfo, NULL, &self->instance)) {
-        MC_MSG_HIGH(self, "failed to create vulkan instance");
+        MC_LOG_ERROR(self, "failed to create vulkan instance");
         return self;
     }
+
+    uint32_t vkVersion;
+    vkEnumerateInstanceVersion(&vkVersion);
+    MC_LOG_DEBUG(
+        self,
+        "vulkan version: %d.%d.%d",
+        VK_VERSION_MAJOR(vkVersion),
+        VK_VERSION_MINOR(vkVersion),
+        VK_VERSION_PATCH(vkVersion)
+    );
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
     PFN_vkCreateDebugUtilsMessengerEXT msg_create
@@ -744,15 +750,15 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 
     uint32_t physDevCount = 0;
     if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, NULL)) {
-        MC_MSG_HIGH(self, "failed to get vulkan devices");
+        MC_LOG_ERROR(self, "failed to get vulkan devices");
         return self;
     }
 
-    MC_MSG_INFO(self, "found %d vulkan device(s)", physDevCount);
+    MC_LOG_DEBUG(self, "found %d vulkan device(s):", physDevCount);
 
     VkPhysicalDevice* physDevs = malloc(sizeof *physDevs * physDevCount);
     if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, physDevs)) {
-        MC_MSG_HIGH(self, "failed to get vulkan devices");
+        MC_LOG_ERROR(self, "failed to get vulkan devices");
         return self;
     }
 
@@ -811,8 +817,8 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         mc_Device_t* dev = (self->devs[idx] = malloc(sizeof *self->devs[idx]));
 
         *dev = (mc_Device_t){0};
-        dev->debugArg = debugArg;
-        dev->debug_cb = debug_cb;
+        dev->logArg = logArg;
+        dev->log_cb = log_cb;
         dev->physDev = physDev;
         dev->queueFamilyIdx = queueFamilyIdx;
         dev->dev = device;
@@ -828,7 +834,7 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
         vkGetPhysicalDeviceProperties(dev->physDev, &devProps);
         memcpy(dev->devName, devProps.deviceName, sizeof devProps.deviceName);
 
-        MC_MSG_INFO(self, "  found device %s", dev->devName);
+        MC_LOG_DEBUG(self, "- found device %s", dev->devName);
 
         physIdx++;
         idx++;
@@ -842,7 +848,7 @@ mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg) {
 }
 
 void mc_instance_destroy(mc_Instance_t* self) {
-    MC_MSG_INFO(self, "destroying mc_Instance_t");
+    MC_LOG_DEBUG(self, "destroying instance");
 
     for (uint32_t i = 0; i < self->devCount; i++) {
         if (self->devs[i]->dev) vkDestroyDevice(self->devs[i]->dev, NULL);
@@ -869,7 +875,7 @@ bool mc_instance_is_initialized(mc_Instance_t* self) {
 
 uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
     if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self, "mc_Instance_t not initialized");
+        MC_LOG_ERROR(self, "instance not initialized");
         return 0;
     }
     return self->devCount;
@@ -877,7 +883,7 @@ uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
 
 mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
     if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self, "mc_Instance_t not initialized");
+        MC_LOG_ERROR(self, "instance not initialized");
         return NULL;
     }
     return self->devs;
@@ -913,11 +919,15 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     self->size = size;
     self->dev = device;
 
-    MC_MSG_INFO(self->dev, "initializing mc_Buffer_t of size %ld", size);
+    MC_LOG_DEBUG(self->dev, "initializing buffer of size %ld", size);
 
     if (self->dev->memUse + size > self->dev->memTot) {
         uint32_t remaining = self->dev->memTot - self->dev->memUse;
-        MC_MSG_HIGH(self->dev, "not enough memory (available: %ld)", remaining);
+        MC_LOG_ERROR(
+            self->dev,
+            "not enough memory (available: %ld)",
+            remaining
+        );
         return self;
     }
 
@@ -932,7 +942,7 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     bufferInfo.pQueueFamilyIndices = &self->dev->queueFamilyIdx;
 
     if (vkCreateBuffer(self->dev->dev, &bufferInfo, NULL, &self->buf)) {
-        MC_MSG_HIGH(self->dev, "failed to create vulkan buffer");
+        MC_LOG_ERROR(self->dev, "failed to create vulkan buffer");
         return self;
     }
 
@@ -957,7 +967,7 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     }
 
     if (memTypeIdx == memProps.memoryTypeCount) {
-        MC_MSG_HIGH(self->dev, "no suitable memory type found");
+        MC_LOG_ERROR(self->dev, "no suitable memory type found");
         return self;
     }
 
@@ -967,17 +977,17 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
     memAllocInfo.memoryTypeIndex = memTypeIdx;
 
     if (vkAllocateMemory(self->dev->dev, &memAllocInfo, NULL, &self->mem)) {
-        MC_MSG_HIGH(self->dev, "failed to allocate vulkan memory");
+        MC_LOG_ERROR(self->dev, "failed to allocate vulkan memory");
         return self;
     }
 
     if (vkMapMemory(self->dev->dev, self->mem, 0, self->size, 0, &self->map)) {
-        MC_MSG_HIGH(self->dev, "failed to map memory");
+        MC_LOG_ERROR(self->dev, "failed to map memory");
         return self;
     }
 
     if (vkBindBufferMemory(self->dev->dev, self->buf, self->mem, 0)) {
-        MC_MSG_HIGH(self->dev, "failed to bind memory");
+        MC_LOG_ERROR(self->dev, "failed to bind memory");
         return self;
     }
 
@@ -998,7 +1008,7 @@ mc_Buffer_t* mc_buffer_create_from(
 }
 
 void mc_buffer_destroy(mc_Buffer_t* self) {
-    MC_MSG_INFO(self->dev, "destroying mc_Buffer_t");
+    MC_LOG_DEBUG(self->dev, "destroying buffer");
     self->dev->memUse -= self->size;
     if (self->mem) vkFreeMemory(self->dev->dev, self->mem, NULL);
     if (self->buf) vkDestroyBuffer(self->dev->dev, self->buf, NULL);
@@ -1019,15 +1029,17 @@ uint64_t mc_buffer_write(
     uint64_t size,
     void* data
 ) {
+    MC_LOG_DEBUG(self->dev, "writing %ld bytes to buffer", size);
+
     if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self->dev, "mc_Buffer_t not initialized");
+        MC_LOG_ERROR(self->dev, "mc_Buffer_t not initialized");
         return 0;
     }
 
     if (offset + size > self->size) {
-        MC_MSG_MEDIUM(
+        MC_LOG_ERROR(
             self->dev,
-            "offset + size > mc_Buffer_t.size (%ld > %ld)",
+            "offset + size > buffer size (%ld > %ld)",
             offset + size,
             self->size
         );
@@ -1045,15 +1057,17 @@ uint64_t mc_buffer_read(
     uint64_t size,
     void* data
 ) {
+    MC_LOG_DEBUG(self->dev, "reading %ld bytes from buffer", size);
+
     if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self->dev, "mc_Buffer_t not initialized");
+        MC_LOG_ERROR(self->dev, "mc_Buffer_t not initialized");
         return 0;
     }
 
     if (offset + size > self->size) {
-        MC_MSG_MEDIUM(
+        MC_LOG_ERROR(
             self->dev,
-            "offset + size > mc_Buffer_t.size (%ld > %ld)",
+            "offset + size > buffer size (%ld > %ld)",
             offset + size,
             self->size
         );
@@ -1075,16 +1089,16 @@ mc_Program_t* mc_program_create(
     self->dev = device;
     self->entryPoint = entryPoint;
 
-    MC_MSG_INFO(
+    MC_LOG_DEBUG(
         self->dev,
-        "initializing mc_Program_t from %s, entry: %s",
+        "initializing program from %s:%s",
         fileName,
         entryPoint
     );
 
     size_t shaderSize = mc_read_file(fileName, NULL);
     if (shaderSize == 0) {
-        MC_MSG_HIGH(self->dev, "failed to open %s", fileName);
+        MC_LOG_ERROR(self->dev, "failed to open %s", fileName);
         return self;
     }
 
@@ -1102,7 +1116,7 @@ mc_Program_t* mc_program_create(
             NULL,
             &self->shaderModule
         )) {
-        MC_MSG_HIGH(self->dev, "failed to create vulkan shader module");
+        MC_LOG_ERROR(self->dev, "failed to create vulkan shader module");
         free(shaderCode);
         return self;
     }
@@ -1114,7 +1128,7 @@ mc_Program_t* mc_program_create(
 }
 
 void mc_program_destroy(mc_Program_t* self) {
-    MC_MSG_INFO(self->dev, "destroying mc_Program_t");
+    MC_LOG_DEBUG(self->dev, "destroying program");
     if (self->cmdBuff)
         vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
     if (self->cmdPool)
@@ -1145,14 +1159,16 @@ double mc_program_run__(
     uint32_t dimZ,
     ...
 ) {
+    MC_LOG_DEBUG(self->dev, "running %dx%dx%d program", dimX, dimY, dimZ);
+
     if (!self->isInitialized) {
-        MC_MSG_MEDIUM(self->dev, "mc_Program_t not initialized");
+        MC_LOG_ERROR(self->dev, "program not initialized");
         return false;
     }
 
     // an easy mistake to make
     if (dimX * dimY * dimZ == 0) {
-        MC_MSG_MEDIUM(self->dev, "at least one dimension is 0");
+        MC_LOG_ERROR(self->dev, "at least one dimension is 0");
         return -1.0;
     }
 
@@ -1188,7 +1204,7 @@ double mc_program_run__(
     cmdBuffBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     if (vkBeginCommandBuffer(self->cmdBuff, &cmdBuffBeginInfo)) {
-        MC_MSG_HIGH(self->dev, "failed to begin command buffer");
+        MC_LOG_ERROR(self->dev, "failed to begin command buffer");
         return -1.0;
     }
 
@@ -1211,7 +1227,7 @@ double mc_program_run__(
 
     vkCmdDispatch(self->cmdBuff, dimX, dimY, dimZ);
     if (vkEndCommandBuffer(self->cmdBuff)) {
-        MC_MSG_HIGH(self->dev, "failed to end command buffer");
+        MC_LOG_ERROR(self->dev, "failed to end command buffer");
         return -1.0;
     }
 
@@ -1224,13 +1240,13 @@ double mc_program_run__(
     submitInfo.pCommandBuffers = &self->cmdBuff;
 
     if (vkQueueSubmit(queue, 1, &submitInfo, 0)) {
-        MC_MSG_HIGH(self->dev, "failed to submit queue");
+        MC_LOG_ERROR(self->dev, "failed to submit queue");
         return -1.0;
     }
 
     double startTime = mc_get_time();
     if (vkQueueWaitIdle(queue)) {
-        MC_MSG_HIGH(self->dev, "failed to wait for queue completion");
+        MC_LOG_ERROR(self->dev, "failed to wait for queue completion");
         return -1.0;
     }
 
@@ -1243,8 +1259,8 @@ double mc_get_time() {
     return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
 
-void mc_default_debug_cb( //
-    mc_DebugLevel_t lvl,
+void mc_default_log_cb( //
+    mc_LogLevel_t lvl,
     const char* src,
     void* arg,
     const char* file,
@@ -1260,14 +1276,10 @@ void mc_default_debug_cb( //
     vsnprintf(message, message_len + 1, fmt, args);
     va_end(args);
 
-    printf(
-        "[%s from %s] (%s:%d) %s\n",
-        mc_debug_level_to_str(lvl),
-        src,
-        file,
-        line,
-        message
-    );
+    printf("%s | %s | %s", mc_log_level_to_str(lvl), src, message);
+
+    if (strlen(file) > 0) printf(" (%s:%d)\n", file, line);
+    else printf("\n");
 }
 
 #endif // MICROCOMPUTE_IMPLEMENTATION

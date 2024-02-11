@@ -5,7 +5,7 @@
 #include "microcompute.h"
 
 int main(void) {
-    mc_Instance_t* instance = mc_instance_create(mc_default_debug_cb, NULL);
+    mc_Instance_t* instance = mc_instance_create(NULL, NULL);
     mc_Device_t** devs = mc_instance_get_devices(instance);
 
     printf(

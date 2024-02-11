@@ -22,7 +22,7 @@ int main(void) {
         .maxIter = 500,
     };
 
-    mc_Instance_t* instance = mc_instance_create(mc_default_debug_cb, NULL);
+    mc_Instance_t* instance = mc_instance_create(mc_default_log_cb, NULL);
     mc_Device_t* dev = mc_instance_get_devices(instance)[0];
 
     mc_Buffer_t* optBuff = mc_buffer_create_from(dev, sizeof opt, &opt);
