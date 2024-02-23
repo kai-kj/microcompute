@@ -145,6 +145,30 @@ uint64_t mc_device_get_total_memory_size(mc_Device_t* self);
 uint64_t mc_device_get_used_memory_size(mc_Device_t* self);
 
 /** code
+ * Get the max workgroup size (the max for x*y*z) of a device.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: The max workgroup size
+ */
+uint32_t mc_device_get_max_workgroup_size_total(mc_Device_t* self);
+
+/** code
+ * Get the max workgroup size (for each x, y, z) of a device.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: The max workgroup size, as a 3 element array (dont free)
+ */
+uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device_t* self);
+
+/** code
+ * Get the max workgroup count (for each x, y, z) of a device.
+ *
+ * - `self`: A reference to a `mc_Device_t` object
+ * - returns: The max workgroup count, as a 3 element array
+ */
+uint32_t* mc_device_get_max_workgroup_count(mc_Device_t* self);
+
+/** code
  * Get the name of a device.
  *
  * - `self`: A reference to a `mc_Device_t` object
@@ -358,6 +382,10 @@ struct mc_Device {
     VkPhysicalDevice physDev;
     uint32_t queueFamilyIdx;
     VkDevice dev;
+    mc_DeviceType_t type;
+    uint32_t maxWorkgroupSizeTotal;
+    uint32_t maxWorkgroupSizeShape[3];
+    uint32_t maxWorkgroupCount[3];
     uint64_t memTot;
     uint64_t memUse;
     char devName[256];
@@ -396,6 +424,8 @@ struct mc_Program {
     VkCommandPool cmdPool;
     VkCommandBuffer cmdBuff;
 };
+
+uint32_t defaultReturn[] = {0, 0, 0};
 
 #ifdef MC_ENABLE_VALIDATION_LAYER
 static VkBool32 mc_vk_log_callback(
@@ -798,6 +828,40 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
 
         VkPhysicalDeviceProperties devProps;
         vkGetPhysicalDeviceProperties(dev->physDev, &devProps);
+
+        switch (devProps.deviceType) {
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                dev->type = MC_DEVICE_TYPE_IGPU;
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                dev->type = MC_DEVICE_TYPE_DGPU;
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                dev->type = MC_DEVICE_TYPE_VGPU;
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                dev->type = MC_DEVICE_TYPE_CPU;
+                break;
+            default: //
+                dev->type = MC_DEVICE_TYPE_OTHER;
+                break;
+        }
+
+        dev->maxWorkgroupSizeTotal
+            = devProps.limits.maxComputeWorkGroupInvocations;
+
+        memcpy(
+            dev->maxWorkgroupSizeShape,
+            devProps.limits.maxComputeWorkGroupSize,
+            sizeof devProps.limits.maxComputeWorkGroupSize
+        );
+
+        memcpy(
+            dev->maxWorkgroupCount,
+            devProps.limits.maxComputeWorkGroupCount,
+            sizeof devProps.limits.maxComputeWorkGroupCount
+        );
+
         memcpy(dev->devName, devProps.deviceName, sizeof devProps.deviceName);
 
         MC_LOG_DEBUG(self, "- found device %s", dev->devName);
@@ -845,17 +909,7 @@ mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
 }
 
 mc_DeviceType_t mc_device_get_type(mc_Device_t* self) {
-    if (!self) return MC_DEVICE_TYPE_OTHER;
-
-    VkPhysicalDeviceProperties devProps;
-    vkGetPhysicalDeviceProperties(self->physDev, &devProps);
-    switch (devProps.deviceType) {
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return MC_DEVICE_TYPE_IGPU;
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return MC_DEVICE_TYPE_DGPU;
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: return MC_DEVICE_TYPE_VGPU;
-        case VK_PHYSICAL_DEVICE_TYPE_CPU: return MC_DEVICE_TYPE_CPU;
-        default: return MC_DEVICE_TYPE_OTHER;
-    }
+    return self ? self->type : MC_DEVICE_TYPE_OTHER;
 }
 
 uint64_t mc_device_get_total_memory_size(mc_Device_t* self) {
@@ -864,6 +918,18 @@ uint64_t mc_device_get_total_memory_size(mc_Device_t* self) {
 
 uint64_t mc_device_get_used_memory_size(mc_Device_t* self) {
     return self ? self->memUse : 0;
+}
+
+uint32_t mc_device_get_max_workgroup_size_total(mc_Device_t* self) {
+    return self ? self->maxWorkgroupSizeTotal : 0;
+}
+
+uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device_t* self) {
+    return self ? self->maxWorkgroupSizeShape : defaultReturn;
+}
+
+uint32_t* mc_device_get_max_workgroup_count(mc_Device_t* self) {
+    return self ? self->maxWorkgroupCount : defaultReturn;
 }
 
 char* mc_device_get_name(mc_Device_t* self) {
