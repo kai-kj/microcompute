@@ -93,7 +93,7 @@ typedef struct mc_Program mc_Program_t;
  *
  * - `log_cb`: A function to call when a error occurs, set to `NULL` to ignore
  * - `logArg`: A value to pass to the log callback, set to `NULL` to ignore
- * - returns: A reference to a `mc_Instance_t` object
+ * - returns: A instance object on success, `NULL` on error
  */
 mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg);
 
@@ -103,14 +103,6 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg);
  * - `self`: A reference to a `mc_Instance_t` object
  */
 void mc_instance_destroy(mc_Instance_t* self);
-
-/** code
- * Checks whether a `mc_Instance_t` object has been successfully initialized.
- *
- * - `self`: A reference to a `mc_Instance_t` object
- * - returns: `true` if successful, `false` otherwise
- */
-bool mc_instance_is_initialized(mc_Instance_t* self);
 
 /** code
  * Get the number of available `mc_Device_t` objects.
@@ -175,7 +167,7 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size);
  * - `device`: A reference to a `mc_Device_t` object
  * - `size`: The size of the buffer
  * - `data`: A reference to the data the initialize the buffer with
- * - returns: A reference to a `mc_Buffer_t` object
+ * - returns: A buffer object on success, `NULL` on error
  */
 mc_Buffer_t* mc_buffer_create_from(
     mc_Device_t* device,
@@ -189,13 +181,6 @@ mc_Buffer_t* mc_buffer_create_from(
  * - `self`: A reference to a `mc_Buffer_t` object
  */
 void mc_buffer_destroy(mc_Buffer_t* self);
-
-/** code
- * Checks whether a `mc_Buffer_t` object been successfully initialized.
- *
- * - `self`: A reference to a `mc_Buffer_t` object
- */
-bool mc_buffer_is_initialized(mc_Buffer_t* self);
 
 /** code
  * Get the size of a `mc_Buffer_t` object.
@@ -243,7 +228,7 @@ uint64_t mc_buffer_read(
  * - `device`: A reference to a `mc_Device_t` object
  * - `fileName`: The path to the shader code
  * - `entryPoint`: The entry point name, generally `"main"`
- * - returns: A reference to a `mc_Program_t` object
+ * - returns: A program object on success, `NULL` on error
  */
 mc_Program_t* mc_program_create(
     mc_Device_t* device,
@@ -257,14 +242,6 @@ mc_Program_t* mc_program_create(
  * - `self`: A reference to a `mc_Program_t` object
  */
 void mc_program_destroy(mc_Program_t* self);
-
-/** code
- * Checks whether a `mc_Program_t` object has been successfully initialized.
- *
- * - `self`: A reference to a `mc_Program_t` object
- * - returns: `true` if successful, `false` otherwise
- */
-bool mc_program_is_initialized(mc_Program_t* self);
 
 /** code
  * Bind buffers to a `mc_Program_t` object.
@@ -387,7 +364,6 @@ struct mc_Device {
 };
 
 struct mc_Instance {
-    bool isInitialized;
     void* logArg;
     mc_log_cb* log_cb;
     VkInstance instance;
@@ -399,7 +375,6 @@ struct mc_Instance {
 };
 
 struct mc_Buffer {
-    bool isInitialized;
     mc_Device_t* dev;
     uint64_t size;
     void* map;
@@ -408,10 +383,9 @@ struct mc_Buffer {
 };
 
 struct mc_Program {
-    bool isInitialized;
     const char* entryPoint;
     mc_Device_t* dev;
-    uint32_t buffCount;
+    int32_t buffCount;
     mc_Buffer_t** buffs;
     VkShaderModule shaderModule;
     VkDescriptorSetLayout descSetLayout;
@@ -458,11 +432,6 @@ static size_t mc_read_file(const char* path, char* contents) {
 }
 
 static void mc_program_setup(mc_Program_t* self) {
-    if (!self->isInitialized) {
-        MC_LOG_ERROR(self->dev, "program not initialized");
-        return;
-    }
-
     // destroy old objects if they exist
     if (self->cmdBuff)
         vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
@@ -488,7 +457,7 @@ static void mc_program_setup(mc_Program_t* self) {
     VkDescriptorSetLayoutBinding* descBindings
         = malloc(sizeof *descBindings * self->buffCount);
 
-    for (uint32_t i = 0; i < self->buffCount; i++) {
+    for (int32_t i = 0; i < self->buffCount; i++) {
         descBindings[i] = (VkDescriptorSetLayoutBinding){0};
         descBindings[i].binding = i;
         descBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -608,15 +577,9 @@ static void mc_program_setup(mc_Program_t* self) {
     VkWriteDescriptorSet* wrtDescSet
         = malloc(sizeof *wrtDescSet * self->buffCount);
 
-    for (uint32_t i = 0; i < self->buffCount; i++) {
+    for (int32_t i = 0; i < self->buffCount; i++) {
         mc_Buffer_t* buffer = self->buffs[i];
-
         MC_LOG_DEBUG(self->dev, "- buffer %d: size=%ld", i, buffer->size);
-
-        if (!buffer->isInitialized) {
-            MC_LOG_ERROR(self->dev, "buffer %d not initialized", i);
-            return;
-        }
 
         descBuffInfo[i] = (VkDescriptorBufferInfo){0};
         descBuffInfo[i].buffer = buffer->buf;
@@ -725,7 +688,8 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
 
     if (vkCreateInstance(&instanceInfo, NULL, &self->instance)) {
         MC_LOG_ERROR(self, "failed to create vulkan instance");
-        return self;
+        mc_instance_destroy(self);
+        return NULL;
     }
 
     uint32_t vkVersion;
@@ -751,7 +715,8 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
     uint32_t physDevCount = 0;
     if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, NULL)) {
         MC_LOG_ERROR(self, "failed to get vulkan devices");
-        return self;
+        mc_instance_destroy(self);
+        return NULL;
     }
 
     MC_LOG_DEBUG(self, "found %d vulkan device(s):", physDevCount);
@@ -759,7 +724,8 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
     VkPhysicalDevice* physDevs = malloc(sizeof *physDevs * physDevCount);
     if (vkEnumeratePhysicalDevices(self->instance, &physDevCount, physDevs)) {
         MC_LOG_ERROR(self, "failed to get vulkan devices");
-        return self;
+        mc_instance_destroy(self);
+        return NULL;
     }
 
     self->devs = malloc(sizeof *self->devs * physDevCount);
@@ -843,11 +809,12 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
     free(physDevs);
     self->devCount = idx;
 
-    self->isInitialized = true;
     return self;
 }
 
 void mc_instance_destroy(mc_Instance_t* self) {
+    if (!self) return;
+
     MC_LOG_DEBUG(self, "destroying instance");
 
     for (uint32_t i = 0; i < self->devCount; i++) {
@@ -869,27 +836,17 @@ void mc_instance_destroy(mc_Instance_t* self) {
     free(self);
 }
 
-bool mc_instance_is_initialized(mc_Instance_t* self) {
-    return self->isInitialized;
-}
-
 uint32_t mc_instance_get_device_count(mc_Instance_t* self) {
-    if (!self->isInitialized) {
-        MC_LOG_ERROR(self, "instance not initialized");
-        return 0;
-    }
-    return self->devCount;
+    return self ? self->devCount : 0;
 }
 
 mc_Device_t** mc_instance_get_devices(mc_Instance_t* self) {
-    if (!self->isInitialized) {
-        MC_LOG_ERROR(self, "instance not initialized");
-        return NULL;
-    }
-    return self->devs;
+    return self ? self->devs : NULL;
 }
 
 mc_DeviceType_t mc_device_get_type(mc_Device_t* self) {
+    if (!self) return MC_DEVICE_TYPE_OTHER;
+
     VkPhysicalDeviceProperties devProps;
     vkGetPhysicalDeviceProperties(self->physDev, &devProps);
     switch (devProps.deviceType) {
@@ -902,24 +859,25 @@ mc_DeviceType_t mc_device_get_type(mc_Device_t* self) {
 }
 
 uint64_t mc_device_get_total_memory_size(mc_Device_t* self) {
-    return self->memTot;
+    return self ? self->memTot : 0;
 }
 
 uint64_t mc_device_get_used_memory_size(mc_Device_t* self) {
-    return self->memUse;
+    return self ? self->memUse : 0;
 }
 
 char* mc_device_get_name(mc_Device_t* self) {
-    return self->devName;
+    return self ? self->devName : NULL;
 }
 
 mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
+    if (!device) return NULL;
+    MC_LOG_DEBUG(device, "initializing buffer of size %ld", size);
+
     mc_Buffer_t* self = malloc(sizeof *self);
     *self = (mc_Buffer_t){0};
     self->size = size;
     self->dev = device;
-
-    MC_LOG_DEBUG(self->dev, "initializing buffer of size %ld", size);
 
     if (self->dev->memUse + size > self->dev->memTot) {
         uint32_t remaining = self->dev->memTot - self->dev->memUse;
@@ -928,7 +886,8 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
             "not enough memory (available: %ld)",
             remaining
         );
-        return self;
+        mc_buffer_destroy(self);
+        return NULL;
     }
 
     self->dev->memUse += size;
@@ -943,7 +902,8 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
 
     if (vkCreateBuffer(self->dev->dev, &bufferInfo, NULL, &self->buf)) {
         MC_LOG_ERROR(self->dev, "failed to create vulkan buffer");
-        return self;
+        mc_buffer_destroy(self);
+        return NULL;
     }
 
     // check the minimum memory size
@@ -968,7 +928,8 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
 
     if (memTypeIdx == memProps.memoryTypeCount) {
         MC_LOG_ERROR(self->dev, "no suitable memory type found");
-        return self;
+        mc_buffer_destroy(self);
+        return NULL;
     }
 
     VkMemoryAllocateInfo memAllocInfo = {0};
@@ -978,20 +939,22 @@ mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size) {
 
     if (vkAllocateMemory(self->dev->dev, &memAllocInfo, NULL, &self->mem)) {
         MC_LOG_ERROR(self->dev, "failed to allocate vulkan memory");
-        return self;
+        mc_buffer_destroy(self);
+        return NULL;
     }
 
     if (vkMapMemory(self->dev->dev, self->mem, 0, self->size, 0, &self->map)) {
         MC_LOG_ERROR(self->dev, "failed to map memory");
-        return self;
+        mc_buffer_destroy(self);
+        return NULL;
     }
 
     if (vkBindBufferMemory(self->dev->dev, self->buf, self->mem, 0)) {
         MC_LOG_ERROR(self->dev, "failed to bind memory");
-        return self;
+        mc_buffer_destroy(self);
+        return NULL;
     }
 
-    self->isInitialized = true;
     return self;
 }
 
@@ -1000,14 +963,17 @@ mc_Buffer_t* mc_buffer_create_from(
     uint64_t size,
     void* data
 ) {
+    if (!device) return NULL;
+
     mc_Buffer_t* self = mc_buffer_create(device, size);
-    if (!self->isInitialized) return self;
+    if (!self) return NULL;
 
     mc_buffer_write(self, 0, size, data);
     return self;
 }
 
 void mc_buffer_destroy(mc_Buffer_t* self) {
+    if (!self) return;
     MC_LOG_DEBUG(self->dev, "destroying buffer");
     self->dev->memUse -= self->size;
     if (self->mem) vkFreeMemory(self->dev->dev, self->mem, NULL);
@@ -1015,11 +981,8 @@ void mc_buffer_destroy(mc_Buffer_t* self) {
     free(self);
 }
 
-bool mc_buffer_is_initialized(mc_Buffer_t* self) {
-    return self->isInitialized;
-}
-
 uint64_t mc_buffer_get_size(mc_Buffer_t* self) {
+    if (!self) return 0;
     return self->size;
 }
 
@@ -1029,12 +992,8 @@ uint64_t mc_buffer_write(
     uint64_t size,
     void* data
 ) {
+    if (!self) return 0;
     MC_LOG_DEBUG(self->dev, "writing %ld bytes to buffer", size);
-
-    if (!self->isInitialized) {
-        MC_LOG_ERROR(self->dev, "mc_Buffer_t not initialized");
-        return 0;
-    }
 
     if (offset + size > self->size) {
         MC_LOG_ERROR(
@@ -1057,12 +1016,8 @@ uint64_t mc_buffer_read(
     uint64_t size,
     void* data
 ) {
+    if (!self) return 0;
     MC_LOG_DEBUG(self->dev, "reading %ld bytes from buffer", size);
-
-    if (!self->isInitialized) {
-        MC_LOG_ERROR(self->dev, "mc_Buffer_t not initialized");
-        return 0;
-    }
 
     if (offset + size > self->size) {
         MC_LOG_ERROR(
@@ -1084,22 +1039,25 @@ mc_Program_t* mc_program_create(
     const char* fileName,
     const char* entryPoint
 ) {
-    mc_Program_t* self = malloc(sizeof *self);
-    *self = (mc_Program_t){0};
-    self->dev = device;
-    self->entryPoint = entryPoint;
-
+    if (!device) return NULL;
     MC_LOG_DEBUG(
-        self->dev,
+        device,
         "initializing program from %s:%s",
         fileName,
         entryPoint
     );
 
+    mc_Program_t* self = malloc(sizeof *self);
+    *self = (mc_Program_t){0};
+    self->dev = device;
+    self->entryPoint = entryPoint;
+    self->buffCount = -1;
+
     size_t shaderSize = mc_read_file(fileName, NULL);
     if (shaderSize == 0) {
         MC_LOG_ERROR(self->dev, "failed to open %s", fileName);
-        return self;
+        mc_program_destroy(self);
+        return NULL;
     }
 
     char* shaderCode = malloc(shaderSize);
@@ -1118,17 +1076,19 @@ mc_Program_t* mc_program_create(
         )) {
         MC_LOG_ERROR(self->dev, "failed to create vulkan shader module");
         free(shaderCode);
-        return self;
+        mc_program_destroy(self);
+        return NULL;
     }
 
     free(shaderCode);
 
-    self->isInitialized = true;
     return self;
 }
 
 void mc_program_destroy(mc_Program_t* self) {
+    if (!self) return;
     MC_LOG_DEBUG(self->dev, "destroying program");
+
     if (self->cmdBuff)
         vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
     if (self->cmdPool)
@@ -1148,10 +1108,6 @@ void mc_program_destroy(mc_Program_t* self) {
     free(self);
 }
 
-bool mc_program_is_initialized(mc_Program_t* self) {
-    return self->isInitialized;
-}
-
 double mc_program_run__(
     mc_Program_t* self,
     uint32_t dimX,
@@ -1159,25 +1115,22 @@ double mc_program_run__(
     uint32_t dimZ,
     ...
 ) {
+    if (!self) return -1.0;
     MC_LOG_DEBUG(self->dev, "running %dx%dx%d program", dimX, dimY, dimZ);
 
-    if (!self->isInitialized) {
-        MC_LOG_ERROR(self->dev, "program not initialized");
-        return false;
-    }
-
-    // an easy mistake to make
     if (dimX * dimY * dimZ == 0) {
         MC_LOG_ERROR(self->dev, "at least one dimension is 0");
         return -1.0;
     }
 
     // check if the buffers have been changed
-    uint32_t buffCount = 0;
+    int32_t buffCount = 0;
     va_list args;
     va_start(args, dimZ);
     while (va_arg(args, mc_Buffer_t*)) buffCount++;
     va_end(args);
+
+    bool buffersChanged = buffCount != self->buffCount;
 
     if (buffCount != self->buffCount) {
         self->buffCount = buffCount;
@@ -1185,10 +1138,8 @@ double mc_program_run__(
         memset(self->buffs, 0, sizeof *self->buffs * buffCount);
     }
 
-    bool buffersChanged = false;
-
     va_start(args, dimZ);
-    for (uint32_t i = 0; i < buffCount; i++) {
+    for (int32_t i = 0; i < buffCount; i++) {
         mc_Buffer_t* buff = va_arg(args, mc_Buffer_t*);
         if (buff != self->buffs[i]) {
             self->buffs[i] = buff;

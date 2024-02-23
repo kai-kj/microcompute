@@ -3,7 +3,7 @@ GLCC     := glslangValidator -V -S comp
 
 INCLUDES := -I ../
 LIBS     := -lvulkan
-FLAGS    := -g -O3 -std=c99 -Wall -Wextra -pedantic -Wno-unused-parameter -D MC_ENABLE_VALIDATION_LAYER
+FLAGS    := -g -O3 -std=c99 -Wall -Wextra -Werror -pedantic -Wno-unused-parameter -D MC_ENABLE_VALIDATION_LAYER
 
 .PHONY: all clean
 
