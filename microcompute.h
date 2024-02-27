@@ -215,6 +215,15 @@ void mc_buffer_destroy(mc_Buffer_t* self);
 uint64_t mc_buffer_get_size(mc_Buffer_t* self);
 
 /** code
+ * Reallocate a `mc_Buffer_t` object.
+ *
+ * - `self`: A reference to a `mc_Buffer_t` object
+ * - `size`: The new size of the buffer
+ * - returns: The new buffer object on success, `NULL` on error
+ */
+mc_Buffer_t* mc_buffer_realloc(mc_Buffer_t* self, uint64_t size);
+
+/** code
  * Write data to a `mc_Buffer_t` object.
  *
  * - `self`: A reference to a `mc_Buffer_t` object
@@ -1050,6 +1059,19 @@ void mc_buffer_destroy(mc_Buffer_t* self) {
 uint64_t mc_buffer_get_size(mc_Buffer_t* self) {
     if (!self) return 0;
     return self->size;
+}
+
+mc_Buffer_t* mc_buffer_realloc(mc_Buffer_t* self, uint64_t size) {
+    if (!self) return NULL;
+    MC_LOG_DEBUG(self->dev, "reallocating buffer to size %ld", size);
+
+    mc_Buffer_t* new = mc_buffer_create(self->dev, size);
+    if (!new) return NULL;
+
+    uint64_t minSize = size < self->size ? size : self->size;
+    mc_buffer_write(new, 0, minSize, self->map);
+    mc_buffer_destroy(self);
+    return new;
 }
 
 uint64_t mc_buffer_write(
