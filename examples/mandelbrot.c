@@ -2,12 +2,13 @@
 
 #define MC_IMPLEMENTATION
 #include "mc.h"
+#include "mc_vec.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
 struct Opt {
-    float center[2];
+    mc_vec2 center;
     float zoom;
     int maxIter;
 };
@@ -17,7 +18,7 @@ int main(void) {
     size_t imgSize = sizeof(int) * width * height;
 
     struct Opt opt = {
-        .center = {-0.7615, -0.08459},
+        .center = {.x = -0.7615, .y = -0.08459},
         .zoom = 1000,
         .maxIter = 500,
     };

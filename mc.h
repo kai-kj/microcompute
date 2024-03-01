@@ -831,8 +831,11 @@ mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg) {
         VkPhysicalDeviceMemoryProperties memProps;
         vkGetPhysicalDeviceMemoryProperties(dev->physDev, &memProps);
         for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
-            if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            if (memProps.memoryHeaps[i].flags
+                & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
                 dev->memTot = memProps.memoryHeaps[i].size;
+                break;
+            }
         }
 
         VkPhysicalDeviceProperties devProps;
