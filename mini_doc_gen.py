@@ -26,5 +26,5 @@ def t_iter(txt):
             case "text": yield "\n" + "".join(d_iter(txt))
             case other: raise ValueError("unknown doc type found: " + other)
 
-assert len(sys.argv) == 3, "provide 2 arguments"
-open(sys.argv[2], "w").write("".join(t_iter(T(open(sys.argv[1], "r").read()))))
+assert len(sys.argv) > 1, "usage: mini_doc_gen.py [file]"
+print("".join(t_iter(T(open(sys.argv[1], "r").read()))))

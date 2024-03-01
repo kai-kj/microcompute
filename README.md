@@ -37,7 +37,7 @@ Run `make all` in `examples/` to build all examples. It requires `gcc` and `glsl
 ## Documentation
 
 - [`doc.md`](https://github.com/kal39/microcompute/blob/master/doc.md)
-- [`microcompute.h`](https://github.com/kal39/microcompute/blob/master/microcompute.h) (generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html))
+- [`mc.h`](https://github.com/kal39/microcompute/blob/master/mc.h) (generated using [`mini_doc_gen.py`](https://kaikitagawajones.com/projects_mini_doc_gen.html))
 
 ## License
 

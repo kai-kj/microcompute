@@ -1,5 +1,5 @@
-#ifndef MICROCOMPUTE_VEC_H_INCLUDE_GUARD
-#define MICROCOMPUTE_VEC_H_INCLUDE_GUARD
+#ifndef MC_VEC_H_INCLUDE_GUARD
+#define MC_VEC_H_INCLUDE_GUARD
 
 typedef unsigned int mc_uint;
 
@@ -168,17 +168,17 @@ typedef union {
     };
 } mc_uvec4;
 
-#ifdef MC_VEC_TYPES_SHORT_NAMES
-#define uvec mc_uvec
-#define vec2 mc_vec2;
-#define vec3 mc_vec3;
-#define vec4 mc_vec4;
-#define ivec2 mc_ivec2;
-#define ivec3 mc_ivec3;
-#define ivec4 mc_ivec4;
-#define uvec2 mc_uvec2;
-#define uvec3 mc_uvec3;
-#define uvec4 mc_uvec4;
+#ifdef MC_VEC_SHORT_NAMES
+#define uint mc_uint
+#define vec2 mc_vec2
+#define vec3 mc_vec3
+#define vec4 mc_vec4
+#define ivec2 mc_ivec2
+#define ivec3 mc_ivec3
+#define ivec4 mc_ivec4
+#define uvec2 mc_uvec2
+#define uvec3 mc_uvec3
+#define uvec4 mc_uvec4
 #endif
 
 #endif

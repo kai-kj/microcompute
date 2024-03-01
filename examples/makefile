@@ -15,10 +15,10 @@ check_devs.spv: check_devs.glsl
 mandelbrot.spv: mandelbrot.glsl
 	$(GLCC) mandelbrot.glsl -o $@
 
-check_devs: check_devs.spv check_devs.c ../microcompute.h
+check_devs: check_devs.spv check_devs.c ../mc.h
 	$(CC) $(FLAGS) $(INCLUDES) $@.c -o $@ $(LIBS)
 
-mandelbrot: mandelbrot.spv mandelbrot.c ../microcompute.h
+mandelbrot: mandelbrot.spv mandelbrot.c ../mc.h
 	$(CC) $(FLAGS) $(INCLUDES) $@.c -o $@ $(LIBS)
 
 clean:

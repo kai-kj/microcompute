@@ -1,23 +1,23 @@
-#ifndef MICROCOMPUTE_H_INCLUDE_GUARD
-#define MICROCOMPUTE_H_INCLUDE_GUARD
+#ifndef MC_H_INCLUDE_GUARD
+#define MC_H_INCLUDE_GUARD
 
 /** text
- * # `microcompute.h`
+ * # `mc.h`
  *
  * This library contains utilities that can be used to easily run SPIR-V compute
  * shaders using vulkan.
  *
  * ## Usage
  *
- * Define `MICROCOMPUTE_IMPLEMENTATION` before including this file in one of
+ * Define `MC_IMPLEMENTATION` before including this file in one of
  * your C files to create the implementation. It should look something like:
  *
  * ```c
  * #include ...
  * #include ...
  *
- * #define MICROCOMPUTE_IMPLEMENTATION
- * #include "microcompute.h"
+ * #define MC_IMPLEMENTATION
+ * #include "mc.h"
  * ```
  *
  * In other C files, just include this file as normal.
@@ -339,7 +339,7 @@ double mc_program_run__(
     ...
 );
 
-#endif // MICROCOMPUTE_H_INCLUDE_GUARD
+#endif // MC_H_INCLUDE_GUARD
 
 /** text
  * ## Licence
@@ -368,7 +368,7 @@ double mc_program_run__(
  * ```
  */
 
-#ifdef MICROCOMPUTE_IMPLEMENTATION
+#ifdef MC_IMPLEMENTATION
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -1321,4 +1321,4 @@ void mc_default_log_cb( //
     else printf("\n");
 }
 
-#endif // MICROCOMPUTE_IMPLEMENTATION
+#endif // MC_IMPLEMENTATION

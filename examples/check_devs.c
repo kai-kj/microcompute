@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MICROCOMPUTE_IMPLEMENTATION
-#include "microcompute.h"
+#define MC_IMPLEMENTATION
+#include "mc.h"
 
 int main(void) {
     mc_Instance_t* instance = mc_instance_create(NULL, NULL);

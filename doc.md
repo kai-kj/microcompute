@@ -1,20 +1,20 @@
 
-# `microcompute.h`
+# `mc.h`
 
 This library contains utilities that can be used to easily run SPIR-V compute
 shaders using vulkan.
 
 ## Usage
 
-Define `MICROCOMPUTE_IMPLEMENTATION` before including this file in one of
+Define `MC_IMPLEMENTATION` before including this file in one of
 your C files to create the implementation. It should look something like:
 
 ```c
 #include ...
 #include ...
 
-#define MICROCOMPUTE_IMPLEMENTATION
-#include "microcompute.h"
+#define MC_IMPLEMENTATION
+#include "mc.h"
 ```
 
 In other C files, just include this file as normal.
@@ -24,16 +24,16 @@ See https://github.com/kal39/microcompute for more info.
 ## Types
 
 ```c
-typedef enum mc_DebugLevel {
-    MC_DEBUG_LEVEL_INFO,
-    MC_DEBUG_LEVEL_LOW,
-    MC_DEBUG_LEVEL_MEDIUM,
-    MC_DEBUG_LEVEL_HIGH,
-    MC_DEBUG_LEVEL_UNKNOWN,
-} mc_DebugLevel_t;
+typedef enum mc_LogLevel {
+    MC_LOG_LEVEL_DEBUG,
+    MC_LOG_LEVEL_INFO,
+    MC_LOG_LEVEL_WARN,
+    MC_LOG_LEVEL_ERROR,
+    MC_LOG_LEVEL_UNKNOWN,
+} mc_LogLevel_t;
 ```
 
-The severity of a debug message.
+The severity of a log message.
 
 ----
 
@@ -52,8 +52,8 @@ The type of a mc_Device_t.
 ----
 
 ```c
-typedef void(mc_debug_cb)( //
-    mc_DebugLevel_t lvl,
+typedef void(mc_log_cb)( //
+    mc_LogLevel_t lvl,
     const char* src,
     void* arg,
     const char* file,
@@ -63,11 +63,11 @@ typedef void(mc_debug_cb)( //
 );
 ```
 
-The debug callback type passed to `mc_set_debug_cb()`.
+The log callback type passed to `mc_set_log_cb()`.
 
-- `lvl`: A `mc_DebugLevel` indicating the severity of the message
+- `lvl`: A `mc_LogLevel` indicating the severity of the message
 - `src`: The message source (NULL terminated)
-- `arg`: The value passed to `debugArg` in `mc_instance_create()`
+- `arg`: The value passed to `logArg` in `mc_instance_create()`
 - `file`: The file the message originated from (NULL terminated)
 - `line`: The line the message originated from
 - `fmt`: The message formatting (same format as `printf()`)
@@ -89,14 +89,14 @@ Core microcompute types.
 ## Functions
 
 ```c
-mc_Instance_t* mc_instance_create(mc_debug_cb* debug_cb, void* debugArg);
+mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg);
 ```
 
 Create a `mc_Instance_t` object.
 
-- `debug_cb`: A function to call when a error occurs, set to `NULL` to ignore
-- `debugArg`: A value to pass to the debug callback, set to `NULL` to ignore
-- returns: A reference to a `mc_Instance_t` object
+- `log_cb`: A function to call when a error occurs, set to `NULL` to ignore
+- `logArg`: A value to pass to the log callback, set to `NULL` to ignore
+- returns: A instance object on success, `NULL` on error
 
 ----
 
@@ -107,17 +107,6 @@ void mc_instance_destroy(mc_Instance_t* self);
 Destroy a `mc_Instance_t` object.
 
 - `self`: A reference to a `mc_Instance_t` object
-
-----
-
-```c
-bool mc_instance_is_initialized(mc_Instance_t* self);
-```
-
-Checks whether a `mc_Instance_t` object has been successfully initialized.
-
-- `self`: A reference to a `mc_Instance_t` object
-- returns: `true` if successful, `false` otherwise
 
 ----
 
@@ -177,6 +166,39 @@ Get the used video memory of a device.
 ----
 
 ```c
+uint32_t mc_device_get_max_workgroup_size_total(mc_Device_t* self);
+```
+
+Get the max workgroup size (the max for x*y*z) of a device.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: The max workgroup size
+
+----
+
+```c
+uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device_t* self);
+```
+
+Get the max workgroup size (for each x, y, z) of a device.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: The max workgroup size, as a 3 element array (dont free)
+
+----
+
+```c
+uint32_t* mc_device_get_max_workgroup_count(mc_Device_t* self);
+```
+
+Get the max workgroup count (for each x, y, z) of a device.
+
+- `self`: A reference to a `mc_Device_t` object
+- returns: The max workgroup count, as a 3 element array
+
+----
+
+```c
 char* mc_device_get_name(mc_Device_t* self);
 ```
 
@@ -212,7 +234,7 @@ Create a `mc_Buffer_t` object and initializes with some data.
 - `device`: A reference to a `mc_Device_t` object
 - `size`: The size of the buffer
 - `data`: A reference to the data the initialize the buffer with
-- returns: A reference to a `mc_Buffer_t` object
+- returns: A buffer object on success, `NULL` on error
 
 ----
 
@@ -227,16 +249,6 @@ Destroy a `mc_Buffer_t` object.
 ----
 
 ```c
-bool mc_buffer_is_initialized(mc_Buffer_t* self);
-```
-
-Checks whether a `mc_Buffer_t` object been successfully initialized.
-
-- `self`: A reference to a `mc_Buffer_t` object
-
-----
-
-```c
 uint64_t mc_buffer_get_size(mc_Buffer_t* self);
 ```
 
@@ -244,6 +256,18 @@ Get the size of a `mc_Buffer_t` object.
 
 - `self`: A reference to a `mc_Buffer_t` object
 - returns: The size, in bytes
+
+----
+
+```c
+mc_Buffer_t* mc_buffer_realloc(mc_Buffer_t* self, uint64_t size);
+```
+
+Reallocate a `mc_Buffer_t` object.
+
+- `self`: A reference to a `mc_Buffer_t` object
+- `size`: The new size of the buffer
+- returns: The new buffer object on success, `NULL` on error
 
 ----
 
@@ -298,7 +322,7 @@ Create a `mc_Program_t` object.
 - `device`: A reference to a `mc_Device_t` object
 - `fileName`: The path to the shader code
 - `entryPoint`: The entry point name, generally `"main"`
-- returns: A reference to a `mc_Program_t` object
+- returns: A program object on success, `NULL` on error
 
 ----
 
@@ -309,17 +333,6 @@ void mc_program_destroy(mc_Program_t* self);
 Destroy a `mc_Program_t` object.
 
 - `self`: A reference to a `mc_Program_t` object
-
-----
-
-```c
-bool mc_program_is_initialized(mc_Program_t* self);
-```
-
-Checks whether a `mc_Program_t` object has been successfully initialized.
-
-- `self`: A reference to a `mc_Program_t` object
-- returns: `true` if successful, `false` otherwise
 
 ----
 
@@ -350,12 +363,12 @@ Get the current time.
 ----
 
 ```c
-const char* mc_debug_level_to_str(mc_DebugLevel_t level);
+const char* mc_log_level_to_str(mc_LogLevel_t level);
 ```
 
-Convert a `mc_DebugLevel_t` enum to a human readable string.
+Convert a `mc_LogLevel_t` enum to a human readable string.
 
-- `level`: A `mc_DebugLevel_t` value
+- `level`: A `mc_LogLevel_t` value
 - returns: A human readable string (`NULL` terminated)
 
 ----
@@ -372,8 +385,8 @@ Convert a `mc_DeviceType_t` enum to a human readable string.
 ----
 
 ```c
-void mc_default_debug_cb( //
-    mc_DebugLevel_t lvl,
+void mc_default_log_cb( //
+    mc_LogLevel_t lvl,
     const char* src,
     void* arg,
     char const* file,
@@ -386,7 +399,7 @@ void mc_default_debug_cb( //
 Default callback function that can be passed to `mc_instance_create()`. Just
 prints all messages to stdout. Use as a template for your own callback.
 
-See `mc_debug_cb` for more info about the arguments.
+See `mc_log_cb` for more info about the arguments.
 
 ----
 
@@ -399,7 +412,7 @@ double mc_program_run__(
     ...
 );
 
-#endif // MICROCOMPUTE_H_INCLUDE_GUARD
+#endif // MC_H_INCLUDE_GUARD
 ```
 
 Wrapped functions. Don't use these directly, use their corresponding macros.
@@ -430,3 +443,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+

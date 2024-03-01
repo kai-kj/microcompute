@@ -5,8 +5,8 @@ v_element_names = [
     ["_0", "_1", "_2", "_3"],
 ]
 
-print("#ifndef MICROCOMPUTE_VEC_H_INCLUDE_GUARD")
-print("#define MICROCOMPUTE_VEC_H_INCLUDE_GUARD\n")
+print("#ifndef MC_VEC_H_INCLUDE_GUARD")
+print("#define MC_VEC_H_INCLUDE_GUARD\n")
 
 # define uint
 print("typedef unsigned int mc_uint;\n")
@@ -27,12 +27,12 @@ for v_type in v_types:
         print(f"}} {v_type[0]}{i};\n")
 
 # short vector types
-print("#ifdef MC_VEC_TYPES_SHORT_NAMES")
-print("#define uvec mc_uvec")
+print("#ifdef MC_VEC_SHORT_NAMES")
+print("#define uint mc_uint")
 
 for v_type in v_types:
     for i in range(2, 5):
-        print(f"#define {v_type[0].split('_')[1]}{i} {v_type[0]}{i};")
+        print(f"#define {v_type[0].split('_')[1]}{i} {v_type[0]}{i}")
 
 print("#endif\n")
 print("#endif\n")
