@@ -259,11 +259,27 @@ uint64_t mc_buffer_read(
  * Create a `mc_Program_t` object.
  *
  * - `device`: A reference to a `mc_Device_t` object
- * - `fileName`: The path to the shader code
+ * - `codeSize`: The size of the shader code
+ * - `code`: The shader code
  * - `entryPoint`: The entry point name, generally `"main"`
  * - returns: A program object on success, `NULL` on error
  */
 mc_Program_t* mc_program_create(
+    mc_Device_t* device,
+    size_t codeSize,
+    const char* code,
+    const char* entryPoint
+);
+
+/** code
+ * Create a `mc_Program_t` object from a file.
+ *
+ * - `device`: A reference to a `mc_Device_t` object
+ * - `fileName`: The path to the shader code
+ * - `entryPoint`: The entry point name, generally `"main"`
+ * - returns: A program object on success, `NULL` on error
+ */
+mc_Program_t* mc_program_create_from_file(
     mc_Device_t* device,
     const char* fileName,
     const char* entryPoint
@@ -1127,16 +1143,12 @@ uint64_t mc_buffer_read(
 
 mc_Program_t* mc_program_create(
     mc_Device_t* device,
-    const char* fileName,
+    size_t codeSize,
+    const char* code,
     const char* entryPoint
 ) {
     if (!device) return NULL;
-    MC_LOG_DEBUG(
-        device,
-        "initializing program from %s:%s",
-        fileName,
-        entryPoint
-    );
+    MC_LOG_DEBUG(device, "initializing program, entry point: %s", entryPoint);
 
     mc_Program_t* self = malloc(sizeof *self);
     *self = (mc_Program_t){0};
@@ -1144,20 +1156,10 @@ mc_Program_t* mc_program_create(
     self->entryPoint = entryPoint;
     self->buffCount = -1;
 
-    size_t shaderSize = mc_read_file(fileName, NULL);
-    if (shaderSize == 0) {
-        MC_LOG_ERROR(self->dev, "failed to open %s", fileName);
-        mc_program_destroy(self);
-        return NULL;
-    }
-
-    char* shaderCode = malloc(shaderSize);
-    mc_read_file(fileName, shaderCode);
-
     VkShaderModuleCreateInfo moduleInfo = {0};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleInfo.codeSize = shaderSize;
-    moduleInfo.pCode = (const uint32_t*)shaderCode;
+    moduleInfo.codeSize = codeSize;
+    moduleInfo.pCode = (const uint32_t*)code;
 
     if (vkCreateShaderModule(
             self->dev->dev,
@@ -1166,13 +1168,32 @@ mc_Program_t* mc_program_create(
             &self->shaderModule
         )) {
         MC_LOG_ERROR(self->dev, "failed to create vulkan shader module");
-        free(shaderCode);
         mc_program_destroy(self);
         return NULL;
     }
 
-    free(shaderCode);
+    return self;
+}
 
+mc_Program_t* mc_program_create_from_file(
+    mc_Device_t* device,
+    const char* fileName,
+    const char* entryPoint
+) {
+    if (!device) return NULL;
+    MC_LOG_DEBUG(device, "initializing program from file: %s", fileName);
+
+    size_t len = mc_read_file(fileName, NULL);
+    if (len == 0) {
+        MC_LOG_ERROR(device, "failed to read file: %s", fileName);
+        return NULL;
+    }
+
+    char* code = malloc(len);
+    mc_read_file(fileName, code);
+
+    mc_Program_t* self = mc_program_create(device, len, code, entryPoint);
+    free(code);
     return self;
 }
 

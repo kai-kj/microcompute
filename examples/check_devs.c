@@ -23,7 +23,8 @@ int main(void) {
         float arr[] = {0.0, 1.0, 2.0, 3.0, 4.0};
 
         mc_Buffer_t* buff = mc_buffer_create_from(dev, sizeof arr, arr);
-        mc_Program_t* prog = mc_program_create(dev, "check_devs.spv", "main");
+        mc_Program_t* prog
+            = mc_program_create_from_file(dev, "check_devs.spv", "main");
 
         for (uint32_t i = 0; i < 3; i++) {
             mc_program_run(prog, 5, 1, 1, buff);
