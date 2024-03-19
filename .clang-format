@@ -27,10 +27,6 @@ ReferenceAlignment: Right
 AlignAfterOpenBracket: BlockIndent
 AlignOperands: AlignAfterOperator
 
-BreakBeforeTernaryOperators: false
-BreakBeforeBinaryOperators: All
-BreakBeforeTernaryOperators: true
-
 PenaltyBreakAssignment: 0
 PenaltyBreakBeforeFirstCallParameter: 0
 PenaltyBreakComment: 0

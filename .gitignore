@@ -1,7 +1,3 @@
 .vscode/
-
-examples/*
-!examples/makefile
-!examples/*.c
-!examples/*.h
-!examples/*.glsl
+.idea/
+build/

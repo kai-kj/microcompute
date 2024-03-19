@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define MC_IMPLEMENTATION
-#include "mc.h"
+#include "microcompute.h"
 
 int main(void) {
     mc_Instance_t* instance = mc_instance_create(NULL, NULL);

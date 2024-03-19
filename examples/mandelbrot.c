@@ -1,8 +1,8 @@
 #include <stdio.h>
 
 #define MC_IMPLEMENTATION
-#include "mc.h"
-#include "mc_vec.h"
+#include "microcompute.h"
+#include "microcompute_vec.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -36,7 +36,7 @@ int main(void) {
 
     void* img = malloc(imgSize);
     mc_buffer_read(imgBuff, 0, imgSize, img);
-    stbi_write_bmp("mandelbrot.bmp", width, height, 4, img);
+    stbi_write_png("mandelbrot.png", width, height, 4, img, width * 4);
 
     free(img);
     mc_buffer_destroy(optBuff);
