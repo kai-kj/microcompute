@@ -1,34 +1,56 @@
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include <vulkan/vulkan.h>
 
-#include "microcompute_internal.h"
+#include "buffer.h"
+#include "device.h"
+#include "log.h"
 
-static void mc_program_setup(mc_Program_t* self) {
-    // destroy old objects if they exist
-    if (self->cmdBuff)
-        vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
-    if (self->cmdPool)
-        vkDestroyCommandPool(self->dev->dev, self->cmdPool, NULL);
-    if (self->descSet)
-        vkFreeDescriptorSets(self->dev->dev, self->descPool, 1, &self->descSet);
-    if (self->descPool)
-        vkDestroyDescriptorPool(self->dev->dev, self->descPool, NULL);
-    if (self->pipeline) //
-        vkDestroyPipeline(self->dev->dev, self->pipeline, NULL);
-    if (self->pipelineLayout)
-        vkDestroyPipelineLayout(self->dev->dev, self->pipelineLayout, NULL);
-    if (self->descSetLayout)
-        vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
+struct mc_Program {
+    mc_Instance* _instance;
+    const char* entryPoint;
+    mc_DeviceInfo devi;
+    int32_t buffCount;
+    mc_Buffer** buffs;
+    VkShaderModule shaderModule;
+    VkDescriptorSetLayout descSetLayout;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline pipeline;
+    VkDescriptorPool descPool;
+    VkDescriptorSet descSet;
+    VkCommandPool cmdPool;
+    VkCommandBuffer cmdBuff;
+};
 
-    MC_LOG_DEBUG(
-        self->dev,
-        "setting up program with %d buffer(s):",
-        self->buffCount
-    );
+static void mc_program_clear(mc_Program* program) {
+    DEBUG(program, "clearing program");
+    VkDevice dev = program->devi.dev;
+    if (program->cmdBuff)
+        vkFreeCommandBuffers(dev, program->cmdPool, 1, &program->cmdBuff);
+    if (program->cmdPool) //
+        vkDestroyCommandPool(dev, program->cmdPool, NULL);
+    if (program->descSet)
+        vkFreeDescriptorSets(dev, program->descPool, 1, &program->descSet);
+    if (program->descPool) //
+        vkDestroyDescriptorPool(dev, program->descPool, NULL);
+    if (program->pipeline) //
+        vkDestroyPipeline(dev, program->pipeline, NULL);
+    if (program->pipelineLayout)
+        vkDestroyPipelineLayout(dev, program->pipelineLayout, NULL);
+    if (program->descSetLayout)
+        vkDestroyDescriptorSetLayout(dev, program->descSetLayout, 0);
+}
+
+static void mc_program_setup(mc_Program* program) {
+    DEBUG(program, "setting up program with %d buffer(s):", program->buffCount);
+
+    mc_program_clear(program);
 
     VkDescriptorSetLayoutBinding* descBindings
-        = malloc(sizeof *descBindings * self->buffCount);
+        = malloc(sizeof *descBindings * program->buffCount);
 
-    for (int32_t i = 0; i < self->buffCount; i++) {
+    for (int32_t i = 0; i < program->buffCount; i++) {
         descBindings[i] = (VkDescriptorSetLayoutBinding){0};
         descBindings[i].binding = i;
         descBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -38,16 +60,16 @@ static void mc_program_setup(mc_Program_t* self) {
 
     VkDescriptorSetLayoutCreateInfo descLayoutInfo = {0};
     descLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descLayoutInfo.bindingCount = self->buffCount;
+    descLayoutInfo.bindingCount = program->buffCount;
     descLayoutInfo.pBindings = descBindings;
 
     if (vkCreateDescriptorSetLayout(
-            self->dev->dev,
+            program->devi.dev,
             &descLayoutInfo,
             NULL,
-            &self->descSetLayout
+            &program->descSetLayout
         )) {
-        MC_LOG_ERROR(self->dev, "failed to create descriptor set layout");
+        ERROR(program, "failed to create descriptor set layout");
         free(descBindings);
         return;
     }
@@ -57,44 +79,44 @@ static void mc_program_setup(mc_Program_t* self) {
     VkPipelineLayoutCreateInfo pipelineInfo = {0};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineInfo.setLayoutCount = 1;
-    pipelineInfo.pSetLayouts = &self->descSetLayout;
+    pipelineInfo.pSetLayouts = &program->descSetLayout;
 
     if (vkCreatePipelineLayout(
-            self->dev->dev,
+            program->devi.dev,
             &pipelineInfo,
             NULL,
-            &self->pipelineLayout
+            &program->pipelineLayout
         )) {
-        MC_LOG_ERROR(self->dev, "failed to create pipeline layout");
+        ERROR(program, "failed to create pipeline layout");
         return;
     }
 
     VkPipelineShaderStageCreateInfo shaderStageInfo = {0};
     shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shaderStageInfo.module = self->shaderModule;
-    shaderStageInfo.pName = self->entryPoint;
+    shaderStageInfo.module = program->shaderModule;
+    shaderStageInfo.pName = program->entryPoint;
 
     VkComputePipelineCreateInfo computePipelineInfo = {0};
     computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     computePipelineInfo.stage = shaderStageInfo;
-    computePipelineInfo.layout = self->pipelineLayout;
+    computePipelineInfo.layout = program->pipelineLayout;
 
     if (vkCreateComputePipelines(
-            self->dev->dev,
+            program->devi.dev,
             0,
             1,
             &computePipelineInfo,
             NULL,
-            &self->pipeline
+            &program->pipeline
         )) {
-        MC_LOG_ERROR(self->dev, "failed to create compute pipeline");
+        ERROR(program, "failed to create compute pipeline");
         return;
     }
 
     VkDescriptorPoolSize descPoolSize = {0};
     descPoolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descPoolSize.descriptorCount = self->buffCount;
+    descPoolSize.descriptorCount = program->buffCount;
 
     VkDescriptorPoolCreateInfo descPoolInfo = {0};
     descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -104,61 +126,61 @@ static void mc_program_setup(mc_Program_t* self) {
     descPoolInfo.pPoolSizes = &descPoolSize;
 
     if (vkCreateDescriptorPool(
-            self->dev->dev,
+            program->devi.dev,
             &descPoolInfo,
             NULL,
-            &self->descPool
+            &program->descPool
         )) {
-        MC_LOG_ERROR(self->dev, "failed to create descriptor pool");
+        ERROR(program, "failed to create descriptor pool");
         return;
     }
 
     VkDescriptorSetAllocateInfo descAllocInfo = {0};
     descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descAllocInfo.descriptorPool = self->descPool;
+    descAllocInfo.descriptorPool = program->descPool;
     descAllocInfo.descriptorSetCount = 1;
-    descAllocInfo.pSetLayouts = &self->descSetLayout;
+    descAllocInfo.pSetLayouts = &program->descSetLayout;
 
     if (vkAllocateDescriptorSets(
-            self->dev->dev,
+            program->devi.dev,
             &descAllocInfo,
-            &self->descSet
+            &program->descSet
         )) {
-        MC_LOG_ERROR(self->dev, "failed to allocate descriptor sets");
+        ERROR(program, "failed to allocate descriptor sets");
         return;
     }
 
     VkCommandPoolCreateInfo cmdPoolInfo = {0};
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    cmdPoolInfo.queueFamilyIndex = self->dev->queueFamilyIdx;
+    cmdPoolInfo.queueFamilyIndex = program->devi.idx;
 
     if (vkCreateCommandPool(
-            self->dev->dev,
+            program->devi.dev,
             &cmdPoolInfo,
             NULL,
-            &self->cmdPool
+            &program->cmdPool
         )) {
-        MC_LOG_ERROR(self->dev, "failed to create command pool");
+        ERROR(program, "failed to create command pool");
         return;
     }
 
     VkDescriptorBufferInfo* descBuffInfo
-        = malloc(sizeof *descBuffInfo * self->buffCount);
+        = malloc(sizeof *descBuffInfo * program->buffCount);
     VkWriteDescriptorSet* wrtDescSet
-        = malloc(sizeof *wrtDescSet * self->buffCount);
+        = malloc(sizeof *wrtDescSet * program->buffCount);
 
-    for (int32_t i = 0; i < self->buffCount; i++) {
-        mc_Buffer_t* buffer = self->buffs[i];
-        MC_LOG_DEBUG(self->dev, "- buffer %d: size=%ld", i, buffer->size);
+    for (int32_t i = 0; i < program->buffCount; i++) {
+        mc_Buffer* buffer = program->buffs[i];
+        DEBUG(program, "- buffer %d: size=%ld", i, mc_buffer_get_size(buffer));
 
         descBuffInfo[i] = (VkDescriptorBufferInfo){0};
-        descBuffInfo[i].buffer = buffer->buf;
+        descBuffInfo[i].buffer = mc_buffer_get_vk_buffer(buffer);
         descBuffInfo[i].range = VK_WHOLE_SIZE;
 
         wrtDescSet[i] = (VkWriteDescriptorSet){0};
         wrtDescSet[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        wrtDescSet[i].dstSet = self->descSet;
+        wrtDescSet[i].dstSet = program->descSet;
         wrtDescSet[i].dstBinding = i;
         wrtDescSet[i].descriptorCount = 1;
         wrtDescSet[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -166,8 +188,8 @@ static void mc_program_setup(mc_Program_t* self) {
     }
 
     vkUpdateDescriptorSets(
-        self->dev->dev,
-        self->buffCount,
+        program->devi.dev,
+        program->buffCount,
         wrtDescSet,
         0,
         NULL
@@ -177,34 +199,36 @@ static void mc_program_setup(mc_Program_t* self) {
 
     VkCommandBufferAllocateInfo cmdBuffAllocInfo = {0};
     cmdBuffAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdBuffAllocInfo.commandPool = self->cmdPool;
+    cmdBuffAllocInfo.commandPool = program->cmdPool;
     cmdBuffAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdBuffAllocInfo.commandBufferCount = 1;
 
     if (vkAllocateCommandBuffers(
-            self->dev->dev,
+            program->devi.dev,
             &cmdBuffAllocInfo,
-            &self->cmdBuff
+            &program->cmdBuff
         )) {
-        MC_LOG_ERROR(self->dev, "failed to allocate command buffers");
+        ERROR(program, "failed to allocate command buffers");
         return;
     }
 }
 
-mc_Program_t* mc_program_create(
-    mc_Device_t* device,
+mc_Program* mc_program_create(
+    mc_Device* device,
     size_t codeSize,
     const char* code,
     const char* entryPoint
 ) {
     if (!device) return NULL;
-    MC_LOG_DEBUG(device, "initializing program, entry point: %s", entryPoint);
 
-    mc_Program_t* self = malloc(sizeof *self);
-    *self = (mc_Program_t){0};
-    self->dev = device;
-    self->entryPoint = entryPoint;
-    self->buffCount = -1;
+    mc_Program* program = malloc(sizeof *program);
+    *program = (mc_Program){0};
+    program->_instance = mc_device_get_instance(device);
+    program->devi = mc_device_get_info(device);
+    program->entryPoint = entryPoint;
+    program->buffCount = -1;
+
+    DEBUG(program, "initializing program, entry point: %s", entryPoint);
 
     VkShaderModuleCreateInfo moduleInfo = {0};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -212,76 +236,41 @@ mc_Program_t* mc_program_create(
     moduleInfo.pCode = (const uint32_t*)code;
 
     if (vkCreateShaderModule(
-            self->dev->dev,
+            program->devi.dev,
             &moduleInfo,
             NULL,
-            &self->shaderModule
+            &program->shaderModule
         )) {
-        MC_LOG_ERROR(self->dev, "failed to create vulkan shader module");
-        mc_program_destroy(self);
+        ERROR(program, "failed to create vulkan shader module");
+        mc_program_destroy(program);
         return NULL;
     }
 
-    return self;
+    return program;
 }
 
-mc_Program_t* mc_program_create_from_file(
-    mc_Device_t* device,
-    const char* fileName,
-    const char* entryPoint
-) {
-    if (!device) return NULL;
-    MC_LOG_DEBUG(device, "initializing program from file: %s", fileName);
+void mc_program_destroy(mc_Program* program) {
+    if (!program) return;
+    DEBUG(program, "destroying program");
 
-    size_t len = mc_read_file(fileName, NULL);
-    if (len == 0) {
-        MC_LOG_ERROR(device, "failed to read file: %s", fileName);
-        return NULL;
-    }
-
-    char* code = malloc(len);
-    mc_read_file(fileName, code);
-
-    mc_Program_t* self = mc_program_create(device, len, code, entryPoint);
-    free(code);
-    return self;
-}
-
-void mc_program_destroy(mc_Program_t* self) {
-    if (!self) return;
-    MC_LOG_DEBUG(self->dev, "destroying program");
-
-    if (self->cmdBuff)
-        vkFreeCommandBuffers(self->dev->dev, self->cmdPool, 1, &self->cmdBuff);
-    if (self->cmdPool)
-        vkDestroyCommandPool(self->dev->dev, self->cmdPool, NULL);
-    if (self->descSet)
-        vkFreeDescriptorSets(self->dev->dev, self->descPool, 1, &self->descSet);
-    if (self->descPool)
-        vkDestroyDescriptorPool(self->dev->dev, self->descPool, NULL);
-    if (self->pipeline) //
-        vkDestroyPipeline(self->dev->dev, self->pipeline, NULL);
-    if (self->pipelineLayout)
-        vkDestroyPipelineLayout(self->dev->dev, self->pipelineLayout, NULL);
-    if (self->descSetLayout)
-        vkDestroyDescriptorSetLayout(self->dev->dev, self->descSetLayout, 0);
-    if (self->shaderModule)
-        vkDestroyShaderModule(self->dev->dev, self->shaderModule, NULL);
-    free(self);
+    mc_program_clear(program);
+    if (program->shaderModule)
+        vkDestroyShaderModule(program->devi.dev, program->shaderModule, NULL);
+    free(program);
 }
 
 double mc_program_run__(
-    mc_Program_t* self,
+    mc_Program* program,
     uint32_t dimX,
     uint32_t dimY,
     uint32_t dimZ,
     ...
 ) {
-    if (!self) return -1.0;
-    MC_LOG_DEBUG(self->dev, "running %dx%dx%d program", dimX, dimY, dimZ);
+    if (!program) return -1.0;
+    DEBUG(program, "running %dx%dx%d program", dimX, dimY, dimZ);
 
     if (dimX * dimY * dimZ == 0) {
-        MC_LOG_ERROR(self->dev, "at least one dimension is 0");
+        ERROR(program, "at least one dimension is 0");
         return -1.0;
     }
 
@@ -289,77 +278,78 @@ double mc_program_run__(
     int32_t buffCount = 0;
     va_list args;
     va_start(args, dimZ);
-    while (va_arg(args, mc_Buffer_t*)) buffCount++;
+    while (va_arg(args, mc_Buffer*)) buffCount++;
     va_end(args);
 
-    bool buffersChanged = buffCount != self->buffCount;
+    bool buffersChanged = buffCount != program->buffCount;
 
-    if (buffCount != self->buffCount) {
-        self->buffCount = buffCount;
-        self->buffs = realloc(self->buffs, sizeof *self->buffs * buffCount);
-        memset(self->buffs, 0, sizeof *self->buffs * buffCount);
+    if (buffCount != program->buffCount) {
+        program->buffCount = buffCount;
+        program->buffs
+            = realloc(program->buffs, sizeof *program->buffs * buffCount);
+        memset(program->buffs, 0, sizeof *program->buffs * buffCount);
     }
 
     va_start(args, dimZ);
     for (int32_t i = 0; i < buffCount; i++) {
-        mc_Buffer_t* buff = va_arg(args, mc_Buffer_t*);
-        if (buff != self->buffs[i]) {
-            self->buffs[i] = buff;
+        mc_Buffer* buff = va_arg(args, mc_Buffer*);
+        if (buff != program->buffs[i]) {
+            program->buffs[i] = buff;
             buffersChanged = true;
         }
     }
     va_end(args);
 
-    if (buffersChanged) mc_program_setup(self);
+    if (buffersChanged) mc_program_setup(program);
 
     VkCommandBufferBeginInfo cmdBuffBeginInfo = {0};
     cmdBuffBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     cmdBuffBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    if (vkBeginCommandBuffer(self->cmdBuff, &cmdBuffBeginInfo)) {
-        MC_LOG_ERROR(self->dev, "failed to begin command buffer");
+    if (vkBeginCommandBuffer(program->cmdBuff, &cmdBuffBeginInfo)) {
+        ERROR(program, "failed to begin command buffer");
         return -1.0;
     }
 
     vkCmdBindPipeline(
-        self->cmdBuff,
+        program->cmdBuff,
         VK_PIPELINE_BIND_POINT_COMPUTE,
-        self->pipeline
+        program->pipeline
     );
 
     vkCmdBindDescriptorSets(
-        self->cmdBuff,
+        program->cmdBuff,
         VK_PIPELINE_BIND_POINT_COMPUTE,
-        self->pipelineLayout,
+        program->pipelineLayout,
         0,
         1,
-        &self->descSet,
+        &program->descSet,
         0,
         NULL
     );
 
-    vkCmdDispatch(self->cmdBuff, dimX, dimY, dimZ);
-    if (vkEndCommandBuffer(self->cmdBuff)) {
-        MC_LOG_ERROR(self->dev, "failed to end command buffer");
+    vkCmdDispatch(program->cmdBuff, dimX, dimY, dimZ);
+    if (vkEndCommandBuffer(program->cmdBuff)) {
+        ERROR(program, "failed to end command buffer");
         return -1.0;
     }
 
     VkQueue queue;
-    vkGetDeviceQueue(self->dev->dev, self->dev->queueFamilyIdx, 0, &queue);
+    vkGetDeviceQueue(program->devi.dev, program->devi.idx, 0, &queue);
 
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &self->cmdBuff;
+    submitInfo.pCommandBuffers = &program->cmdBuff;
 
     if (vkQueueSubmit(queue, 1, &submitInfo, 0)) {
-        MC_LOG_ERROR(self->dev, "failed to submit queue");
+        ERROR(program, "failed to submit queue");
         return -1.0;
     }
 
     double startTime = mc_get_time();
     if (vkQueueWaitIdle(queue)) {
-        MC_LOG_ERROR(self->dev, "failed to wait for queue completion");
+        ERROR(program, "failed to wait for queue completion");
         return -1.0;
     }
 

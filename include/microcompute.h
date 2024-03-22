@@ -1,364 +1,287 @@
 #ifndef MC_H_INCLUDE_GUARD
 #define MC_H_INCLUDE_GUARD
 
-/** text
- * # `mc.h`
- *
+/**
+ * @file microcompute.h
  * This library contains utilities that can be used to easily run SPIR-V compute
  * shaders using vulkan.
- *
- * ## Usage
- *
- * Define `MC_IMPLEMENTATION` before including this file in one of
- * your C files to create the implementation. It should look something like:
- *
- * ```c
- * #include ...
- * #include ...
- *
- * #define MC_IMPLEMENTATION
- * #include "microcompute.h"
- * ```
- *
- * In other C files, just include this file as normal.
- *
- * See https://github.com/kal39/microcompute for more info.
  */
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 
-/** text
- * ## Types
- */
-
-/** code
- * The severity of a log message.
+/**
+ * The severity of a log message
  */
 typedef enum mc_LogLevel {
-    MC_LOG_LEVEL_DEBUG,
-    MC_LOG_LEVEL_INFO,
-    MC_LOG_LEVEL_WARN,
-    MC_LOG_LEVEL_ERROR,
-    MC_LOG_LEVEL_UNKNOWN,
-} mc_LogLevel_t;
+    MC_LOG_LEVEL_DEBUG,   ///< Debug information logs
+    MC_LOG_LEVEL_INFO,    ///< Information logs
+    MC_LOG_LEVEL_WARN,    ///< Warning logs
+    MC_LOG_LEVEL_ERROR,   ///< Error logs
+    MC_LOG_LEVEL_UNKNOWN, ///< Unknown logs
+} mc_LogLevel;
 
-/** code
- * The type of a mc_Device_t.
+/**
+ * The type of a devi.
  */
 typedef enum mc_DeviceType {
-    MC_DEVICE_TYPE_DGPU, // discrete GPU
-    MC_DEVICE_TYPE_IGPU, // integrated GPU
-    MC_DEVICE_TYPE_VGPU, // virtual GPU
-    MC_DEVICE_TYPE_CPU,
-    MC_DEVICE_TYPE_OTHER,
-} mc_DeviceType_t;
+    MC_DEVICE_TYPE_DGPU,  ///< discrete GPU
+    MC_DEVICE_TYPE_IGPU,  ///< integrated GPU
+    MC_DEVICE_TYPE_VGPU,  ///< virtual GPU
+    MC_DEVICE_TYPE_CPU,   ///< CPU
+    MC_DEVICE_TYPE_OTHER, ///< other (or unknown)
+} mc_DeviceType;
 
-/** code
- * The log callback type passed to `mc_set_log_cb()`.
- *
- * - `lvl`: A `mc_LogLevel` indicating the severity of the message
- * - `src`: The message source (NULL terminated)
- * - `arg`: The value passed to `logArg` in `mc_instance_create()`
- * - `file`: The file the message originated from (NULL terminated)
- * - `line`: The line the message originated from
- * - `fmt`: The message formatting (same format as `printf()`)
- * - `...`: The arguments for the formatting
+/**
+ * The type of a buffer.
  */
-typedef void(mc_log_cb)( //
-    mc_LogLevel_t lvl,
-    const char* src,
+typedef enum mc_BufferType {
+    MC_BUFFER_TYPE_CPU, ///< Accessible from CPU, but slow GPU access
+    MC_BUFFER_TYPE_GPU, ///< Not accessible from CPU, but fast GPU access
+} mc_BufferType;
+
+/**
+ * The log callback type.
+ * @param arg The value passed to `logArg` in `mc_instance_create()`
+ * @param lvl A `mc_LogLevel` indicating the severity of the message
+ * @param src The source of the message
+ * @param file The file the message originated from
+ * @param line The line the message originated from
+ * @param fmt The message formatting (same as `printf()`)
+ * @param ... The arguments for the formatting
+ */
+typedef void(mc_log_fn)( //
     void* arg,
+    mc_LogLevel lvl,
+    const char* src,
     const char* file,
     int line,
     const char* fmt,
     ...
 );
 
-/** code
- * Core microcompute types.
+/**
+ * An instance of the library.
  */
-typedef struct mc_Instance mc_Instance_t;
-typedef struct mc_Device mc_Device_t;
-typedef struct mc_Buffer mc_Buffer_t;
-typedef struct mc_Program mc_Program_t;
+typedef struct mc_Instance mc_Instance;
 
-/** text
- * ## Functions
+/**
+ * A devi.
  */
+typedef struct mc_Device mc_Device;
 
-/** code
- * Create a `mc_Instance_t` object.
+/**
+ * A buffer.
+ */
+typedef struct mc_Buffer mc_Buffer;
+
+/**
+ * A program.
+ */
+typedef struct mc_Program mc_Program;
+
+/**
+ * Create an instance of the library. If `log_fn` is `NULL`, no logs will be
+ * from microcompute.
  *
- * - `log_cb`: A function to call when a error occurs, set to `NULL` to ignore
- * - `logArg`: A value to pass to the log callback, set to `NULL` to ignore
- * - returns: A instance object on success, `NULL` on error
+ * @param log_fn A function to call when there is a message from the library
+ * @param logArg A value to pass to the `arg` parameter of `log_fn`
+ * @return A new instance success, `NULL` on error
  */
-mc_Instance_t* mc_instance_create(mc_log_cb* log_cb, void* logArg);
+mc_Instance* mc_instance_create(mc_log_fn* log_fn, void* logArg);
 
-/** code
- * Destroy a `mc_Instance_t` object.
- *
- * - `self`: A reference to a `mc_Instance_t` object
+/**
+ * Destroy an instance of the library.
+ * @param self An instance of the library
  */
-void mc_instance_destroy(mc_Instance_t* self);
+void mc_instance_destroy(mc_Instance* self);
 
-/** code
- * Get the number of available `mc_Device_t` objects.
- *
- * - `self`: A reference to a `mc_Instance_t` object
- * - returns: The number of devices
+/**
+ * Get the number of available devices.
+ * @param self An instance of the library
+ * @return The number of devices
  */
-uint32_t mc_instance_get_device_count(mc_Instance_t* self);
+uint32_t mc_instance_get_device_count(mc_Instance* self);
 
-/** code
- * Get a list of of available `mc_Device_t` objects.
- *
- * - `self`: A reference to a `mc_Instance_t` object
- * - returns: A list of devices
+/**
+ * Get the devices available to an instance.
+ * @param self A n instance of the library
+ * @return An array of devices
  */
-mc_Device_t** mc_instance_get_devices(mc_Instance_t* self);
+mc_Device** mc_instance_get_devices(mc_Instance* self);
 
-/** code
- * Get the type of the device (discrete gpu etc).
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: The type of the GPU
+/**
+ * Get the type of a devi.
+ * @param self A devi
+ * @return The type of the devi
  */
-mc_DeviceType_t mc_device_get_type(mc_Device_t* self);
+mc_DeviceType mc_device_get_type(mc_Device* self);
 
-/** code
- * Get the total video memory of a device.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: The size of the video memory in bytes
+/**
+ * Get the max total workgroup count of a devi.
+ * @param self A devi
+ * @return The max total workgroup count
  */
-uint64_t mc_device_get_total_memory_size(mc_Device_t* self);
+uint32_t mc_device_get_max_workgroup_size_total(mc_Device* self);
 
-/** code
- * Get the used video memory of a device.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: The size of the used video memory in bytes
+/**
+ * Get the max workgroup size (for each x, y, z) of a devi.
+ * @param self A devi
+ * @return The max workgroup size, as a 3 element array
  */
-uint64_t mc_device_get_used_memory_size(mc_Device_t* self);
+uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device* self);
 
-/** code
- * Get the max workgroup size (the max for x*y*z) of a device.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: The max workgroup size
+/**
+ * Get the max workgroup count (for each x, y, z) of a devi.
+ * @param self A devi
+ * @return The max workgroup count, as a 3 element array
  */
-uint32_t mc_device_get_max_workgroup_size_total(mc_Device_t* self);
+uint32_t* mc_device_get_max_workgroup_count(mc_Device* self);
 
-/** code
- * Get the max workgroup size (for each x, y, z) of a device.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: The max workgroup size, as a 3 element array (dont free)
+/**
+ * Get the name of a devi.
+ * @param self A devi
+ * @return The name of the devi
  */
-uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device_t* self);
+char* mc_device_get_name(mc_Device* self);
 
-/** code
- * Get the max workgroup count (for each x, y, z) of a device.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: The max workgroup count, as a 3 element array
+/**
+ * Create an empty buffer.
+ * @param device A devi
+ * @param type The type of the buffer
+ * @param size The size of the buffer
+ * @return An new buffer on success, `NULL` on error
  */
-uint32_t* mc_device_get_max_workgroup_count(mc_Device_t* self);
-
-/** code
- * Get the name of a device.
- *
- * - `self`: A reference to a `mc_Device_t` object
- * - returns: A `NULL` terminated string containing the name of the device
- */
-char* mc_device_get_name(mc_Device_t* self);
-
-/** code
- * Create a `mc_Buffer_t` object.
- *
- * - `device`: A reference to a `mc_Device_t` object
- * - `size`: The size of the buffer
- * - returns: A reference to a `mc_Buffer_t` object
- */
-mc_Buffer_t* mc_buffer_create(mc_Device_t* device, uint64_t size);
-
-/** code
- * Create a `mc_Buffer_t` object and initializes with some data.
- *
- * - `device`: A reference to a `mc_Device_t` object
- * - `size`: The size of the buffer
- * - `data`: A reference to the data the initialize the buffer with
- * - returns: A buffer object on success, `NULL` on error
- */
-mc_Buffer_t* mc_buffer_create_from(
-    mc_Device_t* device,
-    uint64_t size,
-    void* data
+mc_Buffer* mc_buffer_create(
+    mc_Device* device,
+    mc_BufferType type,
+    uint64_t size
 );
 
-/** code
- * Destroy a `mc_Buffer_t` object.
- *
- * - `self`: A reference to a `mc_Buffer_t` object
+/**
+ * Destroy a buffer.
+ * @param self A buffer
  */
-void mc_buffer_destroy(mc_Buffer_t* self);
+void mc_buffer_destroy(mc_Buffer* self);
 
-/** code
- * Get the size of a `mc_Buffer_t` object.
- *
- * - `self`: A reference to a `mc_Buffer_t` object
- * - returns: The size, in bytes
+/**
+ * Get the size of a buffer.
+ * @param self A buffer
+ * @return The size of the buffer
  */
-uint64_t mc_buffer_get_size(mc_Buffer_t* self);
+uint64_t mc_buffer_get_size(mc_Buffer* self);
 
-/** code
- * Reallocate a `mc_Buffer_t` object.
- *
- * - `self`: A reference to a `mc_Buffer_t` object
- * - `size`: The new size of the buffer
- * - returns: The new buffer object on success, `NULL` on error
+/**
+ * Reallocate a buffer. This will copy the data from the old buffer.
+ * @param self A buffer
+ * @param size The new size of the buffer
+ * @return A new buffer on success, `NULL` on error
  */
-mc_Buffer_t* mc_buffer_realloc(mc_Buffer_t* self, uint64_t size);
+mc_Buffer* mc_buffer_realloc(mc_Buffer* self, uint64_t size);
 
-/** code
- * Write data to a `mc_Buffer_t` object.
- *
- * - `self`: A reference to a `mc_Buffer_t` object
- * - `offset`: The offset from witch to start writing the data, in bytes
- * - `size`: The size of the data to write, in bytes
- * - `data`: The data to write
- * - returns: The number of bytes written
+/**
+ * Write data to a `MC_BUFFER_TYPE_HOST` or `MC_BUFFER_TYPE_TRANSFER` buffer.
+ * @param self A buffer
+ * @param offset The offset from witch to start writing the data, in bytes
+ * @param size The size of the data to write, in bytes
+ * @param data A reference to the data to write
+ * @return The number of bytes written, 0 on error
  */
 uint64_t mc_buffer_write(
-    mc_Buffer_t* self,
+    mc_Buffer* self,
     uint64_t offset,
     uint64_t size,
     void* data
 );
 
-/** code
- * Read data from a `mc_Buffer_t` object.
- *
- * - `self`: A reference to a `mc_Buffer_t` object
- * - `offset`: The offset from witch to start reading the data, in bytes
- * - `size`: The size of the data to read, in bytes
- * - `data`: Where to read the data to
- * - returns: The number of bytes read
+/**
+ * Read data from a `MC_BUFFER_TYPE_HOST` or `MC_BUFFER_TYPE_TRANSFER` buffer.
+ * @param self A buffer
+ * @param offset The offset from witch to start reading the data, in bytes
+ * @param size The size of the data to read, in bytes
+ * @param data A reference to the buffer to read the data into
+ * @return The number of bytes read, 0 on error
  */
 uint64_t mc_buffer_read(
-    mc_Buffer_t* self,
+    mc_Buffer* self,
     uint64_t offset,
     uint64_t size,
     void* data
 );
 
-/** code
- * Create a `mc_Program_t` object.
- *
- * - `device`: A reference to a `mc_Device_t` object
- * - `codeSize`: The size of the shader code
- * - `code`: The shader code
- * - `entryPoint`: The entry point name, generally `"main"`
- * - returns: A program object on success, `NULL` on error
+/**
+ * Create a program from some SPIRV code.
+ * @param device A devi
+ * @param codeSize The size of the shader code
+ * @param code The shader code
+ * @param entryPoint The entry point name, generally `"main"`
+ * @return A new program on success, `NULL` on error
  */
-mc_Program_t* mc_program_create(
-    mc_Device_t* device,
+mc_Program* mc_program_create(
+    mc_Device* device,
     size_t codeSize,
     const char* code,
     const char* entryPoint
 );
 
-/** code
- * Create a `mc_Program_t` object from a file.
- *
- * - `device`: A reference to a `mc_Device_t` object
- * - `fileName`: The path to the shader code
- * - `entryPoint`: The entry point name, generally `"main"`
- * - returns: A program object on success, `NULL` on error
+/**
+ * Destroy a program.
+ * @param self A program
  */
-mc_Program_t* mc_program_create_from_file(
-    mc_Device_t* device,
-    const char* fileName,
-    const char* entryPoint
-);
+void mc_program_destroy(mc_Program* self);
 
-/** code
- * Destroy a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
- */
-void mc_program_destroy(mc_Program_t* self);
-
-/** code
- * Bind buffers to a `mc_Program_t` object.
- *
- * - `self`: A reference to a `mc_Program_t` object
- * - `dimX`: The number of local workgroups in the x dimension
- * - `dimY`: The number of local workgroups in the y dimension
- * - `dimZ`: The number of local workgroups in the z dimension
- * - `...`: A list of buffers to bind to the program
- * - returns: Time taken to run the program, in seconds, or `-1.0` on error
+/**
+ * Run a program.
+ * @param self A program
+ * @param dimX The number of workgroups to run in the x direction
+ * @param dimY The number of workgroups to run in the y direction
+ * @param dimZ The number of workgroups to run in the z direction
+ * @param ... Buffers to pass to the program
+ * @return The time taken to run the program, in seconds
  */
 #define mc_program_run(self, dimX, dimY, dimZ, ...)                            \
     mc_program_run__(self, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
 
-/** code
+/**
  * Get the current time.
- *
- * - returns: The current time, in seconds
+ * @return The current time in seconds
  */
 double mc_get_time();
 
-/** code
- * Convert a `mc_LogLevel_t` enum to a human readable string.
- *
- * - `level`: A `mc_LogLevel_t` value
- * - returns: A human readable string (`NULL` terminated)
+/**
+ * Convert a `mc_LogLevel` enum to a human readable string.
+ * @param level A log level
+ * @return A human readable string (`NULL` terminated)
  */
-const char* mc_log_level_to_str(mc_LogLevel_t level);
+const char* mc_log_level_to_str(mc_LogLevel level);
 
-/** code
- * Convert a `mc_DeviceType_t` enum to a human readable string.
- *
- * - `type`: A `mc_DeviceType_t` value
- * - returns: A human readable string (`NULL` terminated)
+/**
+ * Convert a `mc_DeviceType` enum to a human readable string.
+ * @param type A devi type
+ * @return A human readable string (`NULL` terminated)
  */
-const char* mc_device_type_to_str(mc_DeviceType_t type);
+const char* MC_DEVICE_TYPE_to_str(mc_DeviceType type);
 
-/** code
- * Read the contents of a file into a buffer.
- *
- * - `path`: The path to the file
- * - `contents`: A buffer to read the file into, set to `NULL` to just get the
- *   size
- * - returns: The size of the file, in bytes
+/**
+ * A simple log callback that prints to `stderr`. Use this as a base for your
+ * own log callback.
  */
-size_t mc_read_file(const char* path, char* contents);
-
-/** code
- * Default callback function that can be passed to `mc_instance_create()`. Just
- * prints all messages to stdout. Use as a template for your own callback.
- *
- * See `mc_log_cb` for more info about the arguments.
- */
-void mc_default_log_cb( //
-    mc_LogLevel_t lvl,
-    const char* src,
+void mc_log_cb_simple(
     void* arg,
+    mc_LogLevel lvl,
+    const char* src,
     char const* file,
     int line,
     const char* fmt,
     ...
 );
 
-/** code
- * Wrapped functions. Don't use these directly, use their corresponding macros.
+/**
+ * Run a program. This is the internal implementation of `mc_program_run()`, so
+ * it should not be called directly.
  */
 double mc_program_run__(
-    mc_Program_t* self,
+    mc_Program* self,
     uint32_t dimX,
     uint32_t dimY,
     uint32_t dimZ,
@@ -366,30 +289,3 @@ double mc_program_run__(
 );
 
 #endif // MC_H_INCLUDE_GUARD
-
-/** text
- * ## Licence
- *
- * ```
- * MIT License
- * Copyright (c) 2023 Kai Kitagawa-Jones
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- * ```
- */

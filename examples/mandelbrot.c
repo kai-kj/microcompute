@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#define MC_IMPLEMENTATION
 #include "microcompute.h"
 #include "microcompute_vec.h"
 
@@ -18,19 +17,28 @@ int main(void) {
     size_t imgSize = sizeof(int) * width * height;
 
     struct Opt opt = {
-        .center = {.x = -0.7615, .y = -0.08459},
+        .center = {.x = -0.7615f, .y = -0.08459f},
         .zoom = 1000,
         .maxIter = 500,
     };
 
-    mc_Instance_t* instance = mc_instance_create(mc_default_log_cb, NULL);
-    mc_Device_t* dev = mc_instance_get_devices(instance)[0];
+    mc_Instance* instance = mc_instance_create(mc_log_cb_simple, NULL);
+    mc_Device* dev = mc_instance_get_devices(instance)[0];
 
-    mc_Buffer_t* optBuff = mc_buffer_create_from(dev, sizeof opt, &opt);
-    mc_Buffer_t* imgBuff = mc_buffer_create(dev, imgSize);
+    mc_Buffer* optBuff = mc_buffer_create(dev, MC_BUFFER_TYPE_CPU, sizeof opt);
+    mc_buffer_write(optBuff, 0, sizeof opt, &opt);
+    mc_Buffer* imgBuff = mc_buffer_create(dev, MC_BUFFER_TYPE_CPU, imgSize);
 
-    mc_Program_t* prog
-        = mc_program_create_from_file(dev, "mandelbrot.spv", "main");
+    FILE* fp = fopen("mandelbrot.spv", "rb");
+    fseek(fp, 0, SEEK_END);
+    size_t codeLen = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char* code = malloc(codeLen);
+    fread(code, 1, codeLen, fp);
+    fclose(fp);
+
+    mc_Program* prog = mc_program_create(dev, codeLen, code, "main");
+
     double time = mc_program_run(prog, width, height, 1, optBuff, imgBuff);
     printf("compute time: %f[s]\n", time);
 

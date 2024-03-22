@@ -22,6 +22,13 @@ target_sources(
         src/instance.c
         src/misc.c
         src/program.c
+        src/log.c
+)
+
+target_compile_options(
+        microcompute PRIVATE
+        -g -O0 -Wall -Wextra -Werror
+        -Wno-unused-parameter -Wno-missing-braces -Wno-unused-function
 )
 
 add_custom_command(
@@ -38,6 +45,18 @@ target_link_libraries(check_devs PRIVATE microcompute)
 
 add_executable(mandelbrot examples/mandelbrot.c ${PROJECT_BINARY_DIR}/mandelbrot.spv)
 target_link_libraries(mandelbrot PRIVATE microcompute)
+
+target_compile_options(
+        check_devs PRIVATE
+        -g -O0 -Wall -Wextra -Werror
+        -Wno-unused-parameter -Wno-missing-braces -Wno-unused-function
+)
+
+target_compile_options(
+        mandelbrot PRIVATE
+        -g -O0 -Wall -Wextra -Werror
+        -Wno-unused-parameter -Wno-missing-braces -Wno-unused-function
+)
 
 set(GLSLC glslc -fshader-stage=compute)
 
