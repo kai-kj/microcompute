@@ -22,7 +22,7 @@ typedef enum mc_LogLevel {
 } mc_LogLevel;
 
 /**
- * The type of a devi.
+ * The type of a device.
  */
 typedef enum mc_DeviceType {
     MC_DEVICE_TYPE_DGPU,  ///< discrete GPU
@@ -66,7 +66,7 @@ typedef void(mc_log_fn)( //
 typedef struct mc_Instance mc_Instance;
 
 /**
- * A devi.
+ * A device.
  */
 typedef struct mc_Device mc_Device;
 
@@ -111,43 +111,43 @@ uint32_t mc_instance_get_device_count(mc_Instance* self);
 mc_Device** mc_instance_get_devices(mc_Instance* self);
 
 /**
- * Get the type of a devi.
- * @param self A devi
- * @return The type of the devi
+ * Get the type of a device.
+ * @param self A device
+ * @return The type of the device
  */
 mc_DeviceType mc_device_get_type(mc_Device* self);
 
 /**
- * Get the max total workgroup count of a devi.
- * @param self A devi
+ * Get the max total workgroup count of a device.
+ * @param self A device
  * @return The max total workgroup count
  */
 uint32_t mc_device_get_max_workgroup_size_total(mc_Device* self);
 
 /**
- * Get the max workgroup size (for each x, y, z) of a devi.
- * @param self A devi
+ * Get the max workgroup size (for each x, y, z) of a device.
+ * @param self A device
  * @return The max workgroup size, as a 3 element array
  */
 uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device* self);
 
 /**
- * Get the max workgroup count (for each x, y, z) of a devi.
- * @param self A devi
+ * Get the max workgroup count (for each x, y, z) of a device.
+ * @param self A device
  * @return The max workgroup count, as a 3 element array
  */
 uint32_t* mc_device_get_max_workgroup_count(mc_Device* self);
 
 /**
- * Get the name of a devi.
- * @param self A devi
- * @return The name of the devi
+ * Get the name of a device.
+ * @param self A device
+ * @return The name of the device
  */
 char* mc_device_get_name(mc_Device* self);
 
 /**
  * Create an empty buffer.
- * @param device A devi
+ * @param device A device
  * @param type The type of the buffer
  * @param size The size of the buffer
  * @return An new buffer on success, `NULL` on error
@@ -211,7 +211,7 @@ uint64_t mc_buffer_read(
 
 /**
  * Create a program from some SPIRV code.
- * @param device A devi
+ * @param device A device
  * @param codeSize The size of the shader code
  * @param code The shader code
  * @param entryPoint The entry point name, generally `"main"`
@@ -257,7 +257,7 @@ const char* mc_log_level_to_str(mc_LogLevel level);
 
 /**
  * Convert a `mc_DeviceType` enum to a human readable string.
- * @param type A devi type
+ * @param type A device type
  * @return A human readable string (`NULL` terminated)
  */
 const char* MC_DEVICE_TYPE_to_str(mc_DeviceType type);

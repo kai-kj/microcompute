@@ -5,26 +5,23 @@
 #include "device.h"
 #include "log.h"
 
-struct mc_Buffer {
-    mc_Instance* _instance;
-    mc_DeviceInfo devi;
-    mc_BufferType type;
-    uint64_t size;
-    void* map;
-    VkBuffer buf;
-    VkDeviceMemory mem;
-};
-
-mc_Buffer* mc_buffer_create__(
-    mc_DeviceInfo dev,
+mc_Buffer* mc_buffer_create(
+    mc_Device* device,
     mc_BufferType type,
     uint64_t size
 ) {
+    if (!device) return NULL;
+
     mc_Buffer* buffer = malloc(sizeof *buffer);
-    *buffer = (mc_Buffer){0};
-    buffer->_instance = dev._instance;
-    buffer->size = size;
-    buffer->devi = dev;
+    *buffer = (mc_Buffer){
+        ._instance = device->_instance,
+        .device = device,
+        .type = type,
+        .size = size,
+        .map = NULL,
+        .buf = NULL,
+        .mem = NULL,
+    };
 
     DEBUG(buffer, "initializing buffer of size %ld", size);
 
@@ -34,9 +31,9 @@ mc_Buffer* mc_buffer_create__(
     bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     bufferInfo.queueFamilyIndexCount = 1;
-    bufferInfo.pQueueFamilyIndices = &buffer->devi.idx;
+    bufferInfo.pQueueFamilyIndices = &buffer->device->queueFamilyIdx;
 
-    if (vkCreateBuffer(buffer->devi.dev, &bufferInfo, NULL, &buffer->buf)) {
+    if (vkCreateBuffer(buffer->device->dev, &bufferInfo, NULL, &buffer->buf)) {
         ERROR(buffer, "failed to create vulkan buffer");
         mc_buffer_destroy(buffer);
         return NULL;
@@ -44,11 +41,11 @@ mc_Buffer* mc_buffer_create__(
 
     // check the minimum memory size
     VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements(buffer->devi.dev, buffer->buf, &memReqs);
+    vkGetBufferMemoryRequirements(buffer->device->dev, buffer->buf, &memReqs);
     if (memReqs.size > buffer->size) buffer->size = memReqs.size;
 
     VkPhysicalDeviceMemoryProperties memProps;
-    vkGetPhysicalDeviceMemoryProperties(buffer->devi.pDev, &memProps);
+    vkGetPhysicalDeviceMemoryProperties(buffer->device->physDev, &memProps);
 
     uint32_t bestMemTypeIdx = memProps.memoryTypeCount;
     uint32_t bestMemTypeScore = 0;
@@ -96,14 +93,19 @@ mc_Buffer* mc_buffer_create__(
     memAllocInfo.allocationSize = buffer->size;
     memAllocInfo.memoryTypeIndex = bestMemTypeIdx;
 
-    if (vkAllocateMemory(buffer->devi.dev, &memAllocInfo, NULL, &buffer->mem)) {
+    if (vkAllocateMemory(
+            buffer->device->dev,
+            &memAllocInfo,
+            NULL,
+            &buffer->mem
+        )) {
         ERROR(buffer, "failed to allocate vulkan memory");
         mc_buffer_destroy(buffer);
         return NULL;
     }
 
     if (vkMapMemory(
-            buffer->devi.dev,
+            buffer->device->dev,
             buffer->mem,
             0,
             buffer->size,
@@ -115,7 +117,7 @@ mc_Buffer* mc_buffer_create__(
         return NULL;
     }
 
-    if (vkBindBufferMemory(buffer->devi.dev, buffer->buf, buffer->mem, 0)) {
+    if (vkBindBufferMemory(buffer->device->dev, buffer->buf, buffer->mem, 0)) {
         ERROR(buffer, "failed to bind memory");
         mc_buffer_destroy(buffer);
         return NULL;
@@ -124,20 +126,11 @@ mc_Buffer* mc_buffer_create__(
     return buffer;
 }
 
-mc_Buffer* mc_buffer_create(
-    mc_Device* device,
-    mc_BufferType type,
-    uint64_t size
-) {
-    if (!device) return NULL;
-    return mc_buffer_create__(mc_device_get_info(device), type, size);
-}
-
 void mc_buffer_destroy(mc_Buffer* buffer) {
     if (!buffer) return;
     DEBUG(buffer, "destroying buffer");
-    if (buffer->mem) vkFreeMemory(buffer->devi.dev, buffer->mem, NULL);
-    if (buffer->buf) vkDestroyBuffer(buffer->devi.dev, buffer->buf, NULL);
+    if (buffer->mem) vkFreeMemory(buffer->device->dev, buffer->mem, NULL);
+    if (buffer->buf) vkDestroyBuffer(buffer->device->dev, buffer->buf, NULL);
     free(buffer);
 }
 
@@ -149,7 +142,7 @@ mc_Buffer* mc_buffer_realloc(mc_Buffer* buffer, uint64_t size) {
     if (!buffer) return NULL;
     DEBUG(buffer, "reallocating buffer: %ld -> %ld", buffer->size, size);
 
-    mc_Buffer* new = mc_buffer_create__(buffer->devi, buffer->type, size);
+    mc_Buffer* new = mc_buffer_create(buffer->device, buffer->type, size);
     if (!new) return NULL;
 
     uint64_t minSize = size < buffer->size ? size : buffer->size;
@@ -192,8 +185,4 @@ uint64_t mc_buffer_read(
 
     memcpy(data, (char*)buffer->map + offset, size);
     return size;
-}
-
-VkBuffer mc_buffer_get_vk_buffer(mc_Buffer* buffer) {
-    return buffer ? buffer->buf : NULL;
 }

@@ -5,6 +5,14 @@
 
 #include "microcompute.h"
 
-VkBuffer mc_buffer_get_vk_buffer(mc_Buffer* buffer);
+struct mc_Buffer {
+    mc_Instance* _instance;
+    mc_Device* device;
+    mc_BufferType type;
+    uint64_t size;
+    void* map;
+    VkBuffer buf;
+    VkDeviceMemory mem;
+};
 
 #endif // MC_BUFFER_H

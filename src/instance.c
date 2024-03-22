@@ -5,16 +5,6 @@
 #include "instance.h"
 #include "log.h"
 
-struct mc_Instance {
-    mc_Instance* _instance; // for logging purposes
-    void* logArg;
-    mc_log_fn* log_fn;
-    VkInstance instance;
-    uint32_t devCount;
-    mc_Device** devs;
-    VkDebugUtilsMessengerEXT msg;
-};
-
 static VkBool32 mc_vk_log_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
@@ -35,12 +25,17 @@ static VkBool32 mc_vk_log_callback(
     return VK_FALSE;
 }
 
-mc_Instance* mc_instance_create(mc_log_fn* mc_log_fn, void* mcLogArg) {
+mc_Instance* mc_instance_create(mc_log_fn* log_fn, void* logArg) {
     mc_Instance* instance = malloc(sizeof *instance);
-    *instance = (mc_Instance){0};
-    instance->_instance = instance;
-    instance->log_fn = mc_log_fn;
-    instance->logArg = mcLogArg;
+    *instance = (mc_Instance){
+        ._instance = instance,
+        .logArg = logArg,
+        .log_fn = log_fn ? log_fn : mc_log_cb_sink,
+        .instance = NULL,
+        .devCount = 0,
+        .devs = NULL,
+        .msg = NULL,
+    };
 
     DEBUG(instance, "initializing instance");
 
@@ -140,14 +135,14 @@ mc_Instance* mc_instance_create(mc_log_fn* mc_log_fn, void* mcLogArg) {
 
         instance->devs[idx] = mc_device_create(instance, pDev, queueIdx);
         if (!instance->devs[idx]) {
-            WARN(instance, "- failed to create devi %d", idx);
+            WARN(instance, "- failed to create device %d", idx);
             physIdx++;
             continue;
         }
 
         DEBUG(
             instance,
-            "- found devi %d: %s",
+            "- found device %d: %s",
             idx,
             mc_device_get_name(instance->devs[idx])
         );
@@ -191,13 +186,4 @@ uint32_t mc_instance_get_device_count(mc_Instance* instance) {
 
 mc_Device** mc_instance_get_devices(mc_Instance* instance) {
     return instance ? instance->devs : NULL;
-}
-
-mc_log_fn* mc_instance_get_log_fn(mc_Instance* instance) {
-    if (!instance) return NULL;
-    return instance->log_fn ? instance->log_fn : mc_log_cb_sink;
-}
-
-void* mc_instance_get_log_arg(mc_Instance* instance) {
-    return instance ? instance->logArg : NULL;
 }

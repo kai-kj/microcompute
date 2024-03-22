@@ -6,26 +6,11 @@
 #include "buffer.h"
 #include "device.h"
 #include "log.h"
-
-struct mc_Program {
-    mc_Instance* _instance;
-    const char* entryPoint;
-    mc_DeviceInfo devi;
-    int32_t buffCount;
-    mc_Buffer** buffs;
-    VkShaderModule shaderModule;
-    VkDescriptorSetLayout descSetLayout;
-    VkPipelineLayout pipelineLayout;
-    VkPipeline pipeline;
-    VkDescriptorPool descPool;
-    VkDescriptorSet descSet;
-    VkCommandPool cmdPool;
-    VkCommandBuffer cmdBuff;
-};
+#include "program.h"
 
 static void mc_program_clear(mc_Program* program) {
     DEBUG(program, "clearing program");
-    VkDevice dev = program->devi.dev;
+    VkDevice dev = program->device->dev;
     if (program->cmdBuff)
         vkFreeCommandBuffers(dev, program->cmdPool, 1, &program->cmdBuff);
     if (program->cmdPool) //
@@ -64,7 +49,7 @@ static void mc_program_setup(mc_Program* program) {
     descLayoutInfo.pBindings = descBindings;
 
     if (vkCreateDescriptorSetLayout(
-            program->devi.dev,
+            program->device->dev,
             &descLayoutInfo,
             NULL,
             &program->descSetLayout
@@ -82,7 +67,7 @@ static void mc_program_setup(mc_Program* program) {
     pipelineInfo.pSetLayouts = &program->descSetLayout;
 
     if (vkCreatePipelineLayout(
-            program->devi.dev,
+            program->device->dev,
             &pipelineInfo,
             NULL,
             &program->pipelineLayout
@@ -103,7 +88,7 @@ static void mc_program_setup(mc_Program* program) {
     computePipelineInfo.layout = program->pipelineLayout;
 
     if (vkCreateComputePipelines(
-            program->devi.dev,
+            program->device->dev,
             0,
             1,
             &computePipelineInfo,
@@ -126,7 +111,7 @@ static void mc_program_setup(mc_Program* program) {
     descPoolInfo.pPoolSizes = &descPoolSize;
 
     if (vkCreateDescriptorPool(
-            program->devi.dev,
+            program->device->dev,
             &descPoolInfo,
             NULL,
             &program->descPool
@@ -142,7 +127,7 @@ static void mc_program_setup(mc_Program* program) {
     descAllocInfo.pSetLayouts = &program->descSetLayout;
 
     if (vkAllocateDescriptorSets(
-            program->devi.dev,
+            program->device->dev,
             &descAllocInfo,
             &program->descSet
         )) {
@@ -153,10 +138,10 @@ static void mc_program_setup(mc_Program* program) {
     VkCommandPoolCreateInfo cmdPoolInfo = {0};
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    cmdPoolInfo.queueFamilyIndex = program->devi.idx;
+    cmdPoolInfo.queueFamilyIndex = program->device->queueFamilyIdx;
 
     if (vkCreateCommandPool(
-            program->devi.dev,
+            program->device->dev,
             &cmdPoolInfo,
             NULL,
             &program->cmdPool
@@ -175,7 +160,7 @@ static void mc_program_setup(mc_Program* program) {
         DEBUG(program, "- buffer %d: size=%ld", i, mc_buffer_get_size(buffer));
 
         descBuffInfo[i] = (VkDescriptorBufferInfo){0};
-        descBuffInfo[i].buffer = mc_buffer_get_vk_buffer(buffer);
+        descBuffInfo[i].buffer = buffer->buf;
         descBuffInfo[i].range = VK_WHOLE_SIZE;
 
         wrtDescSet[i] = (VkWriteDescriptorSet){0};
@@ -188,7 +173,7 @@ static void mc_program_setup(mc_Program* program) {
     }
 
     vkUpdateDescriptorSets(
-        program->devi.dev,
+        program->device->dev,
         program->buffCount,
         wrtDescSet,
         0,
@@ -204,7 +189,7 @@ static void mc_program_setup(mc_Program* program) {
     cmdBuffAllocInfo.commandBufferCount = 1;
 
     if (vkAllocateCommandBuffers(
-            program->devi.dev,
+            program->device->dev,
             &cmdBuffAllocInfo,
             &program->cmdBuff
         )) {
@@ -222,11 +207,21 @@ mc_Program* mc_program_create(
     if (!device) return NULL;
 
     mc_Program* program = malloc(sizeof *program);
-    *program = (mc_Program){0};
-    program->_instance = mc_device_get_instance(device);
-    program->devi = mc_device_get_info(device);
-    program->entryPoint = entryPoint;
-    program->buffCount = -1;
+    *program = (mc_Program){
+        ._instance = device->_instance,
+        .entryPoint = entryPoint,
+        .device = device,
+        .buffCount = -1,
+        .buffs = NULL,
+        .shaderModule = NULL,
+        .descSetLayout = NULL,
+        .pipelineLayout = NULL,
+        .pipeline = NULL,
+        .descPool = NULL,
+        .descSet = NULL,
+        .cmdPool = NULL,
+        .cmdBuff = NULL,
+    };
 
     DEBUG(program, "initializing program, entry point: %s", entryPoint);
 
@@ -236,7 +231,7 @@ mc_Program* mc_program_create(
     moduleInfo.pCode = (const uint32_t*)code;
 
     if (vkCreateShaderModule(
-            program->devi.dev,
+            program->device->dev,
             &moduleInfo,
             NULL,
             &program->shaderModule
@@ -255,7 +250,11 @@ void mc_program_destroy(mc_Program* program) {
 
     mc_program_clear(program);
     if (program->shaderModule)
-        vkDestroyShaderModule(program->devi.dev, program->shaderModule, NULL);
+        vkDestroyShaderModule(
+            program->device->dev,
+            program->shaderModule,
+            NULL
+        );
     free(program);
 }
 
@@ -335,7 +334,12 @@ double mc_program_run__(
     }
 
     VkQueue queue;
-    vkGetDeviceQueue(program->devi.dev, program->devi.idx, 0, &queue);
+    vkGetDeviceQueue(
+        program->device->dev,
+        program->device->queueFamilyIdx,
+        0,
+        &queue
+    );
 
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

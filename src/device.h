@@ -5,12 +5,17 @@
 
 #include "microcompute.h"
 
-typedef struct mc_DeviceInfo {
+struct mc_Device {
     mc_Instance* _instance;
-    VkPhysicalDevice pDev;
-    uint32_t idx;
+    VkPhysicalDevice physDev;
+    uint32_t queueFamilyIdx;
     VkDevice dev;
-} mc_DeviceInfo;
+    mc_DeviceType type;
+    uint32_t maxWgSizeTotal;
+    uint32_t maxWgSizeShape[3];
+    uint32_t maxWgCount[3];
+    char devName[256];
+};
 
 mc_Device* mc_device_create(
     mc_Instance* instance,
@@ -19,9 +24,5 @@ mc_Device* mc_device_create(
 );
 
 void mc_device_destroy(mc_Device* device);
-
-mc_Instance* mc_device_get_instance(mc_Device* device);
-
-mc_DeviceInfo mc_device_get_info(mc_Device* device);
 
 #endif // MC_DEVICE_H

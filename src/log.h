@@ -5,8 +5,8 @@
 #include "microcompute.h"
 
 #define LOG(src, lvl, ...)                                                     \
-    mc_instance_get_log_fn(src->_instance)(                                    \
-        mc_instance_get_log_arg(src->_instance),                               \
+    src->_instance->log_fn(                                                    \
+        src->_instance->logArg,                                                \
         lvl,                                                                   \
         #src,                                                                  \
         __FILE__,                                                              \

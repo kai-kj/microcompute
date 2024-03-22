@@ -8,7 +8,7 @@ int main(void) {
     mc_Device** devs = mc_instance_get_devices(instance);
 
     printf(
-        "\n%d supported devi(s) found\n\n",
+        "\n%d supported device(s) found\n\n",
         mc_instance_get_device_count(instance)
     );
 
