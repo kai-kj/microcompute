@@ -4,9 +4,9 @@
 #include "microcompute_extra.h"
 
 struct mce_HBuffer {
-    mc_Buffer gpuBuffer; // so it can be cast to mc_Buffer
+    mc_Buffer gpuBuff; // "superclass"
     mc_Instance* _instance;
-    mc_Buffer* cpuBuffer;
+    mc_Buffer* cpuBuff;
     mc_BufferCopier* copier;
 };
 

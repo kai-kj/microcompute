@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "microcompute.h"
 #include "microcompute_extra.h"
 
 #define SPV_PATH "check_devs.spv"
@@ -21,7 +22,7 @@ int main(void) {
 
         float arr[] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
         mce_HBuffer* buff = mce_hybrid_buffer_create_from(dev, sizeof arr, arr);
-        
+
         mc_Program* prog = mce_program_create_from_file(dev, SPV_PATH, "main");
 
         for (uint32_t j = 0; j < 3; j++) {

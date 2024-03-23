@@ -3,6 +3,7 @@
 
 #include "buffer.h"
 #include "device.h"
+#include "hybrid_buffer.h"
 #include "log.h"
 #include "microcompute_extra.h"
 
@@ -25,9 +26,40 @@ mc_Buffer* mce_buffer_realloc(mc_Buffer* buffer, uint64_t size) {
     mc_Buffer* new = mc_buffer_create(buffer->device, buffer->type, size);
     if (!new) return NULL;
 
-    uint64_t minSize = size < buffer->size ? size : buffer->size;
-    mc_buffer_write(new, 0, minSize, buffer->map);
+    if (buffer->type == MC_BUFFER_TYPE_CPU) {
+        uint64_t minSize = size < buffer->size ? size : buffer->size;
+        mc_buffer_write(new, 0, minSize, buffer->map);
+    } else {
+        WARN(buffer, "buffer cannot be written to, the data will be lost");
+    }
+
     mc_buffer_destroy(buffer);
+    return new;
+}
+
+mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* old, uint64_t size) {
+    if (!old) return NULL;
+    DEBUG(
+        old,
+        "reallocating hybrid buffer: %ld -> %ld",
+        old->gpuBuff.size,
+        size
+    );
+
+    mce_HBuffer* new = mce_hybrid_buffer_create(old->gpuBuff.device, size);
+    if (!new) return NULL;
+
+    uint64_t minSize = size < old->gpuBuff.size ? size : old->gpuBuff.size;
+    mc_buffer_copier_copy(
+        old->copier,
+        &new->gpuBuff,
+        &old->gpuBuff,
+        0,
+        0,
+        minSize
+    );
+
+    mce_hybrid_buffer_destroy(old);
     return new;
 }
 

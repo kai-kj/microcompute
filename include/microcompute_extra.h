@@ -1,51 +1,33 @@
 #ifndef MICROCOMPUTE_EXTRA_H
 #define MICROCOMPUTE_EXTRA_H
 
-#include <microcompute.h>
+#include <stdint.h>
+
+/**
+ * A device.
+ */
+typedef struct mc_Device mc_Device;
+
+/**
+ * The type of a buffer.
+ */
+typedef enum mc_BufferType mc_BufferType;
+
+/**
+ * A buffer.
+ */
+typedef struct mc_Buffer mc_Buffer;
+
+/**
+ * A program.
+ */
+typedef struct mc_Program mc_Program;
 
 /**
  * A hybrid buffer. This buffer is can be accessed from the CPU while still
  * being fast to access from the GPU.
  */
 typedef struct mce_HBuffer mce_HBuffer;
-
-/**
- * Create an empty `MC_BUFFER_TYPE_CPU` buffer.
- * @param device A device
- * @param size The size of the buffer
- * @return An new CPU buffer on success, `NULL` on error
- */
-#define mce_cpu_buffer_create(device, size)                                    \
-    mc_buffer_create(device, MC_BUFFER_TYPE_CPU, size)
-
-/**
- * Create an empty `MC_BUFFER_TYPE_GPU` buffer.
- * @param device A device
- * @param size The size of the buffer
- * @return An new GPU buffer on success, `NULL` on error
- */
-#define mce_gpu_buffer_create(device, size)                                    \
-    mce_buffer_create(device, MC_BUFFER_TYPE_GPU, size)
-
-/**
- * Create an `MC_BUFFER_TYPE_CPU` buffer from some data.
- * @param device A device
- * @param size The size of the buffer
- * @param data The data to put in the buffer
- * @return An new CPU buffer on success, `NULL` on error
- */
-#define mce_cpu_buffer_create_from(device, size, data)                         \
-    mce_buffer_create_from(device, MC_BUFFER_TYPE_CPU, size, data)
-
-/**
- * Create an `MC_BUFFER_TYPE_GPU` buffer from some data.
- * @param device A device
- * @param size The size of the buffer
- * @param data The data to put in the buffer
- * @return An new GPU buffer on success, `NULL` on error
- */
-#define mce_gpu_buffer_create_from(device, size, data)                         \
-    mc_buffer_create_from(device, MC_BUFFER_TYPE_GPU, size, data)
 
 /**
  * Create an empty hybrid buffer.
@@ -70,27 +52,27 @@ mce_HBuffer* mce_hybrid_buffer_create_from(
 
 /**
  * Destroy a hybrid buffer.
- * @param tBuffer A hybrid buffer
+ * @param hBuffer A hybrid buffer
  */
-void mce_hybrid_buffer_destroy(mce_HBuffer* tBuffer);
+void mce_hybrid_buffer_destroy(mce_HBuffer* hBuffer);
 
 /**
  * Get the size of a hybrid buffer.
- * @param tBuffer A hybrid buffer
+ * @param hBuffer A hybrid buffer
  * @return The size of the hybrid buffer
  */
-uint64_t mce_hybrid_buffer_get_size(mce_HBuffer* tBuffer);
+uint64_t mce_hybrid_buffer_get_size(mce_HBuffer* hBuffer);
 
 /**
  * Write data to a hybrid buffer.
- * @param tBuffer A hybrid buffer
+ * @param hBuffer A hybrid buffer
  * @param offset The offset from witch to start writing the data, in bytes
  * @param size The size of the data to write, in bytes
  * @param data A reference to the data to write
  * @return The number of bytes written, 0 on error
  */
 uint64_t mce_hybrid_buffer_write(
-    mce_HBuffer* tBuffer,
+    mce_HBuffer* hBuffer,
     uint64_t offset,
     uint64_t size,
     void* data
@@ -98,14 +80,14 @@ uint64_t mce_hybrid_buffer_write(
 
 /**
  * Read data from a hybrid buffer.
- * @param tBuffer A hybrid buffer
+ * @param hBuffer A hybrid buffer
  * @param offset The offset from witch to start reading the data, in bytes
  * @param size The size of the data to read, in bytes
  * @param data A reference to the buffer to read the data into
  * @return The number of bytes read, 0 on error
  */
 uint64_t mce_hybrid_buffer_read(
-    mce_HBuffer* tBuffer,
+    mce_HBuffer* hBuffer,
     uint64_t offset,
     uint64_t size,
     void* data
@@ -127,12 +109,22 @@ mc_Buffer* mce_buffer_create_from(
 );
 
 /**
- * Reallocate a buffer. This will copy the data from the old buffer.
+ * Reallocate a buffer. If the buffer is of type `MC_BUFFER_TYPE_CPU`, the data
+ * will be copied.
+ *
  * @param buffer A buffer
  * @param size The new size of the buffer
  * @return A new buffer on success, `NULL` on error
  */
 mc_Buffer* mce_buffer_realloc(mc_Buffer* buffer, uint64_t size);
+
+/**
+ * Reallocate a hybrid buffer. This will copy the data from the old buffer.
+ * @param hBuffer A buffer
+ * @param size The new size of the buffer
+ * @return A new buffer on success, `NULL` on error
+ */
+mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* hBuffer, uint64_t size);
 
 /**
  * Create a program from some SPIRV code.

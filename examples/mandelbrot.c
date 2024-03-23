@@ -1,7 +1,7 @@
 #include <stdio.h>
 
+#include "microcompute.h"
 #include "microcompute_extra.h"
-#include "microcompute_vec.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -9,7 +9,7 @@
 #define SPV_PATH "mandelbrot.spv"
 
 struct Opt {
-    mc_vec2 center;
+    float center[2];
     float zoom;
     int maxIter;
 };
@@ -19,7 +19,7 @@ int main(void) {
     size_t imgSize = sizeof(int) * width * height;
 
     struct Opt opt = {
-        .center = {.x = -0.7615f, .y = -0.08459f},
+        .center = {-0.7615f, -0.08459f},
         .zoom = 1000,
         .maxIter = 500,
     };
