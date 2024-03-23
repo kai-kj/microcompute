@@ -28,7 +28,9 @@ mc_Buffer* mc_buffer_create(
     VkBufferCreateInfo bufferInfo = {0};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = buffer->size;
-    bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                     | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+                     | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     bufferInfo.queueFamilyIndexCount = 1;
     bufferInfo.pQueueFamilyIndices = &buffer->device->queueFamilyIdx;
@@ -66,15 +68,15 @@ mc_Buffer* mc_buffer_create(
         score *= heap.size;
         score *= memReqs.size <= heap.size;
 
-        DEBUG(
-            buffer,
-            "- found mem type %d: %c%c%c, %ld",
-            i,
-            v ? 'V' : '_',
-            c ? 'C' : '_',
-            d ? 'D' : '_',
-            heap.size
-        );
+        //        DEBUG(
+        //            buffer,
+        //            "- found mem type %d: %c%c%c, %ld",
+        //            i,
+        //            v ? 'V' : '_',
+        //            c ? 'C' : '_',
+        //            d ? 'D' : '_',
+        //            heap.size
+        //        );
 
         if (score > bestMemTypeScore) {
             bestMemTypeIdx = i;
@@ -104,6 +106,14 @@ mc_Buffer* mc_buffer_create(
         return NULL;
     }
 
+    if (vkBindBufferMemory(buffer->device->dev, buffer->buf, buffer->mem, 0)) {
+        ERROR(buffer, "failed to bind memory");
+        mc_buffer_destroy(buffer);
+        return NULL;
+    }
+
+    if (type != MC_BUFFER_TYPE_CPU) return buffer;
+
     if (vkMapMemory(
             buffer->device->dev,
             buffer->mem,
@@ -113,12 +123,6 @@ mc_Buffer* mc_buffer_create(
             &buffer->map
         )) {
         ERROR(buffer, "failed to map memory");
-        mc_buffer_destroy(buffer);
-        return NULL;
-    }
-
-    if (vkBindBufferMemory(buffer->device->dev, buffer->buf, buffer->mem, 0)) {
-        ERROR(buffer, "failed to bind memory");
         mc_buffer_destroy(buffer);
         return NULL;
     }
@@ -134,21 +138,8 @@ void mc_buffer_destroy(mc_Buffer* buffer) {
     free(buffer);
 }
 
-uint64_t mc_buffer_get_size(mc_Buffer* self) {
-    return self ? self->size : 0;
-}
-
-mc_Buffer* mc_buffer_realloc(mc_Buffer* buffer, uint64_t size) {
-    if (!buffer) return NULL;
-    DEBUG(buffer, "reallocating buffer: %ld -> %ld", buffer->size, size);
-
-    mc_Buffer* new = mc_buffer_create(buffer->device, buffer->type, size);
-    if (!new) return NULL;
-
-    uint64_t minSize = size < buffer->size ? size : buffer->size;
-    mc_buffer_write(new, 0, minSize, buffer->map);
-    mc_buffer_destroy(buffer);
-    return new;
+uint64_t mc_buffer_get_size(mc_Buffer* buffer) {
+    return buffer ? buffer->size : 0;
 }
 
 uint64_t mc_buffer_write(
@@ -158,6 +149,11 @@ uint64_t mc_buffer_write(
     void* data
 ) {
     if (!buffer) return 0;
+    if (buffer->type != MC_BUFFER_TYPE_CPU) {
+        ERROR(buffer, "buffer type is not CPU");
+        return 0;
+    }
+
     DEBUG(buffer, "writing %ld bytes to buffer", size);
 
     if (offset + size > buffer->size) {
@@ -176,6 +172,11 @@ uint64_t mc_buffer_read(
     void* data
 ) {
     if (!buffer) return 0;
+    if (buffer->type != MC_BUFFER_TYPE_CPU) {
+        ERROR(buffer, "buffer type is not CPU");
+        return 0;
+    }
+
     DEBUG(buffer, "reading %ld bytes from buffer", size);
 
     if (offset + size > buffer->size) {

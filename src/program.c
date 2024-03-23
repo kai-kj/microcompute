@@ -28,9 +28,9 @@ static void mc_program_clear(mc_Program* program) {
 }
 
 static void mc_program_setup(mc_Program* program) {
-    DEBUG(program, "setting up program with %d buffer(s):", program->buffCount);
-
     mc_program_clear(program);
+    
+    DEBUG(program, "setting up program with %d buffer(s):", program->buffCount);
 
     VkDescriptorSetLayoutBinding* descBindings
         = malloc(sizeof *descBindings * program->buffCount);

@@ -1,10 +1,12 @@
 #include <stdio.h>
 
-#include "microcompute.h"
+#include "microcompute_extra.h"
 #include "microcompute_vec.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+#define SPV_PATH "mandelbrot.spv"
 
 struct Opt {
     mc_vec2 center;
@@ -25,30 +27,20 @@ int main(void) {
     mc_Instance* instance = mc_instance_create(mc_log_cb_simple, NULL);
     mc_Device* dev = mc_instance_get_devices(instance)[0];
 
-    mc_Buffer* optBuff = mc_buffer_create(dev, MC_BUFFER_TYPE_CPU, sizeof opt);
-    mc_buffer_write(optBuff, 0, sizeof opt, &opt);
-    mc_Buffer* imgBuff = mc_buffer_create(dev, MC_BUFFER_TYPE_CPU, imgSize);
-
-    FILE* fp = fopen("mandelbrot.spv", "rb");
-    fseek(fp, 0, SEEK_END);
-    size_t codeLen = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    char* code = malloc(codeLen);
-    fread(code, 1, codeLen, fp);
-    fclose(fp);
-
-    mc_Program* prog = mc_program_create(dev, codeLen, code, "main");
+    mce_HBuffer* optBuff = mce_hybrid_buffer_create_from(dev, sizeof opt, &opt);
+    mce_HBuffer* imgBuff = mce_hybrid_buffer_create(dev, imgSize);
+    mc_Program* prog = mce_program_create_from_file(dev, SPV_PATH, "main");
 
     double time = mc_program_run(prog, width, height, 1, optBuff, imgBuff);
     printf("compute time: %f[s]\n", time);
 
     void* img = malloc(imgSize);
-    mc_buffer_read(imgBuff, 0, imgSize, img);
+    mce_hybrid_buffer_read(imgBuff, 0, imgSize, img);
     stbi_write_png("mandelbrot.png", width, height, 4, img, width * 4);
 
     free(img);
-    mc_buffer_destroy(optBuff);
-    mc_buffer_destroy(imgBuff);
+    mce_hybrid_buffer_destroy(optBuff);
+    mce_hybrid_buffer_destroy(imgBuff);
     mc_program_destroy(prog);
     mc_instance_destroy(instance);
 }

@@ -76,6 +76,11 @@ typedef struct mc_Device mc_Device;
 typedef struct mc_Buffer mc_Buffer;
 
 /**
+ * A buffer copier.
+ */
+typedef struct mc_BufferCopier mc_BufferCopier;
+
+/**
  * A program.
  */
 typedef struct mc_Program mc_Program;
@@ -92,58 +97,58 @@ mc_Instance* mc_instance_create(mc_log_fn* log_fn, void* logArg);
 
 /**
  * Destroy an instance of the library.
- * @param self An instance of the library
+ * @param instance An instance of the library
  */
-void mc_instance_destroy(mc_Instance* self);
+void mc_instance_destroy(mc_Instance* instance);
 
 /**
  * Get the number of available devices.
- * @param self An instance of the library
+ * @param instance An instance of the library
  * @return The number of devices
  */
-uint32_t mc_instance_get_device_count(mc_Instance* self);
+uint32_t mc_instance_get_device_count(mc_Instance* instance);
 
 /**
  * Get the devices available to an instance.
- * @param self A n instance of the library
+ * @param instance A n instance of the library
  * @return An array of devices
  */
-mc_Device** mc_instance_get_devices(mc_Instance* self);
+mc_Device** mc_instance_get_devices(mc_Instance* instance);
 
 /**
  * Get the type of a device.
- * @param self A device
+ * @param device A device
  * @return The type of the device
  */
-mc_DeviceType mc_device_get_type(mc_Device* self);
+mc_DeviceType mc_device_get_type(mc_Device* device);
 
 /**
  * Get the max total workgroup count of a device.
- * @param self A device
+ * @param device A device
  * @return The max total workgroup count
  */
-uint32_t mc_device_get_max_workgroup_size_total(mc_Device* self);
+uint32_t mc_device_get_max_workgroup_size_total(mc_Device* device);
 
 /**
  * Get the max workgroup size (for each x, y, z) of a device.
- * @param self A device
+ * @param device A device
  * @return The max workgroup size, as a 3 element array
  */
-uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device* self);
+uint32_t* mc_device_get_max_workgroup_size_shape(mc_Device* device);
 
 /**
  * Get the max workgroup count (for each x, y, z) of a device.
- * @param self A device
+ * @param device A device
  * @return The max workgroup count, as a 3 element array
  */
-uint32_t* mc_device_get_max_workgroup_count(mc_Device* self);
+uint32_t* mc_device_get_max_workgroup_count(mc_Device* device);
 
 /**
  * Get the name of a device.
- * @param self A device
+ * @param device A device
  * @return The name of the device
  */
-char* mc_device_get_name(mc_Device* self);
+char* mc_device_get_name(mc_Device* device);
 
 /**
  * Create an empty buffer.
@@ -160,53 +165,77 @@ mc_Buffer* mc_buffer_create(
 
 /**
  * Destroy a buffer.
- * @param self A buffer
+ * @param buffer A buffer
  */
-void mc_buffer_destroy(mc_Buffer* self);
+void mc_buffer_destroy(mc_Buffer* buffer);
 
 /**
  * Get the size of a buffer.
- * @param self A buffer
+ * @param buffer A buffer
  * @return The size of the buffer
  */
-uint64_t mc_buffer_get_size(mc_Buffer* self);
+uint64_t mc_buffer_get_size(mc_Buffer* buffer);
 
 /**
- * Reallocate a buffer. This will copy the data from the old buffer.
- * @param self A buffer
- * @param size The new size of the buffer
- * @return A new buffer on success, `NULL` on error
- */
-mc_Buffer* mc_buffer_realloc(mc_Buffer* self, uint64_t size);
-
-/**
- * Write data to a `MC_BUFFER_TYPE_HOST` or `MC_BUFFER_TYPE_TRANSFER` buffer.
- * @param self A buffer
+ * Write data to a buffer. Must be of type `MC_BUFFER_TYPE_CPU`.
+ * @param buffer A buffer
  * @param offset The offset from witch to start writing the data, in bytes
  * @param size The size of the data to write, in bytes
  * @param data A reference to the data to write
  * @return The number of bytes written, 0 on error
  */
 uint64_t mc_buffer_write(
-    mc_Buffer* self,
+    mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
     void* data
 );
 
 /**
- * Read data from a `MC_BUFFER_TYPE_HOST` or `MC_BUFFER_TYPE_TRANSFER` buffer.
- * @param self A buffer
+ * Read data from a buffer. Must be of type `MC_BUFFER_TYPE_CPU`.
+ * @param buffer A buffer
  * @param offset The offset from witch to start reading the data, in bytes
  * @param size The size of the data to read, in bytes
  * @param data A reference to the buffer to read the data into
  * @return The number of bytes read, 0 on error
  */
 uint64_t mc_buffer_read(
-    mc_Buffer* self,
+    mc_Buffer* buffer,
     uint64_t offset,
     uint64_t size,
     void* data
+);
+
+/**
+ * Create a buffer copier.
+ * @param device A device
+ * @return A new buffer copier on success, `NULL` on error
+ */
+mc_BufferCopier* mc_buffer_copier_create(mc_Device* device);
+
+/**
+ * Destroy a buffer copier.
+ * @param copier A buffer copier
+ */
+void mc_buffer_copier_destroy(mc_BufferCopier* copier);
+
+/**
+ * Copy data from one buffer to another.
+ * @param copier A buffer copier
+ * @param src The source buffer
+ * @param dst The destination buffer
+ * @param srcOffset The offset in the source buffer to start copying from
+ * @param dstOffset The offset in the destination buffer to start copying to
+ * @param size The number of bytes to copy
+ * @return The number of bytes copied, 0 on error
+ */
+uint64_t mc_buffer_copier_copy(
+    mc_BufferCopier* copier,
+    mc_Buffer* src,
+    mc_Buffer* dst,
+    uint64_t srcOffset,
+    uint64_t dstOffset,
+    uint64_t size
 );
 
 /**
@@ -226,21 +255,21 @@ mc_Program* mc_program_create(
 
 /**
  * Destroy a program.
- * @param self A program
+ * @param program A program
  */
-void mc_program_destroy(mc_Program* self);
+void mc_program_destroy(mc_Program* program);
 
 /**
  * Run a program.
- * @param self A program
+ * @param program A program
  * @param dimX The number of workgroups to run in the x direction
  * @param dimY The number of workgroups to run in the y direction
  * @param dimZ The number of workgroups to run in the z direction
- * @param ... Buffers to pass to the program
+ * @param ... Buffers / hybrid buffers to pass to the program
  * @return The time taken to run the program, in seconds
  */
-#define mc_program_run(self, dimX, dimY, dimZ, ...)                            \
-    mc_program_run__(self, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
+#define mc_program_run(program, dimX, dimY, dimZ, ...)                         \
+    mc_program_run__(program, dimX, dimY, dimZ, ##__VA_ARGS__, NULL)
 
 /**
  * Get the current time.
@@ -281,7 +310,7 @@ void mc_log_cb_simple(
  * it should not be called directly.
  */
 double mc_program_run__(
-    mc_Program* self,
+    mc_Program* program,
     uint32_t dimX,
     uint32_t dimY,
     uint32_t dimZ,

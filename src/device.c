@@ -86,7 +86,7 @@ mc_Device* mc_device_create(
 
 void mc_device_destroy(mc_Device* device) {
     if (!device) return;
-    ERROR(device, "destroying device");
+    DEBUG(device, "destroying device");
     if (device->dev) vkDestroyDevice(device->dev, NULL);
     free(device);
 }

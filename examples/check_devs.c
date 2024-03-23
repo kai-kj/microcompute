@@ -1,7 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
 
-#include "microcompute.h"
+#include "microcompute_extra.h"
+
+#define SPV_PATH "check_devs.spv"
 
 int main(void) {
     mc_Instance* instance = mc_instance_create(NULL, NULL);
@@ -19,23 +20,13 @@ int main(void) {
         printf("- testing (values should be doubled every iteration):\n");
 
         float arr[] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
-
-        mc_Buffer* buff = mc_buffer_create(dev, MC_BUFFER_TYPE_CPU, sizeof arr);
-        mc_buffer_write(buff, 0, sizeof arr, arr);
-
-        FILE* fp = fopen("check_devs.spv", "rb");
-        fseek(fp, 0, SEEK_END);
-        size_t codeLen = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        char* code = malloc(codeLen);
-        fread(code, 1, codeLen, fp);
-        fclose(fp);
-
-        mc_Program* prog = mc_program_create(dev, codeLen, code, "main");
+        mce_HBuffer* buff = mce_hybrid_buffer_create_from(dev, sizeof arr, arr);
+        
+        mc_Program* prog = mce_program_create_from_file(dev, SPV_PATH, "main");
 
         for (uint32_t j = 0; j < 3; j++) {
             mc_program_run(prog, 5, 1, 1, buff);
-            mc_buffer_read(buff, 0, sizeof arr, arr);
+            mce_hybrid_buffer_read(buff, 0, sizeof arr, arr);
 
             printf("  - iteration %d: {", j + 1);
             for (uint32_t k = 0; k < 5; k++)
@@ -45,7 +36,7 @@ int main(void) {
 
         printf("\n");
 
-        mc_buffer_destroy(buff);
+        mce_hybrid_buffer_destroy(buff);
         mc_program_destroy(prog);
     }
 
