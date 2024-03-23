@@ -17,7 +17,7 @@ int main(void) {
     for (uint32_t i = 0; i < mc_instance_get_device_count(instance); i++) {
         mc_Device* dev = devs[i];
         printf("=== %s ===\n", mc_device_get_name(dev));
-        printf("- type: %s\n", MC_DEVICE_TYPE_to_str(mc_device_get_type(dev)));
+        printf("- type: %s\n", mc_device_type_to_str(mc_device_get_type(dev)));
         printf("- testing (values should be doubled every iteration):\n");
 
         float arr[] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};

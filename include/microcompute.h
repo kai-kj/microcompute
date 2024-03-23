@@ -289,7 +289,7 @@ const char* mc_log_level_to_str(mc_LogLevel level);
  * @param type A device type
  * @return A human readable string (`NULL` terminated)
  */
-const char* MC_DEVICE_TYPE_to_str(mc_DeviceType type);
+const char* mc_device_type_to_str(mc_DeviceType type);
 
 /**
  * A simple log callback that prints to `stderr`. Use this as a base for your
