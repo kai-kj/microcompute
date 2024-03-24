@@ -29,7 +29,7 @@ static void mc_program_clear(mc_Program* program) {
 
 static void mc_program_setup(mc_Program* program) {
     mc_program_clear(program);
-    
+
     DEBUG(program, "setting up program with %d buffer(s):", program->buffCount);
 
     VkDescriptorSetLayoutBinding* descBindings
@@ -196,6 +196,42 @@ static void mc_program_setup(mc_Program* program) {
         ERROR(program, "failed to allocate command buffers");
         return;
     }
+
+    VkCommandBufferBeginInfo cmdBuffBeginInfo = {0};
+    cmdBuffBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    if (vkBeginCommandBuffer(program->cmdBuff, &cmdBuffBeginInfo)) {
+        ERROR(program, "failed to begin command buffer");
+        return;
+    }
+
+    vkCmdBindPipeline(
+        program->cmdBuff,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        program->pipeline
+    );
+
+    vkCmdBindDescriptorSets(
+        program->cmdBuff,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        program->pipelineLayout,
+        0,
+        1,
+        &program->descSet,
+        0,
+        NULL
+    );
+
+    vkCmdDispatch(
+        program->cmdBuff,
+        program->dim[0],
+        program->dim[1],
+        program->dim[2]
+    );
+    if (vkEndCommandBuffer(program->cmdBuff)) {
+        ERROR(program, "failed to end command buffer");
+        return;
+    }
 }
 
 mc_Program* mc_program_create(
@@ -211,6 +247,7 @@ mc_Program* mc_program_create(
         ._instance = device->_instance,
         .entryPoint = entryPoint,
         .device = device,
+        .dim = {1, 1, 1},
         .buffCount = -1,
         .buffs = NULL,
         .shaderModule = NULL,
@@ -273,6 +310,17 @@ double mc_program_run__(
         return -1.0;
     }
 
+    bool configChanged = false;
+
+    // check if the dimensions have been changed
+    if (dimX != program->dim[0] || dimY != program->dim[1]
+        || dimZ != program->dim[2]) {
+        program->dim[0] = dimX;
+        program->dim[1] = dimY;
+        program->dim[2] = dimZ;
+        configChanged = true;
+    }
+
     // check if the buffers have been changed
     int32_t buffCount = 0;
     va_list args;
@@ -280,7 +328,7 @@ double mc_program_run__(
     while (va_arg(args, mc_Buffer*)) buffCount++;
     va_end(args);
 
-    bool buffersChanged = buffCount != program->buffCount;
+    if (buffCount != program->buffCount) configChanged = true;
 
     if (buffCount != program->buffCount) {
         program->buffCount = buffCount;
@@ -294,44 +342,12 @@ double mc_program_run__(
         mc_Buffer* buff = va_arg(args, mc_Buffer*);
         if (buff != program->buffs[i]) {
             program->buffs[i] = buff;
-            buffersChanged = true;
+            configChanged = true;
         }
     }
     va_end(args);
 
-    if (buffersChanged) mc_program_setup(program);
-
-    VkCommandBufferBeginInfo cmdBuffBeginInfo = {0};
-    cmdBuffBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmdBuffBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    if (vkBeginCommandBuffer(program->cmdBuff, &cmdBuffBeginInfo)) {
-        ERROR(program, "failed to begin command buffer");
-        return -1.0;
-    }
-
-    vkCmdBindPipeline(
-        program->cmdBuff,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        program->pipeline
-    );
-
-    vkCmdBindDescriptorSets(
-        program->cmdBuff,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        program->pipelineLayout,
-        0,
-        1,
-        &program->descSet,
-        0,
-        NULL
-    );
-
-    vkCmdDispatch(program->cmdBuff, dimX, dimY, dimZ);
-    if (vkEndCommandBuffer(program->cmdBuff)) {
-        ERROR(program, "failed to end command buffer");
-        return -1.0;
-    }
+    if (configChanged) mc_program_setup(program);
 
     VkQueue queue;
     vkGetDeviceQueue(
