@@ -3,7 +3,7 @@
 
 #include "microcompute_extra.h"
 
-struct mce_HBuffer {
+struct mc_HBuffer {
     mc_Buffer gpuBuff; // "superclass"
     mc_Instance* _instance;
     mc_Buffer* cpuBuff;

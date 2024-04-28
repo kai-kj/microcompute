@@ -27,20 +27,20 @@ int main(void) {
     mc_Instance* instance = mc_instance_create(mc_log_cb_simple, NULL);
     mc_Device* dev = mc_instance_get_devices(instance)[0];
 
-    mce_HBuffer* optBuff = mce_hybrid_buffer_create_from(dev, sizeof opt, &opt);
-    mce_HBuffer* imgBuff = mce_hybrid_buffer_create(dev, imgSize);
-    mc_Program* prog = mce_program_create_from_file(dev, SPV_PATH, "main");
+    mc_HBuffer* optBuff = mc_hybrid_buffer_create_from(dev, sizeof opt, &opt);
+    mc_HBuffer* imgBuff = mc_hybrid_buffer_create(dev, imgSize);
+    mc_Program* prog = mc_program_create_from_file(dev, SPV_PATH, "main");
 
     double time = mc_program_run(prog, width, height, 1, optBuff, imgBuff);
     printf("compute time: %f[s]\n", time);
 
     void* img = malloc(imgSize);
-    mce_hybrid_buffer_read(imgBuff, 0, imgSize, img);
+    mc_hybrid_buffer_read(imgBuff, 0, imgSize, img);
     stbi_write_png("mandelbrot.png", width, height, 4, img, width * 4);
 
     free(img);
-    mce_hybrid_buffer_destroy(optBuff);
-    mce_hybrid_buffer_destroy(imgBuff);
+    mc_hybrid_buffer_destroy(optBuff);
+    mc_hybrid_buffer_destroy(imgBuff);
     mc_program_destroy(prog);
     mc_instance_destroy(instance);
 }

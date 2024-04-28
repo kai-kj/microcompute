@@ -27,7 +27,7 @@ typedef struct mc_Program mc_Program;
  * A hybrid buffer. This buffer is can be accessed from the CPU while still
  * being fast to access from the GPU.
  */
-typedef struct mce_HBuffer mce_HBuffer;
+typedef struct mc_HBuffer mc_HBuffer;
 
 /**
  * Create an empty hybrid buffer.
@@ -35,7 +35,7 @@ typedef struct mce_HBuffer mce_HBuffer;
  * @param size The size of the buffer
  * @return An new hybrid buffer on success, `NULL` on error
  */
-mce_HBuffer* mce_hybrid_buffer_create(mc_Device* device, uint64_t size);
+mc_HBuffer* mc_hybrid_buffer_create(mc_Device* device, uint64_t size);
 
 /**
  * Create an hybrid buffer from some data.
@@ -44,7 +44,7 @@ mce_HBuffer* mce_hybrid_buffer_create(mc_Device* device, uint64_t size);
  * @param data The data to put in the buffer
  * @return An new hybrid buffer on success, `NULL` on error
  */
-mce_HBuffer* mce_hybrid_buffer_create_from(
+mc_HBuffer* mc_hybrid_buffer_create_from(
     mc_Device* device,
     uint64_t size,
     void* data
@@ -54,14 +54,14 @@ mce_HBuffer* mce_hybrid_buffer_create_from(
  * Destroy a hybrid buffer.
  * @param hBuffer A hybrid buffer
  */
-void mce_hybrid_buffer_destroy(mce_HBuffer* hBuffer);
+void mc_hybrid_buffer_destroy(mc_HBuffer* hBuffer);
 
 /**
  * Get the size of a hybrid buffer.
  * @param hBuffer A hybrid buffer
  * @return The size of the hybrid buffer
  */
-uint64_t mce_hybrid_buffer_get_size(mce_HBuffer* hBuffer);
+uint64_t mc_hybrid_buffer_get_size(mc_HBuffer* hBuffer);
 
 /**
  * Write data to a hybrid buffer.
@@ -71,8 +71,8 @@ uint64_t mce_hybrid_buffer_get_size(mce_HBuffer* hBuffer);
  * @param data A reference to the data to write
  * @return The number of bytes written, 0 on error
  */
-uint64_t mce_hybrid_buffer_write(
-    mce_HBuffer* hBuffer,
+uint64_t mc_hybrid_buffer_write(
+    mc_HBuffer* hBuffer,
     uint64_t offset,
     uint64_t size,
     void* data
@@ -86,8 +86,8 @@ uint64_t mce_hybrid_buffer_write(
  * @param data A reference to the buffer to read the data into
  * @return The number of bytes read, 0 on error
  */
-uint64_t mce_hybrid_buffer_read(
-    mce_HBuffer* hBuffer,
+uint64_t mc_hybrid_buffer_read(
+    mc_HBuffer* hBuffer,
     uint64_t offset,
     uint64_t size,
     void* data
@@ -101,7 +101,7 @@ uint64_t mce_hybrid_buffer_read(
  * @param data The data to put in the buffer
  * @return An new buffer on success, `NULL` on error
  */
-mc_Buffer* mce_buffer_create_from(
+mc_Buffer* mc_buffer_create_from(
     mc_Device* device,
     mc_BufferType type,
     uint64_t size,
@@ -116,7 +116,7 @@ mc_Buffer* mce_buffer_create_from(
  * @param size The new size of the buffer
  * @return A new buffer on success, `NULL` on error
  */
-mc_Buffer* mce_buffer_realloc(mc_Buffer* buffer, uint64_t size);
+mc_Buffer* mc_buffer_realloc(mc_Buffer* buffer, uint64_t size);
 
 /**
  * Reallocate a hybrid buffer. This will copy the data from the old buffer.
@@ -124,7 +124,7 @@ mc_Buffer* mce_buffer_realloc(mc_Buffer* buffer, uint64_t size);
  * @param size The new size of the buffer
  * @return A new buffer on success, `NULL` on error
  */
-mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* hBuffer, uint64_t size);
+mc_HBuffer* mc_hybrid_buffer_realloc(mc_HBuffer* hBuffer, uint64_t size);
 
 /**
  * Create a program from some SPIRV code.
@@ -133,7 +133,7 @@ mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* hBuffer, uint64_t size);
  * @param entryPoint The entry point name, generally `"main"`
  * @return A new program on success, `NULL` on error
  */
-mc_Program* mce_program_create_from_file(
+mc_Program* mc_program_create_from_file(
     mc_Device* device,
     const char* filename,
     const char* entryPoint

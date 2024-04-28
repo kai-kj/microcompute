@@ -6,10 +6,10 @@
 #include "hybrid_buffer.h"
 #include "log.h"
 
-mce_HBuffer* mce_hybrid_buffer_create(mc_Device* device, uint64_t size) {
-    mce_HBuffer* hBuffer = malloc(sizeof *hBuffer);
+mc_HBuffer* mc_hybrid_buffer_create(mc_Device* device, uint64_t size) {
+    mc_HBuffer* hBuffer = malloc(sizeof *hBuffer);
 
-    *hBuffer = (mce_HBuffer){
+    *hBuffer = (mc_HBuffer){
         ._instance = device->_instance,
         .gpuBuff = {0},
         .cpuBuff = NULL,
@@ -20,7 +20,7 @@ mce_HBuffer* mce_hybrid_buffer_create(mc_Device* device, uint64_t size) {
 
     mc_Buffer* gpuBuffer = mc_buffer_create(device, MC_BUFFER_TYPE_GPU, size);
     if (!gpuBuffer) {
-        mce_hybrid_buffer_destroy(hBuffer);
+        mc_hybrid_buffer_destroy(hBuffer);
         return NULL;
     }
 
@@ -29,31 +29,31 @@ mce_HBuffer* mce_hybrid_buffer_create(mc_Device* device, uint64_t size) {
 
     hBuffer->cpuBuff = mc_buffer_create(device, MC_BUFFER_TYPE_CPU, size);
     if (!hBuffer->cpuBuff) {
-        mce_hybrid_buffer_destroy(hBuffer);
+        mc_hybrid_buffer_destroy(hBuffer);
         return NULL;
     }
 
     hBuffer->copier = mc_buffer_copier_create(device);
     if (!hBuffer->copier) {
-        mce_hybrid_buffer_destroy(hBuffer);
+        mc_hybrid_buffer_destroy(hBuffer);
         return NULL;
     }
 
     return hBuffer;
 }
 
-mce_HBuffer* mce_hybrid_buffer_create_from(
+mc_HBuffer* mc_hybrid_buffer_create_from(
     mc_Device* device,
     uint64_t size,
     void* data
 ) {
-    struct mce_HBuffer* hBuffer = mce_hybrid_buffer_create(device, size);
+    struct mc_HBuffer* hBuffer = mc_hybrid_buffer_create(device, size);
     if (!hBuffer) return NULL;
-    mce_hybrid_buffer_write(hBuffer, 0, size, data);
+    mc_hybrid_buffer_write(hBuffer, 0, size, data);
     return hBuffer;
 }
 
-void mce_hybrid_buffer_destroy(mce_HBuffer* hBuffer) {
+void mc_hybrid_buffer_destroy(mc_HBuffer* hBuffer) {
     if (!hBuffer) return;
     DEBUG(hBuffer, "destroying hybrid buffer");
 
@@ -67,12 +67,12 @@ void mce_hybrid_buffer_destroy(mce_HBuffer* hBuffer) {
     free(hBuffer);
 }
 
-uint64_t mce_hybrid_buffer_get_size(mce_HBuffer* hBuffer) {
+uint64_t mc_hybrid_buffer_get_size(mc_HBuffer* hBuffer) {
     return mc_buffer_get_size(&hBuffer->gpuBuff);
 }
 
-uint64_t mce_hybrid_buffer_write(
-    mce_HBuffer* hBuffer,
+uint64_t mc_hybrid_buffer_write(
+    mc_HBuffer* hBuffer,
     uint64_t offset,
     uint64_t size,
     void* data
@@ -93,8 +93,8 @@ uint64_t mce_hybrid_buffer_write(
     );
 }
 
-uint64_t mce_hybrid_buffer_read(
-    mce_HBuffer* hBuffer,
+uint64_t mc_hybrid_buffer_read(
+    mc_HBuffer* hBuffer,
     uint64_t offset,
     uint64_t size,
     void* data

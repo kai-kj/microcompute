@@ -21,13 +21,13 @@ int main(void) {
         printf("- testing (values should be doubled every iteration):\n");
 
         float arr[] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
-        mce_HBuffer* buff = mce_hybrid_buffer_create_from(dev, sizeof arr, arr);
+        mc_HBuffer* buff = mc_hybrid_buffer_create_from(dev, sizeof arr, arr);
 
-        mc_Program* prog = mce_program_create_from_file(dev, SPV_PATH, "main");
+        mc_Program* prog = mc_program_create_from_file(dev, SPV_PATH, "main");
 
         for (uint32_t j = 0; j < 3; j++) {
             mc_program_run(prog, 5, 1, 1, buff);
-            mce_hybrid_buffer_read(buff, 0, sizeof arr, arr);
+            mc_hybrid_buffer_read(buff, 0, sizeof arr, arr);
 
             printf("  - iteration %d: {", j + 1);
             for (uint32_t k = 0; k < 5; k++)
@@ -37,7 +37,7 @@ int main(void) {
 
         printf("\n");
 
-        mce_hybrid_buffer_destroy(buff);
+        mc_hybrid_buffer_destroy(buff);
         mc_program_destroy(prog);
     }
 

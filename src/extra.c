@@ -7,7 +7,7 @@
 #include "log.h"
 #include "microcompute_extra.h"
 
-mc_Buffer* mce_buffer_create_from(
+mc_Buffer* mc_buffer_create_from(
     mc_Device* device,
     mc_BufferType type,
     uint64_t size,
@@ -19,7 +19,7 @@ mc_Buffer* mce_buffer_create_from(
     return buffer;
 }
 
-mc_Buffer* mce_buffer_realloc(mc_Buffer* buffer, uint64_t size) {
+mc_Buffer* mc_buffer_realloc(mc_Buffer* buffer, uint64_t size) {
     if (!buffer) return NULL;
     DEBUG(buffer, "reallocating buffer: %ld -> %ld", buffer->size, size);
 
@@ -37,7 +37,7 @@ mc_Buffer* mce_buffer_realloc(mc_Buffer* buffer, uint64_t size) {
     return new;
 }
 
-mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* old, uint64_t size) {
+mc_HBuffer* mc_hybrid_buffer_realloc(mc_HBuffer* old, uint64_t size) {
     if (!old) return NULL;
     DEBUG(
         old,
@@ -46,7 +46,7 @@ mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* old, uint64_t size) {
         size
     );
 
-    mce_HBuffer* new = mce_hybrid_buffer_create(old->gpuBuff.device, size);
+    mc_HBuffer* new = mc_hybrid_buffer_create(old->gpuBuff.device, size);
     if (!new) return NULL;
 
     uint64_t minSize = size < old->gpuBuff.size ? size : old->gpuBuff.size;
@@ -59,11 +59,11 @@ mce_HBuffer* mce_hybrid_buffer_realloc(mce_HBuffer* old, uint64_t size) {
         minSize
     );
 
-    mce_hybrid_buffer_destroy(old);
+    mc_hybrid_buffer_destroy(old);
     return new;
 }
 
-mc_Program* mce_program_create_from_file(
+mc_Program* mc_program_create_from_file(
     mc_Device* device,
     const char* filename,
     const char* entryPoint
