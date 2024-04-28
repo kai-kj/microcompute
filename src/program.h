@@ -9,6 +9,7 @@ struct mc_Program {
     mc_Instance* _instance;
     const char* entryPoint;
     mc_Device* device;
+    uint32_t dim[3];
     int32_t buffCount;
     mc_Buffer** buffs;
     VkShaderModule shaderModule;

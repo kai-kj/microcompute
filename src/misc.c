@@ -22,7 +22,7 @@ const char* mc_log_level_to_str(mc_LogLevel level) {
     }
 }
 
-const char* MC_DEVICE_TYPE_to_str(mc_DeviceType type) {
+const char* mc_device_type_to_str(mc_DeviceType type) {
     switch (type) {
         case MC_DEVICE_TYPE_DGPU: return "MC_DEVICE_TYPE_DGPU";
         case MC_DEVICE_TYPE_IGPU: return "MC_DEVICE_TYPE_IGPU";

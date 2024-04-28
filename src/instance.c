@@ -73,6 +73,7 @@ mc_Instance* mc_instance_create(mc_log_fn* log_fn, void* logArg) {
 
     if (vkCreateInstance(&instanceI, NULL, &instance->instance)) {
         ERROR(instance, "failed to create vulkan instance");
+        ERROR(instance, "make sure vulkan validation layers are installed");
         mc_instance_destroy(instance);
         return NULL;
     }
