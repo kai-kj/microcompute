@@ -41,6 +41,14 @@ typedef enum mc_BufferType {
 } mc_BufferType;
 
 /**
+ * Options to pass to mc_program_code_create_*.
+ */
+typedef struct mc_CompileDefinition {
+    char* key;   ///< The key/name
+    char* value; ///< The value
+} mc_CompileDefinition;
+
+/**
  * The log callback type.
  * @param arg The value passed to `logArg` in `mc_instance_create()`
  * @param lvl A `mc_LogLevel` indicating the severity of the message
@@ -79,6 +87,11 @@ typedef struct mc_Buffer mc_Buffer;
  * A buffer copier.
  */
 typedef struct mc_BufferCopier mc_BufferCopier;
+
+/**
+ * Code that can be used to create an mc_Program.
+ */
+typedef struct mc_ProgramCode mc_ProgramCode;
 
 /**
  * A program.
@@ -239,19 +252,46 @@ uint64_t mc_buffer_copier_copy(
 );
 
 /**
+ * Create some program code from SPIR-V code.
+ * @param instance A instance
+ * @param size The size of the code
+ * @param code The code contens, copied internaly
+ * @return  New program code on success, `NULL` on error
+ */
+mc_ProgramCode* mc_program_code_create_from_spirv(
+    mc_Instance* instance,
+    size_t size,
+    const char* code
+);
+
+/**
+ * Create some program code from GLSL code.
+ * @param instance A instance
+ * @param name The name of the code (used in compile error messages)
+ * @param code The code contens, copied internaly
+ * @param entry The entry point (the name of the "main" function
+ * @param ... Any compile-time definitions (#define's)
+ * @return  New program code on success, `NULL` on error
+ */
+#define mc_program_code_create_from_glsl(instance, name, code, entry, ...)     \
+    mc_program_code_create_from_glsl__(                                        \
+        instance,                                                              \
+        name,                                                                  \
+        code,                                                                  \
+        entry,                                                                 \
+        ##__VA_ARGS__,                                                         \
+        (mc_CompileDefinition){NULL, NULL}                                     \
+    )
+
+void mc_program_code_destroy(mc_ProgramCode* programCode);
+
+/**
  * Create a program from some SPIRV code.
  * @param device A device
- * @param codeSize The size of the shader code
  * @param code The shader code
- * @param entryPoint The entry point name, generally `"main"`
  * @return A new program on success, `NULL` on error
  */
-mc_Program* mc_program_create(
-    mc_Device* device,
-    size_t codeSize,
-    const char* code,
-    const char* entryPoint
-);
+mc_Program* mc_program_create(mc_Device* device, mc_ProgramCode* code);
 
 /**
  * Destroy a program.
@@ -306,8 +346,18 @@ void mc_log_cb_simple(
 );
 
 /**
- * Run a program. This is the internal implementation of `mc_program_run()`, so
- * it should not be called directly.
+ * For internal use
+ */
+mc_ProgramCode* mc_program_code_create_from_glsl__(
+    mc_Instance* instance,
+    const char* name,
+    const char* code,
+    const char* entry,
+    ...
+);
+
+/**
+ * For internal use
  */
 double mc_program_run__(
     mc_Program* program,

@@ -7,7 +7,7 @@
 
 static VkBool32 mc_vk_log_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-    __attribute__((unused)) VkDebugUtilsMessageTypeFlagsEXT type,
+    VkDebugUtilsMessageTypeFlagsEXT type,
     const VkDebugUtilsMessengerCallbackDataEXT* msg,
     void* arg
 ) {

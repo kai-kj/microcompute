@@ -6,7 +6,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#define SPV_PATH "mandelbrot.spv"
+#define SHADER_PATH "../examples/mandelbrot.glsl"
 
 struct Opt {
     float center[2];
@@ -29,7 +29,15 @@ int main(void) {
 
     mc_HBuffer* optBuff = mc_hybrid_buffer_create_from(dev, sizeof opt, &opt);
     mc_HBuffer* imgBuff = mc_hybrid_buffer_create(dev, imgSize);
-    mc_Program* prog = mc_program_create_from_file(dev, SPV_PATH, "main");
+
+    char* programSource = read_file(SHADER_PATH, NULL);
+    mc_ProgramCode* programCode = mc_program_code_create_from_glsl(
+        instance,
+        SHADER_PATH,
+        programSource,
+        "main"
+    );
+    mc_Program* prog = mc_program_create(dev, programCode);
 
     double time = mc_program_run(prog, width, height, 1, optBuff, imgBuff);
     printf("compute time: %f[s]\n", time);
@@ -42,5 +50,7 @@ int main(void) {
     mc_hybrid_buffer_destroy(optBuff);
     mc_hybrid_buffer_destroy(imgBuff);
     mc_program_destroy(prog);
+    mc_program_code_destroy(programCode);
+    free(programSource);
     mc_instance_destroy(instance);
 }

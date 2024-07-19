@@ -63,26 +63,19 @@ mc_HBuffer* mc_hybrid_buffer_realloc(mc_HBuffer* old, uint64_t size) {
     return new;
 }
 
-mc_Program* mc_program_create_from_file(
-    mc_Device* device,
-    const char* filename,
-    const char* entryPoint
-) {
+char* read_file(const char* filename, size_t* size) {
     FILE* fp = fopen(filename, "rb");
-    if (!fp) {
-        ERROR(device, "could not open file %s", filename);
-        return NULL;
-    }
 
     fseek(fp, 0, SEEK_END);
-    size_t codeLen = ftell(fp);
+    size_t dataSize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
-    char* code = malloc(codeLen);
-    fread(code, 1, codeLen, fp);
+    char* data = malloc(dataSize + 1);
+    fread(data, 1, dataSize, fp);
     fclose(fp);
 
-    mc_Program* program = mc_program_create(device, codeLen, code, entryPoint);
-    free(code);
+    data[dataSize] = '\0';
 
-    return program;
+    if (size) *size = dataSize;
+
+    return data;
 }

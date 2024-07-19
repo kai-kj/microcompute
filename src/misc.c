@@ -2,15 +2,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 
 #include "microcompute.h"
+
+#ifdef _WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+double mc_get_time() {
+    SYSTEMTIME st;
+    GetSystemTime(&st);
+
+    FILETIME ft;
+    SystemTimeToFileTime(&st, &ft);
+
+    uint64_t sec
+        = (uint64_t)ft.dwLowDateTime + ((uint64_t)ft.dwHighDateTime << 32);
+
+    uint64_t usec = st.wMilliseconds;
+
+    return (double)(1000000 * sec + usec) / 1000000.0;
+}
+
+#else
+
+#include <sys/time.h>
 
 double mc_get_time() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (double)(1000000 * tv.tv_sec + tv.tv_usec) / 1000000.0;
 }
+
+#endif
 
 const char* mc_log_level_to_str(mc_LogLevel level) {
     switch (level) {

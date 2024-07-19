@@ -127,16 +127,11 @@ mc_Buffer* mc_buffer_realloc(mc_Buffer* buffer, uint64_t size);
 mc_HBuffer* mc_hybrid_buffer_realloc(mc_HBuffer* hBuffer, uint64_t size);
 
 /**
- * Create a program from some SPIRV code.
- * @param device A device
- * @param filename The name of the file containing the SPIRV code
- * @param entryPoint The entry point name, generally `"main"`
- * @return A new program on success, `NULL` on error
+ * Read text/data from a file
+ * @param filename The name of the file to read
+ * @param size Returns the size of the file, can be set to `NULL` to ignore
+ * @return The file contents, `NULL` on error
  */
-mc_Program* mc_program_create_from_file(
-    mc_Device* device,
-    const char* filename,
-    const char* entryPoint
-);
+char* read_file(const char* filename, size_t* size);
 
 #endif // MICROCOMPUTE_EXTRA_H

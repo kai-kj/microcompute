@@ -1,13 +1,24 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "microcompute.h"
 #include "microcompute_extra.h"
 
-#define SPV_PATH "check_devs.spv"
+#define SHADER_PATH "../examples/check_devs.glsl"
 
 int main(void) {
     mc_Instance* instance = mc_instance_create(NULL, NULL);
     mc_Device** devs = mc_instance_get_devices(instance);
+
+    char* programSource = read_file(SHADER_PATH, NULL);
+    mc_ProgramCode* programCode = mc_program_code_create_from_glsl(
+        instance,
+        SHADER_PATH,
+        programSource,
+        "main"
+    );
+
+    printf("\nprogram source code:\n\n```\n%s\n```\n", programSource);
 
     printf(
         "\n%d supported device(s) found\n\n",
@@ -23,10 +34,10 @@ int main(void) {
         float arr[] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
         mc_HBuffer* buff = mc_hybrid_buffer_create_from(dev, sizeof arr, arr);
 
-        mc_Program* prog = mc_program_create_from_file(dev, SPV_PATH, "main");
+        mc_Program* program = mc_program_create(dev, programCode);
 
         for (uint32_t j = 0; j < 3; j++) {
-            mc_program_run(prog, 5, 1, 1, buff);
+            mc_program_run(program, 5, 1, 1, buff);
             mc_hybrid_buffer_read(buff, 0, sizeof arr, arr);
 
             printf("  - iteration %d: {", j + 1);
@@ -38,8 +49,10 @@ int main(void) {
         printf("\n");
 
         mc_hybrid_buffer_destroy(buff);
-        mc_program_destroy(prog);
+        mc_program_destroy(program);
     }
 
+    mc_program_code_destroy(programCode);
+    free(programSource);
     mc_instance_destroy(instance);
 }

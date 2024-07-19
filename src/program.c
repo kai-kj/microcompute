@@ -8,6 +8,8 @@
 #include "log.h"
 #include "program.h"
 
+#include <program_code.h>
+
 static void mc_program_clear(mc_Program* program) {
     DEBUG(program, "clearing program");
     VkDevice dev = program->device->dev;
@@ -234,18 +236,14 @@ static void mc_program_setup(mc_Program* program) {
     }
 }
 
-mc_Program* mc_program_create(
-    mc_Device* device,
-    size_t codeSize,
-    const char* code,
-    const char* entryPoint
-) {
+mc_Program* mc_program_create(mc_Device* device, mc_ProgramCode* code) {
     if (!device) return NULL;
+    if (!code) return NULL;
 
     mc_Program* program = malloc(sizeof *program);
     *program = (mc_Program){
         ._instance = device->_instance,
-        .entryPoint = entryPoint,
+        .entryPoint = code->entry,
         .device = device,
         .dim = {1, 1, 1},
         .buffCount = -1,
@@ -260,12 +258,10 @@ mc_Program* mc_program_create(
         .cmdBuff = NULL,
     };
 
-    DEBUG(program, "initializing program, entry point: %s", entryPoint);
-
     VkShaderModuleCreateInfo moduleInfo = {0};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleInfo.codeSize = codeSize;
-    moduleInfo.pCode = (const uint32_t*)code;
+    moduleInfo.codeSize = code->size;
+    moduleInfo.pCode = (const uint32_t*)code->code;
 
     if (vkCreateShaderModule(
             program->device->dev,
