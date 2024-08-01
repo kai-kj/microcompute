@@ -1,25 +1,51 @@
 BasedOnStyle: LLVM
-ColumnLimit: 80
+ColumnLimit: 100
+
 UseTab: Never
 IndentWidth: 4
 TabWidth: 4
+ContinuationIndentWidth: 4
+
 IndentCaseLabels: true
+NamespaceIndentation: All
+IndentAccessModifiers: true
 
 AllowAllArgumentsOnNextLine: false
 AllowAllParametersOfDeclarationOnNextLine: false
-
-AllowShortBlocksOnASingleLine: Never
+AllowShortBlocksOnASingleLine: Always
 AllowShortCaseLabelsOnASingleLine: true
-AllowShortEnumsOnASingleLine: false
+AllowShortEnumsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: AllIfsAndElse
-AllowShortLoopsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
 
 BinPackArguments: false
 BinPackParameters: false
+PackConstructorInitializers: CurrentLine
 
+BreakStringLiterals: false
 BreakBeforeBinaryOperators: All
 BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: AfterColon
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
 
 PointerAlignment: Left
 ReferenceAlignment: Right
